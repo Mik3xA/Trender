@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const mainController = require('../controladores/main.controller');
 
-router.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Trender server is running' });
-});
+router.get('/health', mainController.healthCheck);
 
 module.exports = router;
