@@ -11,7 +11,7 @@ function crearTransporter() {
   const pass = process.env.SMTP_PASS;
 
   if (!host || !user || !pass) {
-    console.warn('[Email] Configuración SMTP incompleta. Usando transporte de prueba (ethereal).');
+    console.warn('[Email] Configuración SMTP incompleta. Se simulará el envío.');
     return null;
   }
 
@@ -26,16 +26,16 @@ function crearTransporter() {
 }
 
 async function enviarAlerta(mensaje, asunto = 'Nuevo Webhook Recibido') {
-  const tx = crearTransporter();
-
-  if (!tx) {
-    console.log(`[Email - MODO TEST] Asunto: ${asunto}`);
-    console.log(`[Email - MODO TEST] Mensaje: ${mensaje}`);
-    return { success: true, testMode: true, messageId: 'test-' + Date.now() };
-  }
-
   const from = process.env.EMAIL_FROM || 'Trender Webhooks <noreply@trender.local>';
   const to = process.env.EMAIL_TO || 'admin@trender.local';
+
+  const esProduccion = process.env.NODE_ENV === 'production';
+  const tx = esProduccion ? crearTransporter() : null;
+
+  if (!esProduccion || !tx) {
+    console.log(`[Email - MODO SIMULADO] Asunto: ${asunto} | Destinatario: ${to}`);
+    return { status: 'simulated', success: true };
+  }
 
   try {
     const info = await tx.sendMail({
