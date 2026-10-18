@@ -71,6 +71,46 @@ interface RigState {
 
 const SIDES = ['izq', 'der'] as const;
 
+interface MarqueeItem {
+  image: string;
+  size: string;
+  label: string;
+}
+
+// Catálogo del carrusel: se duplica para crear el bucle continuo
+const MARQUEE_ITEMS: MarqueeItem[] = [
+  {
+    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=600&q=80',
+    size: 'Ajuste 98% preciso',
+    label: 'Chaqueta Oversize'
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=600&q=80',
+    size: 'S',
+    label: 'Vestido Midi'
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=600&q=80',
+    size: 'M',
+    label: 'Blazer Entallado'
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80',
+    size: 'L',
+    label: 'Camisa de Lino'
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=600&q=80',
+    size: 'XL',
+    label: 'Pantalón Wide Leg'
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=600&q=80',
+    size: 'Ajuste 97% preciso',
+    label: 'Punto Grueso'
+  }
+];
+
 @Component({
   selector: 'app-avatar-setup',
   standalone: true,
@@ -92,6 +132,12 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
   modelReady = false;
   alertaValidacion: string | null = null;
 
+  // Bloqueo de funciones avanzadas: requieren cuenta
+  mostrarModalAuth = false;
+  tipoAccionAuth: 'escaneo' | 'subir_modelo' | '' = '';
+
+  readonly marqueeItems: MarqueeItem[] = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
@@ -99,6 +145,7 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
   private rootGroup!: THREE.Group;
   private modelGroup!: THREE.Group;
   private resizeObserver?: ResizeObserver;
+  private viewport?: HTMLElement;
 
   private animationId = 0;
   private webglReady = false;
@@ -118,11 +165,18 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
 
   private readonly target: RigState = { ...this.current };
 
-  // Maniquí de estudio: resina blanca perla
+  // Maniquí de estudio: porcelana mate (arcilla)
   private readonly mannequinMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf8fafc,
-    roughness: 0.3,
-    metalness: 0.1
+    color: 0xe2e8f0,
+    roughness: 0.6,
+    metalness: 0.05
+  });
+
+  // Ropa interior sobria: azul marino mate
+  private readonly underwearMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.7,
+    metalness: 0.05
   });
 
   constructor(
@@ -141,15 +195,19 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
         console.error('No se pudo inicializar WebGL:', error);
       }
     });
+
+    this.setupResize();
   }
 
   ngOnDestroy(): void {
     cancelAnimationFrame(this.animationId);
     this.resizeObserver?.disconnect();
+    window.removeEventListener('resize', this.onWindowResize);
     this.controls?.dispose();
     this.disposeSceneResources();
     this.renderer?.dispose();
     this.mannequinMaterial.dispose();
+    this.underwearMaterial.dispose();
   }
 
   // ---------- Entrada del formulario ----------
@@ -175,6 +233,18 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     this.genero = value;
     this.buildMannequin();
     this.syncModel();
+  }
+
+  // ---------- Bloqueo de cuenta (funciones avanzadas) ----------
+
+  requerirCuenta(accion: 'escaneo' | 'subir_modelo'): void {
+    this.tipoAccionAuth = accion;
+    this.mostrarModalAuth = true;
+  }
+
+  cerrarModalAuth(): void {
+    this.mostrarModalAuth = false;
+    this.tipoAccionAuth = '';
   }
 
   // ---------- Validación biológica ----------
@@ -265,7 +335,9 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
   private initThree(): void {
     const canvas = this.rendererCanvas.nativeElement;
     const host = canvas.parentElement ?? canvas;
+    this.viewport = host;
 
+    // Fondo transparente: el degradado de estudio del contenedor se ve detrás del maniquí
     this.scene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
@@ -303,86 +375,53 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     this.addStage();
 
     this.webglReady = true;
-    this.syncModel();
+    this.updateModelProportions(
+      this.estatura ?? BASE_HEIGHT_CM,
+      this.peso ?? BASE_WEIGHT_KG,
+      this.complexion,
+      this.genero
+    );
     this.buildMannequin();
 
     this.updateSize(host);
-    this.observeResize(host);
 
     this.lastFrameTime = performance.now();
     this.animate();
   }
 
   private addLights(): void {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    // Iluminación neutra de estudio fotográfico
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
-    keyLight.position.set(3, 4.5, 4);
+    // Luz principal desde arriba a la derecha con sombras suaves
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    keyLight.position.set(3, 8, 5);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(1024, 1024);
     keyLight.shadow.camera.near = 0.5;
-    keyLight.shadow.camera.far = 14;
-    keyLight.shadow.camera.left = -2.5;
-    keyLight.shadow.camera.right = 2.5;
-    keyLight.shadow.camera.top = 3;
-    keyLight.shadow.camera.bottom = -1;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.camera.left = -4;
+    keyLight.shadow.camera.right = 4;
+    keyLight.shadow.camera.top = 5;
+    keyLight.shadow.camera.bottom = -2;
     keyLight.shadow.bias = -0.0004;
     this.scene.add(keyLight);
 
-    // Iluminación lateral para resaltar las curvas de cilindros y esferas
-    const sideLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    sideLight.position.set(4.5, 1.5, 0.6);
-    this.scene.add(sideLight);
-
-    const sideLightFill = new THREE.DirectionalLight(0xbfe6ff, 0.8);
-    sideLightFill.position.set(-4.5, 1.5, 0.6);
-    this.scene.add(sideLightFill);
-
-    const rimLight = new THREE.DirectionalLight(0x22d3ee, 1.2);
-    rimLight.position.set(-2, 3, -4);
-    this.scene.add(rimLight);
+    // Luz de relleno neutra desde la izquierda
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    fillLight.position.set(-3, 4, -2);
+    this.scene.add(fillLight);
   }
 
   private addStage(): void {
+    // Plano de sombra de estudio que integra el maniquí con el fondo
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(6, 6),
-      new THREE.ShadowMaterial({ opacity: 0.28 })
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 0.15 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
-
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.42, 0.5, 64),
-      new THREE.MeshBasicMaterial({
-        color: 0x22d3ee,
-        transparent: true,
-        opacity: 0.7,
-        side: THREE.DoubleSide
-      })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.003;
-    this.scene.add(ring);
-
-    const disc = new THREE.Mesh(
-      new THREE.CircleGeometry(0.44, 64),
-      new THREE.MeshBasicMaterial({
-        color: 0x22d3ee,
-        transparent: true,
-        opacity: 0.08,
-        side: THREE.DoubleSide
-      })
-    );
-    disc.rotation.x = -Math.PI / 2;
-    disc.position.y = 0.002;
-    this.scene.add(disc);
-
-    const grid = new THREE.GridHelper(6, 24, 0x164e63, 0x0e3a47);
-    const gridMaterial = grid.material as THREE.LineBasicMaterial;
-    gridMaterial.transparent = true;
-    gridMaterial.opacity = 0.25;
-    this.scene.add(grid);
   }
 
   // ---------- Generación procedural del maniquí ----------
@@ -416,9 +455,10 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     x: number,
     y: number,
     z: number,
-    scale?: THREE.Vector3
+    scale?: THREE.Vector3,
+    material: THREE.Material = this.mannequinMaterial
   ): THREE.Mesh {
-    const mesh = new THREE.Mesh(geometry, this.mannequinMaterial);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.name = name;
     mesh.position.set(x, y, z);
     if (scale) {
@@ -436,6 +476,21 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     const skull = new THREE.SphereGeometry(0.105, 32, 24);
     group.add(this.part(skull, 'cabeza', 0, 1.58, 0, new THREE.Vector3(0.92, 1.16, 0.96)));
     group.add(this.part(new THREE.CylinderGeometry(0.05, 0.055, 0.11, 20), 'cuello', 0, 1.47, 0));
+  }
+
+  // Ropa interior sobria que cubre la cadera (se deforma con la pelvis)
+  private addUnderwear(group: THREE.Group, pelvisRadius: number): void {
+    group.add(
+      this.part(
+        new THREE.CylinderGeometry(pelvisRadius, pelvisRadius * 0.92, 0.2, 24),
+        'ropa_interior',
+        0,
+        0.9,
+        0,
+        undefined,
+        this.underwearMaterial
+      )
+    );
   }
 
   private buildLimbs(
@@ -523,6 +578,7 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     // Espalda en V: torso ancho arriba, cintura/ pelvis estrecha
     group.add(this.part(new THREE.CylinderGeometry(0.21, 0.135, 0.4, 28), 'torso', 0, 1.2, 0));
     group.add(this.part(new THREE.CylinderGeometry(0.115, 0.1, 0.16, 24), 'pelvis', 0, 0.92, 0));
+    this.addUnderwear(group, 0.14);
 
     this.buildHeadAndNeck(group);
     this.buildLimbs(
@@ -541,6 +597,7 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     // Hombros estrechos y pelvis más ancha que el torso
     group.add(this.part(new THREE.CylinderGeometry(0.155, 0.115, 0.4, 28), 'torso', 0, 1.2, 0));
     group.add(this.part(new THREE.CylinderGeometry(0.15, 0.135, 0.16, 24), 'pelvis', 0, 0.92, 0));
+    this.addUnderwear(group, 0.17);
 
     // Busto: dos semi-esferas en la zona pectoral superior
     for (const side of SIDES) {
@@ -580,6 +637,7 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     // Torso y pelvis (grasa / anchura)
     this.deform('torso', t.torsoXZ, 1, t.torsoXZ, 1);
     this.deform('pelvis', t.pelvisXZ, 1, t.pelvisXZ, 1);
+    this.deform('ropa_interior', t.pelvisXZ, 1, t.pelvisXZ, 1);
     this.deform('busto_izq', t.torsoXZ, 1, t.torsoXZ, t.torsoXZ);
     this.deform('busto_der', t.torsoXZ, 1, t.torsoXZ, t.torsoXZ);
 
@@ -665,10 +723,24 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
 
   // ---------- Resize ----------
 
-  private observeResize(host: HTMLElement): void {
+  // Observa el contenedor del visor y la ventana para reencuadrar el render
+  private setupResize(): void {
+    const host = this.viewport ?? this.rendererCanvas?.nativeElement.parentElement;
+    if (!host || !this.renderer || !this.camera) {
+      return;
+    }
+
     this.resizeObserver = new ResizeObserver(() => this.updateSize(host));
     this.resizeObserver.observe(host);
+    window.addEventListener('resize', this.onWindowResize);
+    this.updateSize(host);
   }
+
+  private onWindowResize = (): void => {
+    if (this.viewport) {
+      this.updateSize(this.viewport);
+    }
+  };
 
   private updateSize(host: HTMLElement): void {
     if (!this.renderer || !this.camera) {
@@ -701,7 +773,7 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
       const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
       if (Array.isArray(material)) {
         material.forEach((entry) => entry.dispose());
-      } else if (material && material !== this.mannequinMaterial) {
+      } else if (material && material !== this.mannequinMaterial && material !== this.underwearMaterial) {
         material.dispose();
       }
     });
