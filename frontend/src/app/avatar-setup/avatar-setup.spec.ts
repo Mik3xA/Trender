@@ -1,21 +1,17 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { AvatarSetup } from './avatar-setup';
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { AvatarSetupComponent } from './avatar-setup';
 
-describe('AvatarSetup', () => {
-  let component: AvatarSetup;
-  let fixture: ComponentFixture<AvatarSetup>;
-
+describe('AvatarSetupComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AvatarSetup],
+      imports: [AvatarSetupComponent],
+      providers: [provideHttpClient()],
     }).compileComponents();
-
-    fixture = TestBed.createComponent(AvatarSetup);
-    component = fixture.componentInstance;
-    await fixture.whenStable();
   });
 
   it('should create', () => {
-    expect(component).toBeTruthy();
+    const fixture = TestBed.createComponent(AvatarSetupComponent);
+    expect(fixture.componentInstance).toBeTruthy();
   });
 });

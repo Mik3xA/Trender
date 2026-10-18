@@ -29,6 +29,23 @@ function validarPayload(datos) {
     errores.push('Campo "currency" debe ser string');
   }
 
+  if (datos.avatar_data !== undefined) {
+    const avatar = datos.avatar_data;
+    if (!avatar || typeof avatar !== 'object') {
+      errores.push('Campo "avatar_data" debe ser un objeto');
+    } else {
+      if (typeof avatar.estatura !== 'number' || avatar.estatura <= 0) {
+        errores.push('Campo "avatar_data.estatura" debe ser un número mayor a 0');
+      }
+      if (typeof avatar.peso !== 'number' || avatar.peso <= 0) {
+        errores.push('Campo "avatar_data.peso" debe ser un número mayor a 0');
+      }
+      if (typeof avatar.complexion !== 'string' || !avatar.complexion.trim()) {
+        errores.push('Campo "avatar_data.complexion" debe ser un string no vacío');
+      }
+    }
+  }
+
   return errores;
 }
 
@@ -61,10 +78,11 @@ Duplicado: ${resultadoDb.duplicado ? 'Sí' : 'No'}
     res.status(200).json({
       status: 'success',
       message: 'Webhook procesado',
+      id: resultadoDb.id,
       data: {
         transaction_id: datos.transaction_id,
         db_id: resultadoDb.id,
-        duplicated: resultadoDb.duplicado || false
+        duplicated: resultadoDb.duplicated || false
       }
     });
   } catch (err) {

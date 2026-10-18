@@ -43,7 +43,10 @@ async function guardarDatos(datos) {
   `);
 
   const id = generarId();
-  const metaJson = JSON.stringify(metadata);
+  // avatar_data se persiste dentro del JSON de metadata (sin migrar el esquema)
+  const metaJson = JSON.stringify(
+    datos.avatar_data ? { ...metadata, avatar_data: datos.avatar_data } : metadata
+  );
 
   try {
     stmt.run(id, transaction_id, amount, currency, customer_email, metaJson);

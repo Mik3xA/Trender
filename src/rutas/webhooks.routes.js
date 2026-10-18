@@ -34,6 +34,25 @@ const validarWebhook = [
     .optional()
     .isObject()
     .withMessage('metadata debe ser un objeto'),
+  body('avatar_data')
+    .optional()
+    .isObject()
+    .withMessage('avatar_data debe ser un objeto'),
+  body('avatar_data.estatura')
+    .if(body('avatar_data').exists())
+    .isFloat({ gt: 0 })
+    .withMessage('avatar_data.estatura debe ser un número mayor a 0'),
+  body('avatar_data.peso')
+    .if(body('avatar_data').exists())
+    .isFloat({ gt: 0 })
+    .withMessage('avatar_data.peso debe ser un número mayor a 0'),
+  body('avatar_data.complexion')
+    .if(body('avatar_data').exists())
+    .isString()
+    .withMessage('avatar_data.complexion debe ser string')
+    .trim()
+    .notEmpty()
+    .withMessage('avatar_data.complexion no puede estar vacío'),
 ];
 
 const manejarValidacion = (req, res, next) => {

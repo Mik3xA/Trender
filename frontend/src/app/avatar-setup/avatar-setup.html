@@ -9,15 +9,15 @@
       <form class="space-y-6">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Estatura (cm)</label>
-          <input type="number" placeholder="Ej. 175" class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+          <input type="number" name="estatura" [(ngModel)]="estatura" placeholder="Ej. 175" class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Peso (kg)</label>
-          <input type="number" placeholder="Ej. 70" class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+          <input type="number" name="peso" [(ngModel)]="peso" placeholder="Ej. 70" class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Complexión</label>
-          <select class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+          <select name="complexion" [(ngModel)]="complexion" (change)="onComplexionChange()" class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
             <option>Delgada</option>
             <option>Atlética</option>
             <option>Media</option>
@@ -25,7 +25,7 @@
           </select>
         </div>
         <button type="button" (click)="generarModelo()" [disabled]="isGenerating" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md mt-4 disabled:bg-blue-400">
-  {{ isGenerating ? 'Renderizando Avatar...' : 'Generar Modelo 3D' }}
+  {{ isGenerating ? 'Renderizando Avatar...' : (modelReady ? 'Generar Nuevo Modelo' : 'Generar Modelo 3D') }}
 </button>
       </form>
     </div>
@@ -37,21 +37,53 @@
       
       <div class="z-10 text-center">
         <!-- Icono animado simulando carga/escaneo -->
-        <div class="animate-pulse w-48 h-64 border-2 border-blue-400 border-dashed rounded-xl flex items-center justify-center mb-6 mx-auto bg-slate-800/50">
-          <svg class="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-          </svg>
+        <ng-container *ngIf="!modelReady">
+          <div class="animate-pulse w-48 h-64 border-2 border-blue-400 border-dashed rounded-xl flex items-center justify-center mb-6 mx-auto bg-slate-800/50">
+            <svg class="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+          </div>
+        </ng-container>
+        <div *ngIf="modelReady" class="relative mb-6 mx-auto w-full max-w-sm flex justify-center items-center">
+          <div class="absolute inset-0 pointer-events-none z-20">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-60 animate-pulse"></div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-60 animate-pulse delay-150"></div>
+            <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-cyan-500/10 mix-blend-overlay animate-pulse"></div>
+          </div>
+          <img *ngIf="avatarImage" [src]="avatarImage.src" [alt]="avatarImage.alt" class="w-full h-80 object-contain drop-shadow-2xl rounded-xl z-10">
         </div>
         <h3 class="text-blue-300 font-semibold text-xl">
   <span *ngIf="!isGenerating && !modelReady">Esperando parámetros...</span>
   <span *ngIf="isGenerating" class="animate-pulse">Procesando malla 3D...</span>
   <span *ngIf="modelReady" class="text-green-400">¡Modelo generado con éxito!</span>
 </h3>
-<p class="text-slate-400 text-sm mt-2 max-w-xs text-center mx-auto">
-  <span *ngIf="!isGenerating && !modelReady">Ingresa tus datos a la izquierda para renderizar tu modelo virtual.</span>
-  <span *ngIf="isGenerating">Calculando proporciones corporales...</span>
-  <span *ngIf="modelReady">Tu avatar Trender está listo para el probador virtual.</span>
-</p>
+        <div *ngIf="modelReady" class="mt-6 w-full max-w-sm bg-slate-950/80 backdrop-blur-sm border border-cyan-500/30 rounded-lg p-4 shadow-xl shadow-cyan-500/10 text-left font-mono">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-cyan-500/30">
+            <span class="text-cyan-400 text-xs uppercase tracking-widest">HUD - Datos Biométricos</span>
+            <span class="text-green-400 text-xs animate-pulse">ONLINE</span>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-slate-400">Altura calculada:</span>
+              <span class="text-cyan-300">{{ estatura }} cm</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Masa corporal:</span>
+              <span class="text-cyan-300">{{ peso }} kg</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Tipo de malla 3D:</span>
+              <span class="text-cyan-300">Complexión {{ complexion }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-400">Status del Rigging:</span>
+              <span class="text-green-400">Completado al 100%</span>
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
+              <div class="bg-gradient-to-r from-cyan-500 to-green-400 h-1.5 w-full animate-pulse"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
