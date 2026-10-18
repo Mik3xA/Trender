@@ -43,9 +43,9 @@
             <option value="Robusta">Robusta</option>
           </select>
         </div>
-        <!-- Alerta de validación biométrica -->
+        <!-- Alerta de límites biológicos: el motor topa la deformación al rango seguro -->
         <div *ngIf="alertaValidacion"
-             class="bg-red-50 text-red-600 border border-red-200 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm"
+             class="bg-amber-50 text-amber-700 border border-amber-200 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm"
              role="alert">
           <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -98,7 +98,7 @@
         </div>
 
         <h3 class="text-blue-300 font-semibold text-xl">
-          <span *ngIf="!isGenerating && !modelReady">Modelo base · Ajusta tus medidas</span>
+          <span *ngIf="!isGenerating && !modelReady">Maniquí de estudio · Ajusta tus medidas</span>
           <span *ngIf="isGenerating" class="animate-pulse">Procesando malla 3D...</span>
           <span *ngIf="modelReady" class="text-green-400">¡Modelo generado con éxito!</span>
         </h3>
