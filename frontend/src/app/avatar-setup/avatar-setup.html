@@ -24,9 +24,9 @@
             <option>Robusta</option>
           </select>
         </div>
-        <button type="button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md mt-4">
-          Generar Modelo 3D
-        </button>
+        <button type="button" (click)="generarModelo()" [disabled]="isGenerating" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md mt-4 disabled:bg-blue-400">
+  {{ isGenerating ? 'Renderizando Avatar...' : 'Generar Modelo 3D' }}
+</button>
       </form>
     </div>
 
@@ -42,8 +42,16 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
           </svg>
         </div>
-        <h3 class="text-blue-300 font-semibold text-xl">Esperando parámetros...</h3>
-        <p class="text-slate-400 text-sm mt-2 max-w-xs text-center mx-auto">Ingresa tus datos a la izquierda para renderizar tu modelo virtual.</p>
+        <h3 class="text-blue-300 font-semibold text-xl">
+  <span *ngIf="!isGenerating && !modelReady">Esperando parámetros...</span>
+  <span *ngIf="isGenerating" class="animate-pulse">Procesando malla 3D...</span>
+  <span *ngIf="modelReady" class="text-green-400">¡Modelo generado con éxito!</span>
+</h3>
+<p class="text-slate-400 text-sm mt-2 max-w-xs text-center mx-auto">
+  <span *ngIf="!isGenerating && !modelReady">Ingresa tus datos a la izquierda para renderizar tu modelo virtual.</span>
+  <span *ngIf="isGenerating">Calculando proporciones corporales...</span>
+  <span *ngIf="modelReady">Tu avatar Trender está listo para el probador virtual.</span>
+</p>
       </div>
     </div>
 
