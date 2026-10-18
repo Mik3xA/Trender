@@ -1,17 +1,53 @@
-/* Línea de escaneo láser holográfica: baja y sube con fade en los extremos */
-@keyframes escaneo {
+/* Desplazamiento suave al navegar entre secciones */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Carrusel infinito: la animación recorre la mitad del track duplicado */
+@keyframes marquee {
   0% {
-    top: 0%;
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
+    transform: translateX(0%);
   }
   100% {
-    top: 100%;
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: 200%;
+  animation: marquee 25s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Aparición del diálogo de autenticación */
+@keyframes modal-fade {
+  from {
     opacity: 0;
   }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-modal-fade {
+  animation: modal-fade 0.2s ease-out;
+}
+
+.animate-modal-pop {
+  animation: modal-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }

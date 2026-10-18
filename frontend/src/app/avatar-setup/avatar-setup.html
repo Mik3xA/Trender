@@ -1,142 +1,291 @@
-<div class="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl flex flex-col md:flex-row overflow-hidden">
+<div class="min-h-screen bg-slate-50 flex flex-col">
 
-    <!-- Panel Izquierdo: Configuración de Medidas -->
-    <div class="w-full md:w-1/2 p-8 border-r border-gray-100">
-      <h2 class="text-3xl font-bold text-gray-800 mb-2">Crea tu Avatar Trender</h2>
-      <p class="text-gray-500 mb-8">Ingresa tus medidas exactas para generar tu probador virtual 3D.</p>
+  <!-- Barra de navegación superior -->
+  <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-6 py-4 flex items-center justify-between">
+    <a href="#inicio" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 bg-clip-text text-transparent font-black text-2xl tracking-tight">TRENDER</a>
 
-      <form class="space-y-6">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Género</label>
-          <select name="genero"
-                  [ngModel]="genero"
-                  (ngModelChange)="onGeneroChange($event)"
-                  class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-            <option value="Masculino">Masculino</option>
-            <option value="Femenino">Femenino</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Estatura (cm)</label>
-          <input type="number" name="estatura" placeholder="Ej. 175"
-                 [ngModel]="estatura"
-                 (ngModelChange)="onEstaturaChange($event)"
-                 class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Peso (kg)</label>
-          <input type="number" name="peso" placeholder="Ej. 70"
-                 [ngModel]="peso"
-                 (ngModelChange)="onPesoChange($event)"
-                 class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Complexión</label>
-          <select name="complexion"
-                  [ngModel]="complexion"
-                  (ngModelChange)="onComplexionChange($event)"
-                  class="w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-            <option value="Delgada">Delgada</option>
-            <option value="Atlética">Atlética</option>
-            <option value="Media">Media</option>
-            <option value="Robusta">Robusta</option>
-          </select>
-        </div>
-        <!-- Alerta de límites biológicos: el motor topa la deformación al rango seguro -->
-        <div *ngIf="alertaValidacion"
-             class="bg-amber-50 text-amber-700 border border-amber-200 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm"
-             role="alert">
-          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
-          </svg>
-          <span>{{ alertaValidacion }}</span>
-        </div>
+    <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+      <a href="#inicio" class="hover:text-slate-900 transition-colors">Inicio</a>
+      <a href="#probador-section" class="hover:text-slate-900 transition-colors">Escaner IA</a>
+      <a href="#colecciones" class="hover:text-slate-900 transition-colors">Colecciones</a>
+      <a href="#como-funciona" class="hover:text-slate-900 transition-colors">Cómo Funciona</a>
+    </nav>
 
-        <button type="button" (click)="generarModelo()" [disabled]="isGenerating" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md mt-4 disabled:bg-blue-400">
-          {{ isGenerating ? 'Renderizando Avatar...' : (modelReady ? 'Generar Nuevo Modelo' : 'Generar Modelo 3D') }}
-        </button>
-      </form>
+    <div class="flex items-center gap-3">
+      <button type="button" class="border border-slate-300 hover:border-slate-900 text-slate-800 font-semibold px-4 py-2 rounded-xl transition-all text-sm">
+        Iniciar Sesión
+      </button>
+      <button type="button" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:opacity-95 text-white font-semibold px-4 py-2 rounded-xl shadow-sm transition-all text-sm">
+        Registrarse
+      </button>
     </div>
+  </header>
 
-    <!-- Panel Derecho: Motor WebGL paramétrico -->
-    <div class="w-full md:w-1/2 bg-slate-900 relative flex flex-col justify-center items-center p-8 min-h-[400px]">
+  <main class="flex-1">
 
-      <!-- Halo de fondo del estudio -->
-      <div class="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-500/40 via-transparent to-transparent pointer-events-none"></div>
+    <!-- Sección Hero -->
+    <section id="inicio" class="max-w-6xl mx-auto px-6 pt-16 pb-14 text-center scroll-mt-24">
+      <span class="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold px-3.5 py-1.5 rounded-full mb-4">
+        ✨ Probador Virtual con IA y Malla Paramétrica 3D
+      </span>
+      <h1 class="text-4xl md:text-6xl font-black tracking-tight text-slate-900 max-w-4xl mx-auto leading-[1.1]">
+        Elige tu ropa con
+        <span class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">precisión milimétrica</span>
+        antes de comprar
+      </h1>
+      <p class="mt-6 text-lg text-slate-500 max-w-2xl mx-auto">
+        Trender reduce las devoluciones y te ayuda a encontrar tu talla ideal en segundos. Visualiza
+        la caída y el ajuste de cada prenda sobre un maniquí 3D generado con tus medidas exactas.
+      </p>
+      <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="#probador-section"
+           class="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 hover:opacity-95 text-white font-semibold px-7 py-3.5 rounded-xl shadow-sm transition-all text-center">
+          Probar el Probador Virtual
+        </a>
+        <a href="#como-funciona"
+           class="w-full sm:w-auto border border-slate-300 hover:border-slate-900 text-slate-800 font-semibold px-7 py-3.5 rounded-xl transition-all text-center">
+          Ver Demostración IA
+        </a>
+      </div>
+    </section>
 
-      <div class="z-10 w-full flex flex-col items-center">
+    <!-- Carrusel infinito de colecciones -->
+    <section id="colecciones" class="py-12 bg-white border-y border-slate-200 overflow-hidden scroll-mt-24">
+      <div class="max-w-6xl mx-auto px-6 mb-8 text-center">
+        <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">Colecciones que se ajustan a ti</h2>
+        <p class="mt-2 text-sm text-slate-500">Cada prenda estimada con más de un 98% de precisión sobre tu cuerpo real.</p>
+      </div>
 
-        <!-- Visor 3D interactivo -->
-        <div class="relative w-full max-w-sm h-80 mx-auto mb-6 rounded-xl border border-cyan-500/30 bg-slate-950/40 overflow-hidden shadow-[inset_0_0_50px_rgba(8,145,178,0.2)]">
-          <canvas #rendererCanvas
-                  class="block w-full h-full outline-none cursor-grab active:cursor-grabbing touch-none"></canvas>
-
-          <!-- Rejilla HUD superpuesta -->
-          <div class="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(34,211,238,0.4)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.4)_1px,transparent_1px)]"
-               style="background-size: 28px 28px;"></div>
-
-          <!-- Viñeta para dar profundidad -->
-          <div class="absolute inset-0 pointer-events-none shadow-[inset_0_0_70px_rgba(2,6,23,0.85)]"></div>
-
-          <!-- Láser de escaneo mientras se renderiza -->
-          <div *ngIf="isGenerating"
-               class="absolute w-full h-0.5 bg-cyan-300 opacity-80 shadow-[0_0_20px_5px_rgba(34,211,238,1)] pointer-events-none z-20"
-               style="animation: escaneo 2.2s ease-in-out infinite alternate;"></div>
-
-          <!-- Indicación de interacción -->
-          <span class="absolute top-2 left-2 z-20 pointer-events-none whitespace-nowrap text-[10px] uppercase tracking-[0.18em] text-cyan-400/70">
-            Arrastra · 360°
-          </span>
-
-          <!-- Badge de estado de render -->
-          <span *ngIf="isGenerating"
-                class="absolute top-2 right-2 z-20 pointer-events-none rounded-full bg-cyan-500/10 border border-cyan-400/40 px-2 py-0.5 text-[10px] text-cyan-300 animate-pulse">
-            CALCULANDO
-          </span>
-        </div>
-
-        <h3 class="text-blue-300 font-semibold text-xl">
-          <span *ngIf="!isGenerating && !modelReady">Maniquí de estudio · Ajusta tus medidas</span>
-          <span *ngIf="isGenerating" class="animate-pulse">Procesando malla 3D...</span>
-          <span *ngIf="modelReady" class="text-green-400">¡Modelo generado con éxito!</span>
-        </h3>
-
-        <!-- HUD de datos biométricos -->
-        <div *ngIf="modelReady" class="mt-6 w-full max-w-sm bg-slate-950/80 backdrop-blur-sm border border-cyan-500/30 rounded-lg p-4 shadow-xl shadow-cyan-500/10 text-left font-mono">
-          <div class="flex items-center justify-between mb-3 pb-2 border-b border-cyan-500/30">
-            <span class="text-cyan-400 text-xs uppercase tracking-widest">HUD - Datos Biométricos</span>
-            <span class="text-green-400 text-xs animate-pulse">ONLINE</span>
-          </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
-              <span class="text-slate-400">Género del modelo:</span>
-              <span class="text-cyan-300">{{ genero }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-slate-400">Altura calculada:</span>
-              <span class="text-cyan-300">{{ estatura }} cm</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-slate-400">Masa corporal:</span>
-              <span class="text-cyan-300">{{ peso }} kg</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-slate-400">Tipo de malla 3D:</span>
-              <span class="text-cyan-300">Complexión {{ complexion }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-slate-400">Status del Rigging:</span>
-              <span class="text-green-400">Completado al 100%</span>
-            </div>
-            <div class="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-              <div class="bg-gradient-to-r from-cyan-500 to-green-400 h-1.5 w-full animate-pulse"></div>
-            </div>
+      <!-- Track duplicado: translateX(-50%) genera el bucle continuo -->
+      <div class="animate-marquee">
+        <div *ngFor="let item of marqueeItems" class="w-[16.6667%] shrink-0 px-3">
+          <div class="relative h-72 rounded-2xl overflow-hidden border border-slate-200 shadow-sm group">
+            <img [src]="item.image" [alt]="item.label" loading="lazy"
+                 class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-slate-900/10 to-transparent"></div>
+            <span class="absolute top-3 left-3 bg-white/90 text-slate-800 text-xs font-bold px-2.5 py-1 rounded-full border border-slate-200">
+              {{ item.size }}
+            </span>
+            <span class="absolute bottom-3 left-3 text-white text-sm font-semibold">{{ item.label }}</span>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
+    <!-- Por qué Trender -->
+    <section id="como-funciona" class="max-w-6xl mx-auto px-6 py-16 scroll-mt-24">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl md:text-4xl font-black tracking-tight text-slate-900">Por qué Trender</h2>
+        <p class="mt-3 text-slate-500 max-w-2xl mx-auto">Tecnología de moda con visión computacional para comprar con total confianza.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">
+          <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-2xl mb-5">
+            🧍
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Modelado Corporal Paramétrico</h3>
+          <p class="mt-2 text-sm text-slate-500 leading-relaxed">
+            Ajusta tu estatura, peso y complexión en tiempo real y observa cómo tu maniquí virtual se adapta al instante.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">
+          <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white text-2xl mb-5">
+            👗
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Ajuste de Tela Dinámico</h3>
+          <p class="mt-2 text-sm text-slate-500 leading-relaxed">
+            Visualiza la caída y el ajuste de cada prenda según tu masa corporal y evita comprar la talla equivocada.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">
+          <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-2xl mb-5">
+            🔒
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Privacidad y Escaneo IA</h3>
+          <p class="mt-2 text-sm text-slate-500 leading-relaxed">
+            Tus datos biométricos están protegidos con cifrado de extremo a extremo. Tu cuerpo es solo tuyo.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Probador virtual interactivo (core studio) -->
+    <section id="probador-section" class="max-w-6xl mx-auto px-6 pb-20 scroll-mt-24">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row">
+
+        <!-- Panel Izquierdo: Configuración de Medidas -->
+        <div class="w-full md:w-1/2 p-8 md:border-r border-slate-200">
+          <h2 class="text-2xl font-semibold text-slate-900 mb-2">Crea tu Avatar</h2>
+          <p class="text-sm text-slate-500 mb-8">Ingresa tus medidas exactas y mira el resultado en vivo. Sin cuenta.</p>
+
+          <form class="space-y-6">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Género</label>
+              <select name="genero"
+                      [ngModel]="genero"
+                      (ngModelChange)="onGeneroChange($event)"
+                      class="w-full rounded-lg border border-slate-200 p-3 bg-white text-slate-900 outline-none transition-all focus:ring-2 focus:ring-slate-900 focus:border-slate-900">
+                <option value="Masculino">Masculino</option>
+                <option value="Femenino">Femenino</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Estatura (cm)</label>
+              <input type="number" name="estatura" placeholder="Ej. 175"
+                     [ngModel]="estatura"
+                     (ngModelChange)="onEstaturaChange($event)"
+                     class="w-full rounded-lg border border-slate-200 p-3 text-slate-900 outline-none transition-all focus:ring-2 focus:ring-slate-900 focus:border-slate-900">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Peso (kg)</label>
+              <input type="number" name="peso" placeholder="Ej. 70"
+                     [ngModel]="peso"
+                     (ngModelChange)="onPesoChange($event)"
+                     class="w-full rounded-lg border border-slate-200 p-3 text-slate-900 outline-none transition-all focus:ring-2 focus:ring-slate-900 focus:border-slate-900">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Complexión</label>
+              <select name="complexion"
+                      [ngModel]="complexion"
+                      (ngModelChange)="onComplexionChange($event)"
+                      class="w-full rounded-lg border border-slate-200 p-3 bg-white text-slate-900 outline-none transition-all focus:ring-2 focus:ring-slate-900 focus:border-slate-900">
+                <option value="Delgada">Delgada</option>
+                <option value="Atlética">Atlética</option>
+                <option value="Media">Media</option>
+                <option value="Robusta">Robusta</option>
+              </select>
+            </div>
+
+            <!-- Alerta de límites biológicos: el motor topa la deformación al rango seguro -->
+            <div *ngIf="alertaValidacion"
+                 class="bg-amber-50 text-amber-700 border border-amber-200 p-3 rounded-lg flex items-center gap-2 text-sm"
+                 role="alert">
+              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+              </svg>
+              <span>{{ alertaValidacion }}</span>
+            </div>
+
+            <button type="button" (click)="generarModelo()" [disabled]="isGenerating"
+                    class="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 rounded-lg shadow-sm transition-all mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ isGenerating ? 'Renderizando Avatar...' : (modelReady ? 'Generar Nuevo Modelo' : 'Generar Modelo 3D') }}
+            </button>
+          </form>
+
+          <!-- Funciones avanzadas (requieren cuenta) -->
+          <div class="mt-4 pt-5 border-t border-slate-200">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Funciones avanzadas</p>
+            <div class="grid grid-cols-1 gap-3">
+              <button type="button" (click)="requerirCuenta('escaneo')"
+                      class="w-full flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-semibold py-3 rounded-lg transition-all text-sm">
+                📸 Escanear mi Cuerpo con IA
+              </button>
+              <button type="button" (click)="requerirCuenta('subir_modelo')"
+                      class="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold py-3 rounded-lg transition-all text-sm">
+                📤 Subir mi propio Modelo 3D (.GLB)
+              </button>
+            </div>
+            <p class="mt-3 text-[11px] text-slate-400">El escáner IA y la carga de modelos requieren una cuenta gratuita.</p>
+          </div>
+        </div>
+
+        <!-- Panel Derecho: Visor 3D -->
+        <div class="w-full md:w-1/2 p-6 flex flex-col items-center justify-center">
+          <div class="w-full h-[520px] relative min-h-[500px] bg-slate-100 rounded-2xl overflow-hidden shadow-inner">
+            <!-- Fondo de estudio: degradado suave que da contraste al maniquí -->
+            <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_30%,_#ffffff_0%,_#e2e8f0_55%,_#cbd5e1_100%)]"></div>
+
+            <canvas #rendererCanvas
+                    class="relative block w-full h-full outline-none cursor-grab active:cursor-grabbing touch-none"></canvas>
+
+            <!-- Indicación de interacción -->
+            <span class="absolute top-4 right-4 z-20 pointer-events-none text-[11px] font-medium text-slate-400">
+              Arrastra para rotar
+            </span>
+
+            <!-- Estado de render -->
+            <div *ngIf="isGenerating"
+                 class="absolute inset-0 z-20 flex items-center justify-center bg-white/50 backdrop-blur-[2px]">
+              <span class="text-xs uppercase tracking-widest text-slate-600 animate-pulse">Generando modelo…</span>
+            </div>
+
+            <!-- Indicador biométrico -->
+            <div class="absolute bottom-4 left-4 z-20 pointer-events-none flex flex-wrap items-center gap-2">
+              <span class="bg-white/90 border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1 rounded-full shadow-sm">{{ estatura ?? '—' }} cm</span>
+              <span class="bg-white/90 border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1 rounded-full shadow-sm">{{ peso ?? '—' }} kg</span>
+              <span class="bg-white/90 border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1 rounded-full shadow-sm">{{ complexion }}</span>
+            </div>
+          </div>
+
+          <p class="mt-6 text-sm text-slate-500 text-center">
+            <span *ngIf="!isGenerating && !modelReady">Ajusta tus medidas para ver el maniquí en tiempo real.</span>
+            <span *ngIf="isGenerating">Procesando malla 3D…</span>
+            <span *ngIf="modelReady" class="text-slate-700 font-medium">Modelo generado con éxito.</span>
+          </p>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- Pie de página -->
+  <footer class="bg-white border-t border-slate-200 mt-auto">
+    <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
+      <span class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">TRENDER</span>
+      <nav class="flex flex-wrap items-center justify-center gap-6 text-sm text-slate-500">
+        <a href="#" class="hover:text-slate-900 transition-colors">Términos</a>
+        <a href="#" class="hover:text-slate-900 transition-colors">Privacidad</a>
+        <a href="#" class="hover:text-slate-900 transition-colors">Documentación de la API Trender</a>
+      </nav>
+      <p class="text-xs text-slate-400">© 2026 Trender. Todos los derechos reservados.</p>
+    </div>
+  </footer>
+
+  <!-- Modal de autenticación (auth gate) -->
+  <div *ngIf="mostrarModalAuth"
+       class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-modal-fade"
+       (click)="cerrarModalAuth()">
+    <div class="relative w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-8 animate-modal-pop"
+         (click)="$event.stopPropagation()">
+      <button type="button" (click)="cerrarModalAuth()" aria-label="Cerrar"
+              class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+
+      <h3 class="text-xl font-bold text-slate-900 pr-8">Crea tu cuenta gratuita</h3>
+      <p class="mt-2 text-sm text-slate-500">
+        Desbloquea el escáner IA y prueba ropa en tu propio cuerpo con total precisión.
+      </p>
+
+      <div class="mt-6 space-y-3">
+        <input type="email" name="authEmail" placeholder="Correo electrónico"
+               class="w-full rounded-lg border border-slate-200 p-3 text-slate-900 outline-none transition-all focus:ring-2 focus:ring-slate-900 focus:border-slate-900">
+        <input type="password" name="authPassword" placeholder="Contraseña"
+               class="w-full rounded-lg border border-slate-200 p-3 text-slate-900 outline-none transition-all focus:ring-2 focus:ring-slate-900 focus:border-slate-900">
+      </div>
+
+      <button type="button"
+              class="mt-4 w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:opacity-95 text-white font-semibold py-3 rounded-lg shadow-sm transition-all">
+        Crear cuenta gratis
+      </button>
+
+      <div class="my-4 flex items-center gap-3 text-xs text-slate-400">
+        <span class="h-px flex-1 bg-slate-200"></span>
+        o
+        <span class="h-px flex-1 bg-slate-200"></span>
+      </div>
+
+      <button type="button"
+              class="w-full flex items-center justify-center gap-2 border border-slate-300 hover:border-slate-900 text-slate-800 font-semibold py-3 rounded-lg transition-all text-sm">
+        Continuar con Google
+      </button>
+    </div>
   </div>
+
 </div>
