@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 const jwt = require('jsonwebtoken');
-const { crearUsuario, obtenerUsuarioPorEmail } = require('./db.service');
+const { crearUsuario, obtenerUsuarioPorEmail, obtenerMedidas } = require('./db.service');
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -170,10 +170,18 @@ function obtenerPerfil(token) {
       return null;
     }
 
+    const medidas = obtenerMedidas(payload.sub);
+
     return {
       id: payload.sub,
       email: payload.email,
-      nombre: payload.nombre || nombreDesdeEmail(payload.email)
+      nombre: payload.nombre || nombreDesdeEmail(payload.email),
+      medidas: medidas ? {
+        estatura: medidas.estatura,
+        peso: medidas.peso,
+        complexion: medidas.complexion,
+        genero: medidas.genero
+      } : null
     };
   } catch {
     return null;

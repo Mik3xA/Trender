@@ -23,13 +23,23 @@ function initDb() {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS user_measurements (
+      user_id TEXT PRIMARY KEY,
+      estatura REAL,
+      peso REAL,
+      complexion TEXT,
+      genero TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
 
   migrarUsuarios();
+  limpiarTablaVestidor();
 }
 
-// Bases previas: la columna nombre era nullable y debe pasar a obligatoria
 function migrarUsuarios() {
   const columnaNombre = db
     .pragma('table_info(users)')
@@ -57,6 +67,14 @@ function migrarUsuarios() {
   `);
 }
 
+function limpiarTablaVestidor() {
+  const tablaExiste = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='wardrobe_items'").get();
+  if (tablaExiste) {
+    db.exec('DROP TABLE wardrobe_items');
+    console.log('[DB] Tabla wardrobe_items eliminada');
+  }
+}
+
 initDb();
 
 async function guardarDatos(datos) {
@@ -74,7 +92,6 @@ async function guardarDatos(datos) {
   `);
 
   const id = randomUUID();
-  // avatar_data se persiste dentro del JSON de metadata (sin migrar el esquema)
   const metaJson = JSON.stringify(
     datos.avatar_data ? { ...metadata, avatar_data: datos.avatar_data } : metadata
   );
@@ -123,6 +140,25 @@ function eliminarUsuarioPorEmail(email) {
   return db.prepare('DELETE FROM users WHERE email = ?').run(email);
 }
 
+function guardarMedidas({ userId, estatura, peso, complexion, genero }) {
+  const stmt = db.prepare(`
+    INSERT INTO user_measurements (user_id, estatura, peso, complexion, genero, updated_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+      estatura = excluded.estatura,
+      peso = excluded.peso,
+      complexion = excluded.complexion,
+      genero = excluded.genero,
+      updated_at = datetime('now')
+  `);
+  stmt.run(userId, estatura, peso, complexion, genero);
+  return obtenerMedidas(userId);
+}
+
+function obtenerMedidas(userId) {
+  return db.prepare('SELECT * FROM user_measurements WHERE user_id = ?').get(userId);
+}
+
 function cerrarDb() {
   db.close();
 }
@@ -135,5 +171,7 @@ module.exports = {
   obtenerUsuarioPorEmail,
   obtenerUsuarioPorId,
   eliminarUsuarioPorEmail,
+  guardarMedidas,
+  obtenerMedidas,
   cerrarDb
 };

@@ -31,11 +31,14 @@ app.use(express.json());
 
 const rutasWebhooks = require('./rutas/webhooks.routes');
 const rutasAuth = require('./rutas/auth.routes');
+const rutasMedidas = require('./rutas/medidas.routes');
+const rutasRopa = require('./rutas/ropa.routes');
 const manejarErrores = require('./controladores/error.controller');
 
-// Se agrega el prefijo '/webhooks' para que coincida con la petición de Angular
 app.use('/webhooks', rutasWebhooks);
 app.use('/api/auth', rutasAuth);
+app.use('/api/medidas', rutasMedidas);
+app.use('/api/ropa', rutasRopa);
 
 app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 
