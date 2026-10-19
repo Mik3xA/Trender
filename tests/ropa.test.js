@@ -13,27 +13,46 @@ describe('POST /api/ropa/escanear-link', () => {
     expect(res.body.prenda.id).toMatch(/^scanned_/);
     expect(res.body.prenda.nombre).toBeTruthy();
     expect(res.body.prenda.precio).toBeTruthy();
-    expect(['Torso', 'Piernas']).toContain(res.body.prenda.categoria);
-    expect(res.body.prenda.imagenUrl).toMatch(/^https?:\/\//);
+    expect(['Torso', 'Piernas', 'Calzado']).toContain(res.body.prenda.categoria);
+    expect(res.body.prenda.imagenUrl).toMatch(/^\/ropa\/.+\.png$/);
   });
 
-  it('debe detectar marca conocida en la URL (Zara)', async () => {
+  it('debe detectar calzado por palabras clave', async () => {
     const res = await request(app)
       .post('/api/ropa/escanear-link')
-      .send({ url: 'https://www.zara.com/blazer-estructurado' });
+      .send({ url: 'https://tienda.example/tenis-sneakers' });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.prenda.nombre).toBeTruthy();
+    expect(res.body.prenda.categoria).toBe('Calzado');
+    expect(res.body.prenda.nombre).toBe('Calzado Deportivo/Casual');
   });
 
-  it('debe detectar marca conocida en la URL (Shein)', async () => {
+  it('debe detectar piernas y normalizar diacríticos', async () => {
     const res = await request(app)
       .post('/api/ropa/escanear-link')
-      .send({ url: 'https://www.shein.com/blusa-satinada' });
+      .send({ url: 'https://tienda.example/pantalón-de-mezclilla' });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(res.body.prenda.categoria).toBe('Piernas');
+    expect(res.body.prenda.nombre).toBe('Pantalón / Short');
+  });
+
+  it('debe detectar torso por palabra clave y usar el fallback torso', async () => {
+    const keywordResponse = await request(app)
+      .post('/api/ropa/escanear-link')
+      .send({ url: 'https://tienda.example/camisa-satinada' });
+
+    const fallbackResponse = await request(app)
+      .post('/api/ropa/escanear-link')
+      .send({ url: 'https://tienda.example/producto-generico' });
+
+    expect(keywordResponse.status).toBe(200);
+    expect(keywordResponse.body.prenda.categoria).toBe('Torso');
+    expect(keywordResponse.body.prenda.nombre).toBe('Prenda Superior');
+    expect(fallbackResponse.status).toBe(200);
+    expect(fallbackResponse.body.prenda.categoria).toBe('Torso');
   });
 
   it('debe devolver 400 si la URL está vacía', async () => {
@@ -64,13 +83,4 @@ describe('POST /api/ropa/escanear-link', () => {
     expect(res.body.errors).toBeDefined();
   });
 
-  it('debe usar fallback para marcas desconocidas', async () => {
-    const res = await request(app)
-      .post('/api/ropa/escanear-link')
-      .send({ url: 'https://tienda-desconocida.com/producto' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.prenda.id).toMatch(/^scanned_/);
-  });
 });

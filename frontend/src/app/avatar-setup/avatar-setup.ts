@@ -28,7 +28,7 @@ export type Genero = 'Masculino' | 'Femenino';
 type AuthMode = 'login' | 'registro';
 type AuthAction = 'login' | 'registro';
 type NotificationType = 'exito' | 'error';
-type CategoriaPrenda = 'Torso' | 'Piernas';
+type CategoriaPrenda = 'Torso' | 'Piernas' | 'Calzado';
 
 interface Faq {
   pregunta: string;
@@ -52,13 +52,15 @@ const FAQS: Faq[] = [
   {
     pregunta: '¿Cómo funciona el Escáner Web de Prendas?',
     respuesta:
-      'Pega el enlace de cualquier producto de una tienda online. Nuestro motor analiza la URL, detecta la marca y extrae la imagen, nombre, precio y categoría de la prenda. Luego la texturiza sobre tu avatar 3D al instante.'
+      'Pega el enlace de cualquier producto de una tienda online. Nuestro motor analiza la URL, detecta la categoría y asigna una textura, nombre y precio simulados. Luego la texturiza sobre tu avatar 3D al instante.'
   }
 ];
 
 const BASE_HEIGHT_CM = 170;
 const BASE_WEIGHT_KG = 70;
 const SCENE_SCALE = 100;
+const SCAN_ERROR_MESSAGE =
+  'No pudimos analizar este enlace. Intenta con una URL válida de una tienda.';
 
 const NEUTRAL_GROSOR = BASE_WEIGHT_KG / Math.pow(BASE_HEIGHT_CM / 100, 2);
 
@@ -214,6 +216,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   private garmentMeshes: THREE.Mesh[] = [];
   private garmentTexture?: THREE.Texture;
   private garmentMaterial?: THREE.MeshStandardMaterial;
+  private garmentVersion = 0;
   private readonly textureLoader = new THREE.TextureLoader();
 
   private readonly basePositions = new Map<string, THREE.Vector3>();
@@ -537,7 +540,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   escanearProducto(): void {
     const url = this.urlEscaneo.trim();
     if (!url) {
-      this.errorEscaneo = 'Ingresa una URL válida.';
+      this.errorEscaneo = SCAN_ERROR_MESSAGE;
       return;
     }
 
@@ -545,27 +548,49 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.errorEscaneo = null;
     this.prendaEscaneada = null;
 
-    this.http
-      .post<{ success: boolean; prenda: PrendaEscaneada }>(
-        `${environment.apiUrl}/api/ropa/escanear-link`,
-        { url }
-      )
-      .subscribe({
-        next: (res) => {
-          if (res.success && res.prenda) {
-            this.prendaEscaneada = res.prenda;
-          } else {
-            this.errorEscaneo = 'No se pudo escanear la prenda. Intenta con otra URL.';
-          }
-          this.escaneando = false;
-          this.cdr.detectChanges();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.escaneando = false;
-          this.errorEscaneo = err.error?.message || 'Error al escanear. Verifica la URL e intenta de nuevo.';
-          this.cdr.detectChanges();
-        }
-      });
+    try {
+      this.http
+        .post<{ success: boolean; prenda: PrendaEscaneada }>(
+          `${environment.apiUrl}/api/ropa/escanear-link`,
+          { url }
+        )
+        .subscribe({
+          next: (res) => {
+            try {
+              if (!res.success || !res.prenda) {
+                throw new Error(SCAN_ERROR_MESSAGE);
+              }
+
+              void this.finalizarEscaneo(res.prenda);
+            } catch {
+              this.finalizarErrorEscaneo();
+            }
+          },
+          error: () => this.finalizarErrorEscaneo()
+        });
+    } catch {
+      this.finalizarErrorEscaneo();
+    }
+  }
+
+  private async finalizarEscaneo(prenda: PrendaEscaneada): Promise<void> {
+    try {
+      this.prendaEscaneada = prenda;
+      await this.probarPrenda(prenda);
+    } catch {
+      this.prendaEscaneada = null;
+      this.finalizarErrorEscaneo();
+      return;
+    }
+
+    this.escaneando = false;
+    this.cdr.detectChanges();
+  }
+
+  private finalizarErrorEscaneo(): void {
+    this.escaneando = false;
+    this.errorEscaneo = SCAN_ERROR_MESSAGE;
+    this.cdr.detectChanges();
   }
 
   probarPrendaEscaneada(): void {
@@ -677,12 +702,12 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     return error.error?.message ?? error.error?.error ?? fallback;
   }
 
-  probarPrenda(prenda: PrendaEscaneada): void {
+  async probarPrenda(prenda: PrendaEscaneada): Promise<void> {
     this.prendaActiva = prenda;
     this.scrollToVisor();
 
     if (this.webglReady && this.modelGroup) {
-      this.aplicarPrendaVirtual(prenda);
+      await this.aplicarPrendaVirtual(prenda);
     }
 
     this.mostrarNotificacion(
@@ -697,44 +722,48 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mostrarNotificacion('Prenda retirada. Maniquí restaurado.', 'exito');
   }
 
-  private aplicarPrendaVirtual(prenda: PrendaEscaneada): void {
+  private async aplicarPrendaVirtual(prenda: PrendaEscaneada): Promise<void> {
     this.limpiarRopa();
 
     if (!this.modelGroup) {
       return;
     }
 
-    const colorFallback = prenda.categoria === 'Torso' ? 0x3f4e3b : 0x2d3728;
+    const colorFallback =
+      prenda.categoria === 'Torso'
+        ? 0x3f4e3b
+        : prenda.categoria === 'Piernas'
+          ? 0x2d3728
+          : 0x1c1917;
 
-    this.garmentMaterial = new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial({
       color: colorFallback,
       roughness: 0.85,
       metalness: 0.05,
       side: THREE.DoubleSide
     });
+    this.garmentMaterial = material;
+    const version = this.garmentVersion;
+    const texture = await this.cargarTextura(prenda.imagenUrl);
 
-    this.textureLoader.load(
-      prenda.imagenUrl,
-      (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.minFilter = THREE.LinearMipmapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.generateMipmaps = true;
-        this.garmentTexture = texture;
-        if (this.garmentMaterial) {
-          this.garmentMaterial.map = texture;
-          this.garmentMaterial.needsUpdate = true;
-        }
-      },
-      undefined,
-      (err) => {
-        console.warn('No se pudo cargar la textura de la prenda, usando color de respaldo:', err);
-      }
-    );
+    if (version !== this.garmentVersion || this.garmentMaterial !== material || !this.modelGroup) {
+      texture?.dispose();
+      material.dispose();
+      return;
+    }
 
-    const escala = prenda.categoria === 'Torso' ? 1.08 : 1.1;
+    if (texture) {
+      this.garmentTexture = texture;
+      material.map = texture;
+      material.needsUpdate = true;
+    }
+
+    const escala =
+      prenda.categoria === 'Torso'
+        ? 1.08
+        : prenda.categoria === 'Piernas'
+          ? 1.1
+          : 1.12;
 
     for (const parte of this.partesParaPrenda(prenda)) {
       const cuerpo = this.modelGroup.getObjectByName(parte) as THREE.Mesh | undefined;
@@ -742,7 +771,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
         continue;
       }
 
-      const capa = new THREE.Mesh(cuerpo.geometry.clone(), this.garmentMaterial);
+      const capa = new THREE.Mesh(cuerpo.geometry.clone(), material);
       capa.name = `${parte}_ropa`;
       capa.scale.setScalar(escala);
       capa.castShadow = true;
@@ -752,8 +781,34 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private cargarTextura(url: string): Promise<THREE.Texture | null> {
+    return new Promise((resolve) => {
+      this.textureLoader.load(
+        url,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.wrapT = THREE.RepeatWrapping;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.generateMipmaps = true;
+          resolve(texture);
+        },
+        undefined,
+        (error) => {
+          console.warn('No se pudo cargar la textura de la prenda, usando color de respaldo:', error);
+          resolve(null);
+        }
+      );
+    });
+  }
+
   private partesParaPrenda(prenda: PrendaEscaneada): string[] {
     const esTorso = prenda.categoria === 'Torso';
+    if (prenda.categoria === 'Calzado') {
+      return ['pie_izq', 'pie_der'];
+    }
+
     const esLargo = /vestido|abrigo|trench/i.test(prenda.nombre);
     const partes = new Set<string>();
 
@@ -773,6 +828,8 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private limpiarRopa(): void {
+    this.garmentVersion += 1;
+
     for (const capa of this.garmentMeshes) {
       capa.parent?.remove(capa);
       capa.geometry.dispose();
@@ -785,6 +842,22 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
       this.garmentTexture.dispose();
       this.garmentTexture = undefined;
     }
+
+    this.mannequinMaterial.color.setHex(0xe2e8f0);
+    this.mannequinMaterial.needsUpdate = true;
+    this.underwearMaterial.color.setHex(0x2d3728);
+    this.underwearMaterial.needsUpdate = true;
+
+    this.modelGroup?.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh || mesh.name.endsWith('_ropa')) {
+        return;
+      }
+
+      mesh.material = mesh.name === 'ropa_interior'
+        ? this.underwearMaterial
+        : this.mannequinMaterial;
+    });
   }
 
   private partesTorsoRopa(): string[] {
