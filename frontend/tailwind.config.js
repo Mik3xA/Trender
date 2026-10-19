@@ -17,8 +17,7 @@ module.exports = {
           soft: '#fafaf9'
         },
         studio: '#f4f4f2',
-        taupe: '#71717a',
-        night: '#0f172a'
+        taupe: '#71717a'
       }
     },
   },
