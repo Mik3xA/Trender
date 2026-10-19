@@ -1,63 +1,67 @@
 <div class="min-h-screen bg-[#fafaf9] text-carbon flex flex-col">
 
   <!-- Barra de navegación superior -->
-  <header class="sticky top-0 z-50 bg-[#fcfcf9]/90 backdrop-blur-md border-b border-stone-200/80 px-6 py-4 flex items-center justify-between">
-    <a href="#inicio" class="font-black text-2xl text-stone-900 tracking-wider uppercase">TRENDER</a>
+  <header class="sticky top-0 z-50 bg-[#fcfcf9]/90 backdrop-blur-md border-b border-stone-200/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+      <a href="#inicio" class="font-black text-2xl text-stone-900 tracking-wider uppercase">TRENDER</a>
 
-    <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-stone-500">
-      <a href="#como-funciona" class="hover:text-stone-900 transition-colors">Cómo funciona</a>
-      <a href="#catalogos" class="hover:text-stone-900 transition-colors">Catálogos</a>
-      <a href="#tiendas" class="hover:text-stone-900 transition-colors">Tiendas</a>
-      <a href="#probador-section" class="hover:text-stone-900 transition-colors">Probador</a>
-    </nav>
+      <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-stone-500">
+        <a href="#como-funciona" class="hover:text-stone-900 transition-colors">Cómo funciona</a>
+        <a href="#escaner" class="hover:text-stone-900 transition-colors">Escáner</a>
+        <a href="#probador-section" class="hover:text-stone-900 transition-colors">Probador</a>
+      </nav>
 
-    <div *ngIf="!sesionIniciada" class="flex items-center gap-3">
-      <button type="button" (click)="abrirAuthModal('login')"
-              class="border border-stone-300 text-stone-800 hover:border-stone-900 font-medium px-4 py-2 rounded-xl text-sm transition-all">
-        Iniciar Sesión
-      </button>
-      <button type="button" (click)="abrirAuthModal('registro')"
-              class="bg-stone-900 hover:bg-stone-800 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-sm transition-all">
-        Crear Cuenta
-      </button>
-    </div>
+      <div *ngIf="!sesionIniciada" class="flex items-center gap-3">
+        <button type="button" (click)="abrirAuthModal('login')"
+                class="border border-stone-300 text-stone-800 hover:border-stone-900 font-medium px-4 py-2 rounded-xl text-sm transition-all">
+          Iniciar Sesión
+        </button>
+        <button type="button" (click)="abrirAuthModal('registro')"
+                class="bg-stone-900 hover:bg-stone-800 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-sm transition-all">
+          Crear Cuenta
+        </button>
+      </div>
 
-    <div *ngIf="sesionIniciada" class="flex items-center gap-3">
-      <a href="#mi-espacio"
-         class="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-300 transition-colors">
-        <svg class="w-5 h-5 text-olive" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round"
-                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-        </svg>
-        <span class="hidden sm:inline">Hola, {{ nombreAutenticado }}</span>
-      </a>
-      <button type="button" (click)="cerrarSesion()"
-              class="text-stone-500 hover:text-stone-900 text-sm font-medium transition-colors">
-        Cerrar sesión
-      </button>
+      <div *ngIf="sesionIniciada" class="flex items-center gap-3">
+        <a href="#mi-espacio"
+           class="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-300 transition-colors">
+          <svg class="w-5 h-5 text-olive" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+          </svg>
+          <span class="hidden sm:inline">Hola, {{ nombreAutenticado }}</span>
+        </a>
+        <button type="button" (click)="cerrarSesion()"
+                class="text-stone-500 hover:text-stone-900 text-sm font-medium transition-colors">
+          Cerrar sesión
+        </button>
+      </div>
     </div>
   </header>
 
   <main class="flex-1">
 
-    <!-- Sección Hero -->
-    <section id="inicio" class="max-w-6xl mx-auto px-6 pt-16 pb-14 text-center scroll-mt-24">
-      <span class="inline-flex items-center gap-2 bg-olive/10 border border-olive/20 text-olive text-xs font-semibold px-3.5 py-1.5 rounded-full mb-4">
+    <!-- Sección Hero + métricas -->
+    <section id="inicio" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 text-center scroll-mt-24">
+      <span class="inline-flex items-center gap-2 bg-olive/10 border border-olive/20 text-olive text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round"
                 d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
         </svg>
         Probador Virtual con Cálculo Paramétrico y Malla 3D
       </span>
-      <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-stone-900 max-w-4xl mx-auto leading-[1.1]">
+
+      <h1 class="text-4xl md:text-6xl font-black text-stone-900 tracking-tight text-center max-w-4xl mx-auto leading-[1.1]">
         Elige tu ropa con
         <span class="text-olive">precisión milimétrica</span>
         antes de comprar
       </h1>
+
       <p class="mt-6 text-lg text-stone-500 max-w-2xl mx-auto">
         Trender reduce las devoluciones y te ayuda a encontrar tu talla ideal en segundos. Visualiza
         la caída y el ajuste de cada prenda sobre un maniquí 3D generado con tus medidas exactas.
       </p>
+
       <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
         <a href="#probador-section"
            class="w-full sm:w-auto bg-stone-900 hover:bg-stone-800 text-white font-medium px-6 py-3.5 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
@@ -73,11 +77,27 @@
           Ver Cálculo Paramétrico
         </a>
       </div>
+
+      <!-- Barra de métricas -->
+      <div class="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm px-6 py-6">
+          <p class="text-3xl md:text-4xl font-black text-stone-900">99.2%</p>
+          <p class="mt-1 text-xs font-semibold uppercase tracking-wider text-stone-500">Precisión Biométrica</p>
+        </article>
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm px-6 py-6">
+          <p class="text-3xl md:text-4xl font-black text-stone-900">Escáner Web</p>
+          <p class="mt-1 text-xs font-semibold uppercase tracking-wider text-stone-500">Importa cualquier prenda por URL</p>
+        </article>
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm px-6 py-6">
+          <p class="text-3xl md:text-4xl font-black text-stone-900">0.0s</p>
+          <p class="mt-1 text-xs font-semibold uppercase tracking-wider text-stone-500">Renderizado Paramétrico Local</p>
+        </article>
+      </div>
     </section>
 
     <!-- Panel privado del usuario -->
     <section id="mi-espacio" *ngIf="sesionIniciada"
-             class="max-w-6xl mx-auto px-6 pb-20 scroll-mt-24">
+             class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 scroll-mt-24">
       <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-olive mb-2">Mi Perfil</p>
@@ -90,8 +110,8 @@
         </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <article class="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6">
           <div class="w-11 h-11 flex items-center justify-center rounded-xl bg-olive/10 text-olive mb-5">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -111,99 +131,291 @@
               <dt class="text-stone-500">Complexión</dt>
               <dd class="font-semibold text-stone-800">{{ complexion }}</dd>
             </div>
+            <div class="flex items-center justify-between gap-3">
+              <dt class="text-stone-500">Género</dt>
+              <dd class="font-semibold text-stone-800">{{ genero }}</dd>
+            </div>
           </dl>
         </article>
 
-        <article class="bg-white rounded-2xl border border-stone-200 shadow-sm p-6 flex flex-col">
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6">
           <div class="w-11 h-11 flex items-center justify-center rounded-xl bg-olive/10 text-olive mb-5">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l4.5-4.5M12 15l-4.5-4.5M4.5 19.5h15" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
           </div>
-          <h3 class="text-lg font-bold text-stone-900">Mis Modelos 3D Exportados</h3>
-          <p class="mt-3 text-sm text-stone-500">
-            {{ modelosExportados > 0 ? modelosExportados + ' modelo(s) descargado(s) en .GLB' : 'Aún no has exportado tu avatar.' }}
-          </p>
-          <button type="button" (click)="exportarModelo()"
-                  [disabled]="!modelReady || exportandoModelo"
-                  class="mt-auto inline-flex w-full items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold px-4 py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l4.5-4.5M12 15l-4.5-4.5M4.5 19.5h15" />
+          <h3 class="text-lg font-bold text-stone-900">Escáner Web de Prendas</h3>
+          <p class="mt-3 text-sm text-stone-500">Pega un enlace de cualquier tienda y pruébala al instante en tu avatar.</p>
+          <a href="#escaner" class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-olive hover:underline">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12l-7.5 7.5" />
             </svg>
-            {{ exportandoModelo ? 'Exportando...' : 'Exportar avatar .GLB' }}
-          </button>
-          <p *ngIf="!modelReady" class="mt-2 text-[11px] text-stone-400">Genera tu avatar para habilitar la descarga.</p>
-        </article>
-
-        <article class="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
-          <div class="w-11 h-11 flex items-center justify-center rounded-xl bg-olive/10 text-olive mb-5">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m-.75 9h9a2.25 2.25 0 002.25-2.25V9.75a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 005.25 9.75v7.5A2.25 2.25 0 007.5 19.5z" />
-            </svg>
-          </div>
-          <h3 class="text-lg font-bold text-stone-900">Tiendas Vinculadas</h3>
-          <p class="mt-3 text-sm text-stone-500">
-            {{ tiendasVinculadasCount }} de {{ tiendas.length }} tiendas sincronizadas.
-          </p>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <ng-container *ngFor="let tienda of tiendas">
-              <span *ngIf="tienda.vinculada"
-                    class="inline-flex items-center rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
-                {{ tienda.nombre }}
-              </span>
-            </ng-container>
-          </div>
+            Ir al Escáner
+          </a>
         </article>
       </div>
     </section>
 
-    <!-- Cómo funciona -->
-    <section id="como-funciona" class="max-w-6xl mx-auto px-6 py-20 scroll-mt-24">
-      <div class="max-w-2xl mb-12">
+    <!-- Probador virtual studio -->
+    <section id="probador-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 scroll-mt-24">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        <!-- Columna izquierda: controles -->
+        <div class="lg:col-span-5 w-full">
+          <div class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6 md:p-8">
+            <div class="flex items-center gap-2 mb-2">
+              <svg class="w-5 h-5 text-[#3f4e3b]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010 -.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.073-.044.146-.087.22-.128.332-.183.582-.495.645-.869l.213-1.28z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <h2 class="text-2xl font-semibold text-stone-900">Crea tu Avatar</h2>
+            </div>
+            <p class="text-sm text-stone-500 mb-8">Ingresa tus medidas exactas y mira el resultado en vivo. Sin cuenta.</p>
+
+            <form class="space-y-6">
+              <div>
+                <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Género</label>
+                <select name="genero"
+                        [ngModel]="genero"
+                        (ngModelChange)="onGeneroChange($event)"
+                        class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
+                  <option value="Masculino">Masculino</option>
+                  <option value="Femenino">Femenino</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Estatura (cm)</label>
+                <input type="number" name="estatura" placeholder="Ej. 175"
+                       [ngModel]="estatura"
+                       (ngModelChange)="onEstaturaChange($event)"
+                       class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Peso (kg)</label>
+                <input type="number" name="peso" placeholder="Ej. 70"
+                       [ngModel]="peso"
+                       (ngModelChange)="onPesoChange($event)"
+                       class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Complexión</label>
+                <select name="complexion"
+                        [ngModel]="complexion"
+                        (ngModelChange)="onComplexionChange($event)"
+                        class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
+                  <option value="Delgada">Delgada</option>
+                  <option value="Atlética">Atlética</option>
+                  <option value="Media">Media</option>
+                  <option value="Robusta">Robusta</option>
+                </select>
+              </div>
+
+              <!-- Alerta de límites biológicos -->
+              <div *ngIf="alertaValidacion"
+                   class="bg-amber-50 text-amber-700 border border-amber-200 p-3 rounded-xl flex items-center gap-2 text-sm"
+                   role="alert">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+                <span>{{ alertaValidacion }}</span>
+              </div>
+
+              <button type="button" (click)="generarModelo()" [disabled]="isGenerating"
+                      class="w-full py-4 bg-[#3f4e3b] hover:bg-[#323f2f] text-white font-semibold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+                </svg>
+                {{ isGenerating ? 'Renderizando Avatar...' : 'Generar Nuevo Modelo' }}
+              </button>
+            </form>
+
+          </div>
+        </div>
+
+        <!-- Columna derecha: visor 3D -->
+        <div class="lg:col-span-7 w-full lg:self-stretch">
+          <div id="visor-3d-container"
+               class="overflow-hidden border border-stone-300/80 shadow-inner"
+               [ngClass]="modoInmersivo
+                  ? 'fixed inset-0 z-[100] w-full h-screen bg-[#f4f4f2] flex justify-center items-center'
+                  : 'relative w-full h-[600px] min-h-[600px] bg-[#f4f4f2] rounded-2xl lg:sticky lg:top-24'">
+            <!-- Fondo de estudio -->
+            <div class="absolute inset-0 z-0 pointer-events-none bg-[radial-gradient(circle_at_50%_28%,_#fcfcf9_0%,_#f4f4f2_55%,_#d9d5cd_100%)]"></div>
+
+            <canvas #rendererCanvas
+                    class="relative z-10 block w-full h-full scroll-mt-24 outline-none cursor-grab active:cursor-grabbing touch-none"></canvas>
+
+            <!-- Botón de salida del modo inmersivo -->
+            <button *ngIf="modoInmersivo" type="button" (click)="salirModoInmersivo()"
+                    class="absolute top-6 right-6 z-30 inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white/95 px-4 py-2.5 text-sm font-semibold text-stone-800 shadow-sm backdrop-blur-sm transition-all hover:border-stone-900">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Volver al formulario
+            </button>
+
+            <!-- Botón Quitar Ropa -->
+            <button *ngIf="prendaActiva && !modoInmersivo" type="button" (click)="quitarRopa()"
+                    class="absolute top-6 right-6 z-20 inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 shadow-sm transition-all hover:border-stone-900 hover:text-stone-900">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Quitar Ropa
+            </button>
+
+            <!-- Indicación de interacción -->
+            <span *ngIf="!modoInmersivo"
+                  class="absolute top-4 right-4 z-20 pointer-events-none text-[11px] font-medium text-stone-400">
+              Arrastra para rotar
+            </span>
+
+            <div *ngIf="prendaActiva && !modoInmersivo"
+                 class="absolute top-4 left-4 z-20 max-w-[70%] rounded-xl border border-stone-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur-sm">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Probando ahora</p>
+              <p class="text-xs font-semibold text-stone-800">{{ prendaActiva.nombre }}</p>
+            </div>
+
+            <!-- Estado de render -->
+            <div *ngIf="isGenerating"
+                 class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
+              <span class="text-xs uppercase tracking-widest text-stone-600 animate-pulse">Generando modelo…</span>
+            </div>
+
+            <!-- Píldora biométrica flotante -->
+            <div *ngIf="!modoInmersivo"
+                 class="absolute bottom-4 inset-x-4 z-20 pointer-events-none flex justify-center">
+              <div class="inline-flex items-center gap-3 bg-white/90 backdrop-blur-sm border border-stone-200 rounded-full px-4 py-2 shadow-sm">
+                <span class="flex items-center gap-1 text-xs font-medium text-stone-700">
+                  <span class="text-stone-400">Altura</span> {{ estatura ?? '—' }} cm
+                </span>
+                <span class="h-4 w-px bg-stone-200"></span>
+                <span class="flex items-center gap-1 text-xs font-medium text-stone-700">
+                  <span class="text-stone-400">Peso</span> {{ peso ?? '—' }} kg
+                </span>
+                <span class="h-4 w-px bg-stone-200"></span>
+                <span class="flex items-center gap-1 text-xs font-medium text-stone-700">
+                  <span class="text-stone-400">Complexión</span> {{ complexion }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p *ngIf="!modoInmersivo" class="mt-6 text-sm text-stone-500 text-center">
+            <span *ngIf="!isGenerating && !modelReady">Ajusta tus medidas para ver el maniquí en tiempo real.</span>
+            <span *ngIf="isGenerating">Procesando malla 3D…</span>
+            <span *ngIf="modelReady" class="text-stone-700 font-medium">Modelo generado con éxito.</span>
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Escáner Web de Prendas -->
+    <section id="escaner" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 scroll-mt-24">
+      <div class="max-w-2xl mx-auto">
+        <div class="text-center mb-10">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-olive mb-3">Escáner Web de Prendas</p>
+          <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight text-stone-900">Importa cualquier prenda por URL</h2>
+          <p class="mt-3 text-sm text-stone-500">Pega el enlace de cualquier tienda online para importar la prenda a tu probador 3D al instante.</p>
+        </div>
+
+        <!-- Input de URL -->
+        <div class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6 mb-8">
+          <div class="space-y-4">
+            <div class="flex gap-3">
+              <input type="url" [(ngModel)]="urlEscaneo" placeholder="https://www.tu-tienda-favorita.com/producto/..."
+                     class="flex-1 rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive" />
+              <button type="button" (click)="escanearProducto()" [disabled]="escaneando || !urlEscaneo.trim()"
+                      class="px-6 py-3 bg-[#3f4e3b] hover:bg-[#323f2f] text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2">
+                <svg *ngIf="escaneando" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z"></path>
+                </svg>
+                <span *ngIf="escaneando">Analizando estructura de la prenda y texturas...</span>
+                <span *ngIf="!escaneando">Escanear e Importar</span>
+              </button>
+            </div>
+            <p *ngIf="errorEscaneo" class="text-sm font-medium text-red-700" role="alert">{{ errorEscaneo }}</p>
+          </div>
+        </div>
+
+        <!-- Tarjeta de vista previa de la prenda escaneada -->
+        <div *ngIf="prendaEscaneada && !escaneando" class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6 mb-8">
+          <h3 class="text-lg font-bold text-stone-900 mb-4">Prenda detectada</h3>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+              <div class="relative h-64 overflow-hidden bg-stone-100 rounded-xl">
+                <img [src]="prendaEscaneada.imagenUrl" [alt]="prendaEscaneada.nombre" loading="lazy"
+                     class="w-full h-full object-contain p-6 bg-stone-100" />
+              </div>
+            </div>
+            <div class="md:col-span-2 space-y-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-stone-400">{{ prendaEscaneada.categoria }}</p>
+                <h3 class="mt-1 text-base font-bold text-stone-900">{{ prendaEscaneada.nombre }}</h3>
+              </div>
+              <div class="text-sm font-semibold text-stone-800">{{ prendaEscaneada.precio }}</div>
+              <button type="button" (click)="probarPrendaEscaneada()"
+                      class="w-full py-3 bg-[#3f4e3b] hover:bg-[#323f2f] text-white font-semibold rounded-xl transition-all inline-flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Probar en mi Avatar 3D
+              </button>
+              <button type="button" (click)="limpiarEscaneo()"
+                      class="w-full py-2 text-stone-500 hover:text-stone-700 font-medium text-sm transition-colors inline-flex items-center justify-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Probar otra prenda
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección editorial: cómo funciona -->
+    <section id="como-funciona" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 scroll-mt-24">
+      <div class="max-w-2xl mb-10">
         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-olive mb-3">Cómo funciona</p>
         <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight text-stone-900">Del dato corporal al ajuste visual</h2>
       </div>
 
-      <ol class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-        <li class="flex gap-5 border-t border-stone-200 pt-6">
-          <span class="text-4xl md:text-5xl font-extrabold tracking-tighter text-stone-300">01</span>
-          <div>
-            <h3 class="text-lg font-bold text-stone-900">Ingresa tus medidas biométricas.</h3>
-            <p class="mt-2 text-sm leading-relaxed text-stone-500">Estatura, peso y complexión definen la base del volumen corporal.</p>
-          </div>
-        </li>
-        <li class="flex gap-5 border-t border-stone-200 pt-6">
-          <span class="text-4xl md:text-5xl font-extrabold tracking-tighter text-stone-300">02</span>
-          <div>
-            <h3 class="text-lg font-bold text-stone-900">El motor renderiza tu volumen corporal.</h3>
-            <p class="mt-2 text-sm leading-relaxed text-stone-500">La malla 3D se deforma en tiempo real con cálculo paramétrico.</p>
-          </div>
-        </li>
-        <li class="flex gap-5 border-t border-stone-200 pt-6">
-          <span class="text-4xl md:text-5xl font-extrabold tracking-tighter text-stone-300">03</span>
-          <div>
-            <h3 class="text-lg font-bold text-stone-900">Selecciona prendas de catálogos internacionales.</h3>
-            <p class="mt-2 text-sm leading-relaxed text-stone-500">Explora once tiendas y elige la prenda que quieres evaluar.</p>
-          </div>
-        </li>
-        <li class="flex gap-5 border-t border-stone-200 pt-6">
-          <span class="text-4xl md:text-5xl font-extrabold tracking-tighter text-stone-300">04</span>
-          <div>
-            <h3 class="text-lg font-bold text-stone-900">Visualiza el ajuste (Fit) en tiempo real.</h3>
-            <p class="mt-2 text-sm leading-relaxed text-stone-500">Compara la caída y la holgura antes de comprar.</p>
-          </div>
-        </li>
-      </ol>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6">
+          <span class="text-4xl font-extrabold tracking-tighter text-stone-300">01</span>
+          <h3 class="mt-4 text-lg font-bold text-stone-900">Mapeo Biométrico</h3>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">Ingresa tus medidas de altura, peso y complexión.</p>
+        </article>
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6">
+          <span class="text-4xl font-extrabold tracking-tighter text-stone-300">02</span>
+          <h3 class="mt-4 text-lg font-bold text-stone-900">Renderizado 3D</h3>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">El algoritmo ajusta la malla volumétrica en vivo.</p>
+        </article>
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6">
+          <span class="text-4xl font-extrabold tracking-tighter text-stone-300">03</span>
+          <h3 class="mt-4 text-lg font-bold text-stone-900">Escáner Web</h3>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">Pega el enlace de la prenda y la importamos al instante.</p>
+        </article>
+        <article class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6">
+          <span class="text-4xl font-extrabold tracking-tighter text-stone-300">04</span>
+          <h3 class="mt-4 text-lg font-bold text-stone-900">Prueba en Vivo</h3>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">Visualiza la caída y holgura de la prenda texturizada.</p>
+        </article>
+      </div>
     </section>
 
     <!-- Carrusel infinito de colecciones -->
     <section id="colecciones" class="py-12 bg-white border-y border-stone-200 overflow-hidden scroll-mt-24">
-      <div class="max-w-6xl mx-auto px-6 mb-8 text-center">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 text-center">
         <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-stone-900">Colecciones que se ajustan a ti</h2>
         <p class="mt-2 text-sm text-stone-500">Cada prenda estimada con más de un 98% de precisión sobre tu cuerpo real.</p>
       </div>
 
-      <!-- Track duplicado: translateX(-50%) genera el bucle continuo -->
       <div class="animate-marquee">
         <div *ngFor="let item of marqueeItems" class="w-[16.6667%] shrink-0 px-3">
           <div class="rounded-2xl border border-stone-200 bg-white p-2 shadow-sm group">
@@ -229,256 +441,15 @@
       </div>
     </section>
 
-    <!-- Hub de sincronización con tiendas -->
-    <section id="tiendas" class="max-w-6xl mx-auto px-6 pt-4 pb-12 scroll-mt-24">
-      <div class="text-center mb-10">
-        <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-stone-900">Sincroniza tus Tiendas Favoritas</h2>
-        <p class="mt-3 text-stone-500 max-w-2xl mx-auto">Importa catálogos y prueba prendas directamente en tu avatar 3D</p>
-      </div>
-
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 my-12">
-        <article *ngFor="let tienda of tiendas"
-                 class="bg-white p-4 rounded-xl border border-stone-200/80 hover:border-[#3f4e3b] shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-between text-center group gap-3 min-h-[164px]">
-          <div class="w-12 h-12 rounded-full bg-stone-100 group-hover:bg-[#3f4e3b]/10 flex items-center justify-center text-sm font-black text-stone-700 group-hover:text-[#3f4e3b] transition-all">
-            {{ tienda.monograma }}
-          </div>
-          <h3 class="text-sm font-semibold text-stone-800 leading-tight">{{ tienda.nombre }}</h3>
-
-          <button *ngIf="!tienda.vinculada" type="button" (click)="vincularTienda(tienda)"
-                  [disabled]="redirigiendoTienda !== null"
-                  class="inline-flex items-center gap-1 bg-stone-100 group-hover:bg-[#3f4e3b] group-hover:text-white text-stone-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Vincular Tienda
-          </button>
-
-          <span *ngIf="tienda.vinculada"
-                class="inline-flex items-center gap-1 bg-[#3f4e3b]/10 text-[#3f4e3b] text-xs font-semibold px-3 py-1.5 rounded-lg">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-            Conectada
-          </span>
-        </article>
-      </div>
-    </section>
-
-    <!-- Explorador de catálogos multi-tienda -->
-    <section id="catalogos" class="max-w-6xl mx-auto px-6 py-20 scroll-mt-24">
-      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
-        <div class="max-w-2xl">
-          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-olive mb-3">Catálogos</p>
-          <h2 class="text-3xl md:text-5xl font-extrabold tracking-tight text-stone-900">Explorar Catálogos Sincronizados</h2>
-          <p class="mt-3 text-sm text-stone-500">Once tiendas internacionales, una misma medida: la tuya.</p>
-        </div>
-        <span class="text-xs font-medium text-stone-400">{{ catalogoActivo.prendas.length }} prendas disponibles</span>
-      </div>
-
-      <div class="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
-        <button *ngFor="let tienda of catalogos"
-                type="button"
-                (click)="seleccionarTiendaCatalogo(tienda.id)"
-                [ngClass]="tienda.id === tiendaCatalogoActiva
-                  ? 'bg-stone-900 text-white border-stone-900'
-                  : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'"
-                class="shrink-0 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all">
-          <span class="text-[10px] font-black tracking-wide opacity-70">{{ tienda.monograma }}</span>
-          {{ tienda.nombre }}
-        </button>
-      </div>
-
-      <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <article *ngFor="let prenda of catalogoActivo.prendas"
-                 class="group bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
-          <div class="relative h-64 overflow-hidden bg-stone-100">
-            <img [src]="prenda.imagen" [alt]="prenda.nombre" loading="lazy"
-                 class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            <span class="absolute top-3 left-3 rounded-full border border-stone-200 bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
-              {{ catalogoActivo.nombre }}
-            </span>
-          </div>
-          <div class="p-5 flex flex-col flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-wider text-stone-400">{{ prenda.categoria }}</p>
-            <h3 class="mt-1 text-base font-bold text-stone-900">{{ prenda.nombre }}</h3>
-            <div class="mt-4 flex items-center justify-between gap-3">
-              <span class="text-sm font-semibold text-stone-800">{{ prenda.precio }}</span>
-              <span *ngIf="prendaSeleccionada?.id === prenda.id"
-                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-olive">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                Seleccionada
-              </span>
-            </div>
-            <button type="button" (click)="probarPrenda(prenda)"
-                    class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-stone-800">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Probar en mi Avatar
-            </button>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- Probador virtual interactivo (core studio) -->
-    <section id="probador-section" class="max-w-6xl mx-auto px-6 pb-20 scroll-mt-24">
-      <div class="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden flex flex-col md:flex-row">
-
-        <!-- Panel Izquierdo: Configuración de Medidas -->
-        <div class="w-full md:w-1/2 p-8 md:border-r border-stone-200">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-5 h-5 text-[#3f4e3b]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.073-.044.146-.087.22-.128.332-.183.582-.495.645-.869l.213-1.28z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <h2 class="text-2xl font-semibold text-stone-900">Crea tu Avatar</h2>
-          </div>
-          <p class="text-sm text-stone-500 mb-8">Ingresa tus medidas exactas y mira el resultado en vivo. Sin cuenta.</p>
-
-          <form class="space-y-6">
-            <div>
-              <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Género</label>
-              <select name="genero"
-                      [ngModel]="genero"
-                      (ngModelChange)="onGeneroChange($event)"
-                      class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
-                <option value="Masculino">Masculino</option>
-                <option value="Femenino">Femenino</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Estatura (cm)</label>
-              <input type="number" name="estatura" placeholder="Ej. 175"
-                     [ngModel]="estatura"
-                     (ngModelChange)="onEstaturaChange($event)"
-                     class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Peso (kg)</label>
-              <input type="number" name="peso" placeholder="Ej. 70"
-                     [ngModel]="peso"
-                     (ngModelChange)="onPesoChange($event)"
-                     class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Complexión</label>
-              <select name="complexion"
-                      [ngModel]="complexion"
-                      (ngModelChange)="onComplexionChange($event)"
-                      class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive">
-                <option value="Delgada">Delgada</option>
-                <option value="Atlética">Atlética</option>
-                <option value="Media">Media</option>
-                <option value="Robusta">Robusta</option>
-              </select>
-            </div>
-
-            <!-- Alerta de límites biológicos: el motor topa la deformación al rango seguro -->
-            <div *ngIf="alertaValidacion"
-                 class="bg-amber-50 text-amber-700 border border-amber-200 p-3 rounded-xl flex items-center gap-2 text-sm"
-                 role="alert">
-              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <span>{{ alertaValidacion }}</span>
-            </div>
-
-            <button type="button" (click)="generarModelo()" [disabled]="isGenerating"
-                    class="w-full bg-stone-900 hover:bg-stone-800 text-white font-medium py-3 rounded-xl shadow-sm transition-all mt-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-              </svg>
-              {{ isGenerating ? 'Renderizando Avatar...' : (modelReady ? 'Generar Nuevo Modelo' : 'Generar Modelo 3D') }}
-            </button>
-          </form>
-
-          <!-- Funciones avanzadas (requieren cuenta) -->
-          <div class="mt-4 pt-5 border-t border-stone-200">
-            <p class="text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-3">Funciones avanzadas</p>
-            <div class="grid grid-cols-1 gap-3">
-              <button type="button" (click)="abrirAuthModal('escaneo')"
-                      class="w-full flex items-center justify-center gap-2 bg-olive/10 hover:bg-olive/15 border border-olive/20 text-olive font-semibold py-3 rounded-xl transition-all text-sm">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-                </svg>
-                Escanear mi Cuerpo con Fotogrametría 3D
-              </button>
-            </div>
-            <p class="mt-3 text-[11px] text-stone-400">El Motor Biométrico Local requiere una cuenta gratuita.</p>
-          </div>
-        </div>
-
-        <!-- Panel Derecho: Visor 3D -->
-        <div class="w-full md:w-1/2 p-6 flex flex-col items-center justify-center">
-          <div class="w-full min-h-[500px] h-[520px] relative rounded-2xl overflow-hidden bg-[#efece6] border border-stone-300/80 shadow-inner">
-            <!-- Fondo de estudio: degradado radial cálido que da contraste al maniquí -->
-            <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_28%,_#fcfcf9_0%,_#efece6_55%,_#d9d5cd_100%)]"></div>
-
-            <canvas #rendererCanvas
-                    class="relative block w-full h-full scroll-mt-24 outline-none cursor-grab active:cursor-grabbing touch-none"></canvas>
-
-            <!-- Indicación de interacción -->
-            <span class="absolute top-4 right-4 z-20 pointer-events-none text-[11px] font-medium text-stone-400">
-              Arrastra para rotar
-            </span>
-
-            <div *ngIf="prendaSeleccionada"
-                 class="absolute top-4 left-4 z-20 max-w-[70%] rounded-xl border border-stone-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur-sm">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Prenda seleccionada</p>
-              <p class="text-xs font-semibold text-stone-800">{{ prendaSeleccionada.nombre }}</p>
-            </div>
-
-            <!-- Estado de render -->
-            <div *ngIf="isGenerating"
-                 class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
-              <span class="text-xs uppercase tracking-widest text-stone-600 animate-pulse">Generando modelo…</span>
-            </div>
-
-            <!-- Píldora biométrica flotante -->
-            <div class="absolute bottom-4 inset-x-4 z-20 pointer-events-none flex justify-center">
-              <div class="inline-flex items-center gap-3 bg-white/90 backdrop-blur-sm border border-stone-200 rounded-full px-4 py-2 shadow-sm">
-                <span class="flex items-center gap-1 text-xs font-medium text-stone-700">
-                  <span class="text-stone-400">Altura</span> {{ estatura ?? '—' }} cm
-                </span>
-                <span class="h-4 w-px bg-stone-200"></span>
-                <span class="flex items-center gap-1 text-xs font-medium text-stone-700">
-                  <span class="text-stone-400">Peso</span> {{ peso ?? '—' }} kg
-                </span>
-                <span class="h-4 w-px bg-stone-200"></span>
-                <span class="flex items-center gap-1 text-xs font-medium text-stone-700">
-                  <span class="text-stone-400">Complexión</span> {{ complexion }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <p class="mt-6 text-sm text-stone-500 text-center">
-            <span *ngIf="!isGenerating && !modelReady">Ajusta tus medidas para ver el maniquí en tiempo real.</span>
-            <span *ngIf="isGenerating">Procesando malla 3D…</span>
-            <span *ngIf="modelReady" class="text-stone-700 font-medium">Modelo generado con éxito.</span>
-          </p>
-        </div>
-
-      </div>
-    </section>
-
     <!-- Preguntas frecuentes -->
-    <section id="faq" class="max-w-4xl mx-auto px-6 pb-20 scroll-mt-24">
+    <section id="faq" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 scroll-mt-24">
       <div class="text-center mb-8">
         <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-stone-900">Preguntas Frecuentes sobre el Probador Virtual</h2>
       </div>
 
       <div class="space-y-3">
         <div *ngFor="let faq of faqs; let i = index"
-             class="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+             class="bg-white rounded-xl border border-stone-200/80 shadow-sm overflow-hidden">
           <button type="button" (click)="toggleFaq(i)"
                   [attr.aria-expanded]="faqAbierto === i"
                   class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-stone-50/70 transition-colors">
@@ -497,20 +468,41 @@
     </section>
   </main>
 
-  <!-- Pie de página -->
-  <footer class="bg-white border-t border-stone-200 mt-auto">
-    <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
-      <span class="font-black text-xl tracking-wider uppercase text-stone-900">TRENDER</span>
-      <nav class="flex flex-wrap items-center justify-center gap-6 text-sm text-stone-500">
-        <a href="#" class="hover:text-stone-900 transition-colors">Términos</a>
-        <a href="#" class="hover:text-stone-900 transition-colors">Privacidad</a>
-        <a href="#" class="hover:text-stone-900 transition-colors">Documentación de la API Trender</a>
-      </nav>
-      <p class="text-xs text-stone-400">© 2026 Trender. Todos los derechos reservados.</p>
+  <!-- Pie de página institucional -->
+  <footer class="bg-stone-900 text-stone-300 py-16 border-t border-stone-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+        <div>
+          <span class="font-black text-2xl tracking-wider uppercase text-white">TRENDER</span>
+          <p class="mt-4 text-sm leading-relaxed text-stone-400 max-w-sm">
+            Plataforma de probador virtual con mapeo biométrico y renderizado 3D paramétrico para
+            comprar moda con la talla y caída correctas.
+          </p>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-white">Enlaces rápidos</h3>
+          <nav class="mt-4 flex flex-col gap-3 text-sm">
+            <a href="#probador-section" class="text-stone-400 hover:text-white transition-colors">Probador 3D</a>
+            <a href="#escaner" class="text-stone-400 hover:text-white transition-colors">Escáner Web</a>
+            <a href="#como-funciona" class="text-stone-400 hover:text-white transition-colors">Cómo Funciona</a>
+          </nav>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-white">Legal</h3>
+          <nav class="mt-4 flex flex-col gap-3 text-sm">
+            <a href="#" class="text-stone-400 hover:text-white transition-colors">Privacidad</a>
+            <a href="#" class="text-stone-400 hover:text-white transition-colors">Términos de Servicio</a>
+            <a href="#" class="text-stone-400 hover:text-white transition-colors">Seguridad de Datos</a>
+          </nav>
+        </div>
+      </div>
+      <div class="mt-12 pt-8 border-t border-stone-800 text-center text-xs text-stone-500">
+        © 2026 Trender. Todos los derechos reservados.
+      </div>
     </div>
   </footer>
 
-  <!-- Modal de autenticación (OTP / contraseña) -->
+  <!-- Modal de autenticación clásica -->
   <div *ngIf="mostrarModalAuth"
        class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-modal-fade"
        (click)="cerrarModalAuth()">
@@ -533,142 +525,54 @@
       <h3 *ngIf="!registroExitoso" class="text-xl font-bold text-stone-900 pr-8">{{ tituloAuth }}</h3>
       <p *ngIf="!registroExitoso" class="mt-2 text-sm text-stone-500">{{ descripcionAuth }}</p>
 
-      <ng-container *ngIf="modoAuth !== 'codigo' && !registroExitoso">
-        <ng-container *ngIf="modoAuth !== 'password-login' && modoAuth !== 'password-registro'">
-          <label for="auth-email" class="block mt-6 text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Correo electrónico</label>
-          <input id="auth-email" type="email" name="authEmail" [(ngModel)]="emailIngresado"
-                 [disabled]="cargandoAuth"
-                 placeholder="tu@correo.com" autocomplete="email"
-                 (keyup.enter)="enviarCodigo()"
+      <ng-container *ngIf="!registroExitoso">
+        <div *ngIf="modoAuth === 'registro'" class="mt-6">
+          <label for="auth-name" class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Nombre</label>
+          <input id="auth-name" type="text" name="authName" [(ngModel)]="nombreIngresado"
+                 [disabled]="cargandoAuth" placeholder="Tu nombre" autocomplete="name"
                  class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
-          <p *ngIf="errorAuth" class="mt-2 text-xs font-medium text-red-700" role="alert">{{ errorAuth }}</p>
-
-          <button type="button" (click)="enviarCodigo()" [disabled]="cargandoAuth"
-                  class="mt-4 w-full bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
-            <svg *ngIf="cargandoAuth" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-              <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle>
-              <path class="opacity-75" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z"></path>
-            </svg>
-            {{ cargandoAuth ? 'Enviando...' : 'Continuar' }}
-          </button>
-
-          <p class="mt-4 text-center text-xs text-stone-500">
-            ¿Prefieres usar contraseña?
-            <button type="button" (click)="irAPasswordRegistro()"
-                    class="font-semibold text-olive hover:underline">Crear cuenta clásica</button>
-          </p>
-
-          <p class="mt-3 text-center text-xs text-stone-500">
-            <ng-container *ngIf="modoAuth === 'login'">
-              ¿No tienes cuenta?
-              <button type="button" (click)="cambiarModoAuth('registro')" class="font-semibold text-olive hover:underline">Crear cuenta</button>
-            </ng-container>
-            <ng-container *ngIf="modoAuth === 'registro'">
-              ¿Ya tienes cuenta?
-              <button type="button" (click)="cambiarModoAuth('login')" class="font-semibold text-olive hover:underline">Iniciar sesión</button>
-            </ng-container>
-          </p>
-        </ng-container>
-
-        <ng-container *ngIf="modoAuth === 'password-login' || modoAuth === 'password-registro'">
-          <div *ngIf="modoAuth === 'password-registro'" class="mt-6">
-            <label for="auth-name" class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Nombre</label>
-            <input id="auth-name" type="text" name="authName" [(ngModel)]="nombreIngresado"
-                   [disabled]="cargandoAuth" placeholder="Tu nombre" autocomplete="name"
-                   class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
-          </div>
-
-          <div [class.mt-6]="modoAuth !== 'password-registro'" [class.mt-4]="modoAuth === 'password-registro'">
-            <label for="password-email" class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Correo electrónico</label>
-            <input id="password-email" type="email" name="passwordEmail" [(ngModel)]="emailIngresado"
-                   [disabled]="cargandoAuth" placeholder="tu@correo.com" autocomplete="email"
-                   class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
-          </div>
-
-          <div class="mt-4">
-            <label for="password-input" class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Contraseña</label>
-            <input id="password-input" type="password" name="passwordInput" [(ngModel)]="passwordIngresado"
-                   [disabled]="cargandoAuth"
-                   [attr.autocomplete]="modoAuth === 'password-registro' ? 'new-password' : 'current-password'"
-                   placeholder="Mínimo 8 caracteres"
-                   class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
-          </div>
-
-          <div *ngIf="modoAuth === 'password-registro'" class="mt-4">
-            <label for="password-confirm" class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Confirmar contraseña</label>
-            <input id="password-confirm" type="password" name="passwordConfirm" [(ngModel)]="passwordConfirmacion"
-                   [disabled]="cargandoAuth" placeholder="Repite tu contraseña" autocomplete="new-password"
-                   class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
-          </div>
-
-          <p *ngIf="errorAuth" class="mt-3 text-xs font-medium text-red-700" role="alert">{{ errorAuth }}</p>
-
-          <button type="button"
-                  (click)="modoAuth === 'password-registro' ? registrarConPassword() : iniciarSesionConPassword()"
-                  [disabled]="cargandoAuth"
-                  class="mt-4 w-full bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
-            <svg *ngIf="cargandoAuth" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-              <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle>
-              <path class="opacity-75" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z"></path>
-            </svg>
-            {{ cargandoAuth ? 'Procesando...' : (modoAuth === 'password-registro' ? 'Crear cuenta' : 'Iniciar sesión') }}
-          </button>
-
-          <p class="mt-4 text-center text-xs text-stone-500">
-            <button type="button" (click)="modoAuth === 'password-registro' ? irAPasswordLogin() : irAPasswordRegistro()"
-                    class="font-semibold text-olive hover:underline">
-              {{ modoAuth === 'password-registro' ? '¿Ya tienes cuenta? Inicia sesión' : 'Crear cuenta clásica' }}
-            </button>
-          </p>
-          <p class="mt-2 text-center text-xs text-stone-500">
-            <button type="button" (click)="volverACodigo()"
-                    class="font-semibold text-stone-600 hover:text-stone-900 hover:underline">Volver a código</button>
-          </p>
-        </ng-container>
-      </ng-container>
-
-      <ng-container *ngIf="modoAuth === 'codigo' && !registroExitoso">
-        <p class="mt-6 text-sm text-stone-500">
-          Enviamos un código de 6 dígitos a
-          <strong class="font-semibold text-stone-800">{{ emailIngresado }}</strong>
-        </p>
-
-        <div class="mt-5 flex items-center justify-center gap-2" (paste)="onCodigoPaste($event)">
-          <input *ngFor="let _ of [0, 1, 2, 3, 4, 5]; let i = index"
-                 #otpInput
-                 type="text"
-                 inputmode="numeric"
-                 maxlength="1"
-                 autocomplete="one-time-code"
-                 [value]="digitoCodigo(i)"
-                 (input)="onCodigoInput($event, i)"
-                 (keydown)="onCodigoKeydown($event, i)"
-                 [disabled]="cargandoAuth"
-                 [attr.aria-label]="'Dígito ' + (i + 1) + ' del código'"
-                 class="w-11 h-12 text-center text-lg font-semibold text-stone-900 rounded-xl border border-stone-300 bg-stone-50/50 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
         </div>
 
-        <p *ngIf="errorCodigo" class="mt-3 text-center text-xs font-medium text-red-700" role="alert">{{ errorCodigo }}</p>
+        <div [class.mt-6]="modoAuth !== 'registro'" [class.mt-4]="modoAuth === 'registro'">
+          <label for="auth-email" class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Correo electrónico</label>
+          <input id="auth-email" type="email" name="authEmail" [(ngModel)]="emailIngresado"
+                 [disabled]="cargandoAuth" placeholder="tu@correo.com" autocomplete="email"
+                 class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
+        </div>
 
-        <button type="button" (click)="verificarCodigo()" [disabled]="cargandoAuth"
+        <div class="mt-4">
+          <label for="auth-password" class="block text-xs font-bold text-stone-600 uppercase tracking-wider mb-2">Contraseña</label>
+          <input id="auth-password" type="password" name="authPassword" [(ngModel)]="passwordIngresado"
+                 [disabled]="cargandoAuth"
+                 [attr.autocomplete]="modoAuth === 'registro' ? 'new-password' : 'current-password'"
+                 placeholder="Mínimo 8 caracteres"
+                 (keyup.enter)="modoAuth === 'registro' ? registrarConPassword() : iniciarSesionConPassword()"
+                 class="w-full rounded-xl border border-stone-300 p-3 bg-stone-50/50 text-stone-900 outline-none transition-all focus:ring-2 focus:ring-olive focus:border-olive disabled:opacity-60">
+        </div>
+
+        <p *ngIf="errorAuth" class="mt-3 text-xs font-medium text-red-700" role="alert">{{ errorAuth }}</p>
+
+        <button type="button"
+                (click)="modoAuth === 'registro' ? registrarConPassword() : iniciarSesionConPassword()"
+                [disabled]="cargandoAuth"
                 class="mt-4 w-full bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
           <svg *ngIf="cargandoAuth" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
             <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle>
             <path class="opacity-75" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z"></path>
           </svg>
-          {{ cargandoAuth ? 'Verificando...' : 'Verificar código' }}
+          {{ cargandoAuth ? 'Procesando...' : (modoAuth === 'registro' ? 'Crear cuenta' : 'Iniciar sesión') }}
         </button>
 
-        <div class="mt-4 flex items-center justify-between gap-3 text-xs">
-          <button type="button" (click)="cambiarCorreo()" [disabled]="cargandoAuth"
-                  class="font-semibold text-stone-500 hover:text-stone-900 transition-colors disabled:opacity-50">
-            Usar otro correo
-          </button>
-          <button type="button" (click)="reenviarCodigo()" [disabled]="reenvioSegundos > 0 || cargandoAuth"
-                  class="font-semibold text-olive hover:underline disabled:text-stone-400 disabled:no-underline disabled:cursor-not-allowed">
-            {{ reenvioSegundos > 0 ? 'Reenviar en ' + reenvioSegundos + 's' : 'Reenviar código' }}
-          </button>
-        </div>
+        <p class="mt-4 text-center text-xs text-stone-500">
+          <ng-container *ngIf="modoAuth === 'login'">
+            ¿No tienes cuenta?
+            <button type="button" (click)="cambiarModoAuth('registro')" class="font-semibold text-olive hover:underline">Crear cuenta</button>
+          </ng-container>
+          <ng-container *ngIf="modoAuth === 'registro'">
+            ¿Ya tienes cuenta?
+            <button type="button" (click)="cambiarModoAuth('login')" class="font-semibold text-olive hover:underline">Iniciar sesión</button>
+          </ng-container>
+        </p>
       </ng-container>
 
       <p *ngIf="!registroExitoso" class="mt-5 flex items-center justify-center gap-1.5 text-[11px] text-stone-400">
@@ -693,30 +597,12 @@
     </div>
   </div>
 
-  <!-- Redirección externa simulada para conectar una tienda -->
-  <div *ngIf="redirigiendoTienda"
-       class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-modal-fade"
-       role="status" aria-live="polite">
-    <div class="flex max-w-sm flex-col items-center gap-4 rounded-2xl border border-stone-200 bg-white px-8 py-7 text-center shadow-xl animate-modal-pop">
-      <span class="flex h-12 w-12 items-center justify-center rounded-full bg-[#3f4e3b]/10 text-[#3f4e3b]">
-        <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-          <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle>
-          <path class="opacity-75" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z"></path>
-        </svg>
-      </span>
-      <p class="text-sm font-medium leading-relaxed text-stone-700">
-        Redirigiendo a la página de inicio de sesión de
-        <strong class="font-semibold text-stone-900">{{ redirigiendoTienda }}</strong>…
-      </p>
-    </div>
-  </div>
-
   <!-- Notificación flotante -->
   <div *ngIf="notificacion"
        class="fixed bottom-6 right-6 z-[120] flex items-start gap-3 max-w-sm rounded-xl border p-4 shadow-xl animate-toast"
        [ngClass]="notificacion.tipo === 'exito'
-         ? 'bg-white border-[#3f4e3b]/30 text-stone-800'
-         : 'bg-white border-red-200 text-stone-800'"
+          ? 'bg-white border-[#3f4e3b]/30 text-stone-800'
+          : 'bg-white border-red-200 text-stone-800'"
        role="status" aria-live="polite">
     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
           [ngClass]="notificacion.tipo === 'exito' ? 'bg-[#3f4e3b]/10 text-[#3f4e3b]' : 'bg-red-50 text-red-700'">

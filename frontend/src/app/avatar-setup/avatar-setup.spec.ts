@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, of } from 'rxjs';
 import { AvatarSetupComponent } from './avatar-setup';
 import { AuthResponse, AuthService, StoredSession } from '../servicios/auth.service';
+import { environment } from '../../environments/environment';
 
 describe('AvatarSetupComponent', () => {
   let fixture: ComponentFixture<AvatarSetupComponent>;
@@ -12,12 +13,11 @@ describe('AvatarSetupComponent', () => {
     sesion$: Observable<StoredSession | null>;
     sesionActual: StoredSession | null;
     refrescarSesion: () => void;
-    solicitarCodigo: (email: string) => Observable<{ status: string; message: string }>;
-    verificarCodigo: (email: string, codigo: string) => Observable<AuthResponse>;
     registrar: (payload: { nombre?: string; email: string; password: string }) => Observable<AuthResponse>;
     iniciarSesion: (payload: { email: string; password: string }) => Observable<AuthResponse>;
-    obtenerPerfil: () => Observable<{ status: string; user: { id: string; nombre: string; email: string } }>;
+    obtenerPerfil: () => Observable<{ status: string; user: { id: string; nombre: string; email: string; medidas?: any } }>;
     cerrarSesion: () => void;
+    obtenerToken: () => string;
   };
 
   function crearSesion(email: string, metodo: StoredSession['metodo']): StoredSession {
@@ -45,15 +45,7 @@ describe('AvatarSetupComponent', () => {
       sesion$: sesionSubject.asObservable(),
       sesionActual: null,
       refrescarSesion: () => undefined,
-      solicitarCodigo: () => of({ status: 'success', message: 'Código enviado' }),
-      verificarCodigo: (email, codigo) => {
-        if (codigo !== '123456') {
-          return throwError(() => ({ status: 401, error: { message: 'Código inválido' } }));
-        }
-        const sesion = crearSesion(email, 'otp');
-        persistirSesion(sesion);
-        return of({ status: 'success', token: sesion.token, user: sesion.user! });
-      },
+      obtenerToken: () => 'test-token',
       registrar: ({ nombre, email }) => {
         const sesion = crearSesion(email, 'password');
         sesion.user!.nombre = nombre || 'Usuario Demo';
@@ -68,7 +60,7 @@ describe('AvatarSetupComponent', () => {
       obtenerPerfil: () =>
         of({
           status: 'success',
-          user: { id: 'user-otp', nombre: 'Usuario Demo', email: 'demo@trender.com' }
+          user: { id: 'user-password', nombre: 'Usuario Demo', email: 'demo@trender.com', medidas: null }
         }),
       cerrarSesion: () => {
         authMock.sesionActual = null;
@@ -107,11 +99,9 @@ describe('AvatarSetupComponent', () => {
 
   it('muestra la pantalla de éxito antes de cerrar el modal de registro', () => {
     component.abrirAuthModal('registro');
-    component.irAPasswordRegistro();
     component.nombreIngresado = 'Michael';
     component.emailIngresado = 'michael@trender.com';
     component.passwordIngresado = 'secreto-seguro';
-    component.passwordConfirmacion = 'secreto-seguro';
 
     component.registrarConPassword();
 
@@ -128,36 +118,23 @@ describe('AvatarSetupComponent', () => {
     expect(component.nombreAutenticado).toBe('Michael');
   });
 
-  it('solicita el OTP y solo acepta el código 123456', () => {
+  it('inicia sesión con correo y contraseña', () => {
     component.abrirAuthModal('login');
-    component.emailIngresado = 'otp@trender.com';
+    component.emailIngresado = 'clasica@trender.com';
+    component.passwordIngresado = 'secreto-seguro';
 
-    component.enviarCodigo();
-
-    expect(component.modoAuth).toBe('codigo');
-    expect(component.codigoEnviado).toBe(true);
-    expect(component.reenvioSegundos).toBe(30);
-
-    component.codigoVerificacion = '000000';
-    component.verificarCodigo();
-    expect(component.errorCodigo).toContain('Código inválido');
-    expect(component.sesionIniciada).toBe(false);
-
-    component.codigoVerificacion = '123456';
-    component.verificarCodigo();
+    component.iniciarSesionConPassword();
 
     expect(component.sesionIniciada).toBe(true);
     expect(component.mostrarModalAuth).toBe(false);
-    expect(component.emailAutenticado).toBe('otp@trender.com');
+    expect(component.emailAutenticado).toBe('clasica@trender.com');
   });
 
   it('crea una cuenta clásica con contraseña', () => {
     component.abrirAuthModal('registro');
-    component.irAPasswordRegistro();
     component.nombreIngresado = 'Estudio Trender';
     component.emailIngresado = 'clasica@trender.com';
     component.passwordIngresado = 'secreto-seguro';
-    component.passwordConfirmacion = 'secreto-seguro';
 
     component.registrarConPassword();
     vi.advanceTimersByTime(2000);
@@ -167,26 +144,22 @@ describe('AvatarSetupComponent', () => {
     expect(JSON.parse(localStorage.getItem('trender.auth') || '{}').metodo).toBe('password');
   });
 
-  it('valida que las contraseñas coincidan', () => {
+  it('exige una contraseña de al menos 8 caracteres', () => {
     component.abrirAuthModal('registro');
-    component.irAPasswordRegistro();
     component.nombreIngresado = 'Usuario Demo';
     component.emailIngresado = 'clasica@trender.com';
-    component.passwordIngresado = 'secreto-seguro';
-    component.passwordConfirmacion = 'otra-clave';
+    component.passwordIngresado = 'corta';
 
     component.registrarConPassword();
 
-    expect(component.errorAuth).toBe('Las contraseñas no coinciden.');
+    expect(component.errorAuth).toBe('La contraseña debe tener al menos 8 caracteres.');
     expect(component.sesionIniciada).toBe(false);
   });
 
   it('exige un nombre para crear la cuenta', () => {
     component.abrirAuthModal('registro');
-    component.irAPasswordRegistro();
     component.emailIngresado = 'clasica@trender.com';
     component.passwordIngresado = 'secreto-seguro';
-    component.passwordConfirmacion = 'secreto-seguro';
 
     component.registrarConPassword();
 
@@ -194,71 +167,146 @@ describe('AvatarSetupComponent', () => {
     expect(component.sesionIniciada).toBe(false);
   });
 
-  it('conecta una tienda sin sesión tras la redirección simulada', () => {
-    const tienda = component.tiendas.find((item) => item.nombre === 'Zara')!;
+  it('reinicia medidas al cerrar sesión', () => {
+    persistirSesion(crearSesion('demo@trender.com', 'password'));
 
-    component.vincularTienda(tienda);
+    component.estatura = 182;
+    component.peso = 84;
+    localStorage.setItem(
+      'trender.measurements',
+      JSON.stringify({ estatura: 182, peso: 84, complexion: 'Atlética', genero: 'Masculino' })
+    );
 
-    expect(component.redirigiendoTienda).toBe('Zara');
-    expect(component.mostrarModalAuth).toBe(false);
-    expect(tienda.vinculada).toBe(false);
+    component.cerrarSesion();
 
-    vi.advanceTimersByTime(1500);
-
-    expect(component.redirigiendoTienda).toBeNull();
-    expect(component.tiendas.find((item) => item.nombre === 'Zara')?.vinculada).toBe(true);
-    expect(JSON.parse(localStorage.getItem('trender.stores') || '[]')).toContain('Zara');
+    expect(component.estatura).toBeNull();
+    expect(component.peso).toBeNull();
+    expect(component.prendaActiva).toBeNull();
+    expect(localStorage.getItem('trender.measurements')).toBeNull();
   });
 
-  it('ignora una nueva conexión mientras hay una redirección en curso', () => {
-    component.vincularTienda(component.tiendas[0]);
-    component.vincularTienda(component.tiendas[1]);
+  it('renderiza la sección Escáner Web de Prendas', () => {
+    fixture.detectChanges();
 
-    expect(component.redirigiendoTienda).toBe(component.tiendas[0].nombre);
-
-    vi.advanceTimersByTime(1500);
-
-    expect(component.tiendas[0].vinculada).toBe(true);
-    expect(component.tiendas[1].vinculada).toBe(false);
+    const escaner = fixture.nativeElement.querySelector('#escaner') as HTMLElement;
+    expect(escaner).toBeTruthy();
+    expect(escaner.textContent).toContain('Escáner Web de Prendas');
+    expect(escaner.textContent).toContain('Importa cualquier prenda por URL');
+    expect(escaner.querySelector('input[type="url"]')).toBeTruthy();
+    expect(escaner.querySelector('button')).toBeTruthy();
   });
 
-  it('muestra el panel Mi Espacio de Medición solo con sesión', () => {
+  it('muestra error si URL está vacía al escanear', () => {
+    component.urlEscaneo = '';
+    component.escanearProducto();
+
+    expect(component.errorEscaneo).toBe('Ingresa una URL válida.');
+    expect(component.escaneando).toBe(false);
+  });
+
+  it('llama al endpoint de escaneo con URL válida', () => {
+    const spy = vi.spyOn(component['http'], 'post').mockReturnValue(
+      of({
+        success: true,
+        prenda: {
+          id: 'scanned_1',
+          nombre: 'Blazer Estructurado',
+          precio: '$2,590',
+          categoria: 'Torso',
+          imagenUrl: 'https://example.com/blazer.jpg'
+        }
+      })
+    );
+
+    component.urlEscaneo = 'https://www.zara.com/blazer';
+    component.escanearProducto();
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const callArgs = spy.mock.calls[0];
+    expect(callArgs[0]).toBe(`${environment.apiUrl}/api/ropa/escanear-link`);
+    expect(callArgs[1]).toEqual({ url: 'https://www.zara.com/blazer' });
+  });
+
+  it('muestra la prenda escaneada y permite probarla', () => {
+    const prendaMock = {
+      id: 'scanned_1',
+      nombre: 'Blazer Estructurado',
+      precio: '$2,590',
+      categoria: 'Torso' as const,
+      imagenUrl: 'https://example.com/blazer.jpg'
+    };
+
+    component.prendaEscaneada = prendaMock;
+    fixture.detectChanges();
+
+    const escaner = fixture.nativeElement.querySelector('#escaner') as HTMLElement;
+    expect(escaner.textContent).toContain('Blazer Estructurado');
+    expect(escaner.textContent).toContain('$2,590');
+    expect(escaner.textContent).toContain('Probar en mi Avatar 3D');
+
+    component.probarPrendaEscaneada();
+
+    expect(component.prendaActiva?.id).toBe('scanned_1');
+    expect(component.prendaActiva?.nombre).toBe('Blazer Estructurado');
+  });
+
+  it('limpia el escaneo y permite escanear otra prenda', () => {
+    component.urlEscaneo = 'https://test.com';
+    component.prendaEscaneada = { id: 's1', nombre: 'Test', precio: '$100', categoria: 'Torso', imagenUrl: 'img.jpg' };
+    component.errorEscaneo = null;
+
+    component.limpiarEscaneo();
+
+    expect(component.urlEscaneo).toBe('');
+    expect(component.prendaEscaneada).toBeNull();
+    expect(component.errorEscaneo).toBeNull();
+  });
+
+  it('renderiza la sección Mi Espacio de Medición solo con sesión', () => {
     expect(fixture.nativeElement.querySelector('#mi-espacio')).toBeNull();
 
-    persistirSesion(crearSesion('demo@trender.com', 'otp'));
+    persistirSesion(crearSesion('demo@trender.com', 'password'));
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('#mi-espacio')).toBeTruthy();
   });
 
   it('muestra el nombre del usuario en el Navbar al iniciar sesión', () => {
-    persistirSesion(crearSesion('demo@trender.com', 'otp'));
+    persistirSesion(crearSesion('demo@trender.com', 'password'));
     fixture.detectChanges();
 
     expect(component.nombreAutenticado).toBe('Usuario Demo');
     expect(fixture.nativeElement.textContent).toContain('Hola, Usuario Demo');
   });
 
-  it('explora 11 catálogos y permite seleccionar una prenda con sesión', () => {
-    expect(component.catalogos.length).toBe(11);
+  it('activa y desactiva el modo inmersivo del visor', () => {
+    component.activarModoInmersivo();
 
-    const prenda = component.catalogos[0].prendas[0];
-    component.probarPrenda(prenda);
+    expect(component.modoInmersivo).toBe(true);
+    expect(document.body.classList.contains('overflow-hidden')).toBe(true);
 
-    expect(component.mostrarModalAuth).toBe(true);
-    expect(component.prendaPendiente?.id).toBe(prenda.id);
+    component.salirModoInmersivo();
 
-    persistirSesion(crearSesion('demo@trender.com', 'otp'));
-    component.probarPrenda(prenda);
-
-    expect(component.prendaSeleccionada?.id).toBe(prenda.id);
+    expect(component.modoInmersivo).toBe(false);
+    expect(document.body.classList.contains('overflow-hidden')).toBe(false);
   });
 
-  it('abre y cierra el acordeón de preguntas frecuentes', () => {
-    component.toggleFaq(0);
-    expect(component.faqAbierto).toBe(0);
+  it('renderiza métricas del hero y footer institucional', () => {
+    const texto = fixture.nativeElement.textContent as string;
 
-    component.toggleFaq(0);
-    expect(component.faqAbierto).toBeNull();
+    expect(texto).toContain('99.2%');
+    expect(texto).toContain('Precisión Biométrica');
+    expect(texto).toContain('Escáner Web');
+    expect(texto).toContain('0.0s');
+    expect(texto).toContain('© 2026 Trender');
+  });
+
+  it('no expone exportación GLB ni inputs OTP', () => {
+    const texto = (fixture.nativeElement.textContent as string).toLowerCase();
+
+    expect(texto).not.toContain('.glb');
+    expect(texto).not.toContain('exportar avatar');
+    expect(texto).not.toContain('escanear mi cuerpo');
+    expect(fixture.nativeElement.querySelectorAll('input[autocomplete="one-time-code"]').length).toBe(0);
   });
 });

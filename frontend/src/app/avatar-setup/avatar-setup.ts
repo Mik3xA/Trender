@@ -7,9 +7,7 @@ import {
   NgZone,
   OnDestroy,
   OnInit,
-  QueryList,
   ViewChild,
-  ViewChildren,
   ViewEncapsulation
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -18,53 +16,32 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { environment } from '../../environments/environment';
 import { AuthService, StoredSession } from '../servicios/auth.service';
-import {
-  CATALOGOS,
-  Prenda,
-  TIENDA_CATALOGO_INICIAL,
-  TiendaCatalogo
-} from '../data/catalogos.data';
 
 const DEFAULT_CUSTOMER_EMAIL = 'usuario@trender.com';
-const STORES_STORAGE_KEY = 'trender.stores';
 const MEASUREMENTS_STORAGE_KEY = 'trender.measurements';
-const EXPORTED_MODELS_STORAGE_KEY = 'trender.models.exported';
-const OTP_LENGTH = 6;
-const RESEND_SECONDS = 30;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type Complexion = 'Delgada' | 'Atlética' | 'Media' | 'Robusta';
 export type Genero = 'Masculino' | 'Femenino';
-type AuthMode = 'login' | 'registro' | 'codigo' | 'password-login' | 'password-registro';
-type AuthAction = 'login' | 'registro' | 'escaneo' | 'prenda';
+type AuthMode = 'login' | 'registro';
+type AuthAction = 'login' | 'registro';
 type NotificationType = 'exito' | 'error';
-
-interface Tienda {
-  nombre: string;
-  monograma: string;
-  vinculada: boolean;
-}
+type CategoriaPrenda = 'Torso' | 'Piernas';
 
 interface Faq {
   pregunta: string;
   respuesta: string;
 }
 
-const TIENDAS: Tienda[] = [
-  { nombre: 'Shein', monograma: 'SH', vinculada: false },
-  { nombre: 'El Palacio de Hierro', monograma: 'PH', vinculada: false },
-  { nombre: 'Adidas', monograma: 'AD', vinculada: false },
-  { nombre: 'Studio F', monograma: 'SF', vinculada: false },
-  { nombre: 'Amazon Fashion', monograma: 'AF', vinculada: false },
-  { nombre: 'Zara', monograma: 'ZA', vinculada: false },
-  { nombre: 'H&M', monograma: 'H&M', vinculada: false },
-  { nombre: 'C&A Moda', monograma: 'C&A', vinculada: false },
-  { nombre: 'AliExpress', monograma: 'AE', vinculada: false },
-  { nombre: 'Bershka & Nike', monograma: 'B&N', vinculada: false }
-];
+interface PrendaEscaneada {
+  id: string;
+  nombre: string;
+  precio: string;
+  categoria: CategoriaPrenda;
+  imagenUrl: string;
+}
 
 const FAQS: Faq[] = [
   {
@@ -73,29 +50,18 @@ const FAQS: Faq[] = [
       'Trender utiliza un motor gráfico paramétrico que convierte tus datos de estatura, peso y complexión en deformaciones geométricas reales sobre la malla 3D en tiempo real.'
   },
   {
-    pregunta: '¿Es seguro el escaneo de mi cuerpo con el Motor Biométrico Local?',
+    pregunta: '¿Cómo funciona el Escáner Web de Prendas?',
     respuesta:
-      'Totalmente seguro. Las imágenes procesadas para la fotogrametría 3D no se almacenan en servidores públicos; se procesan de forma cifrada para generar únicamente los puntos de medición biométrica.'
-  },
-  {
-    pregunta: '¿Cómo funciona la sincronización con tiendas como Zara, Shein o Adidas?',
-    respuesta:
-      'Una vez vinculada tu cuenta, Trender mapea el tallaje oficial de cada marca con las medidas exactas de tu avatar 3D, mostrándote el porcentaje de ajuste y holgura de cada prenda.'
-  },
-  {
-    pregunta: '¿Puedo exportar mi modelo 3D a otras plataformas?',
-    respuesta:
-      'Sí, los usuarios registrados pueden exportar su avatar en formato .GLB estandarizado para usarlo en otras herramientas de modelado o metaverso.'
+      'Pega el enlace de cualquier producto de una tienda online. Nuestro motor analiza la URL, detecta la marca y extrae la imagen, nombre, precio y categoría de la prenda. Luego la texturiza sobre tu avatar 3D al instante.'
   }
 ];
 
 const BASE_HEIGHT_CM = 170;
 const BASE_WEIGHT_KG = 70;
+const SCENE_SCALE = 100;
 
-// El origen del grupo es la planta de los pies: estatura relativa al maniquí base
 const NEUTRAL_GROSOR = BASE_WEIGHT_KG / Math.pow(BASE_HEIGHT_CM / 100, 2);
 
-// Límites biológicos tolerantes: enanismo a gigantismo
 const LIMITS = {
   estatura: { min: 80, max: 250 },
   peso: { min: 30, max: 300 }
@@ -116,7 +82,6 @@ interface ComplexionProfile {
   legXZ: number;
 }
 
-// Perfiles anatómicos: grasa reparte al torso/pelvis, músculo a hombros/brazos, delgada reduce todo
 const COMPLEXION_PROFILE: Record<Complexion, ComplexionProfile> = {
   Delgada: { torsoXZ: 0.8, pelvisXZ: 0.8, shoulderX: 0.8, armXZ: 0.8, legXZ: 0.8 },
   Media: { torsoXZ: 1.0, pelvisXZ: 1.0, shoulderX: 1.0, armXZ: 1.0, legXZ: 1.0 },
@@ -146,7 +111,6 @@ interface MarqueeItem {
   label: string;
 }
 
-// Catálogo del carrusel: se duplica para crear el bucle continuo
 const MARQUEE_ITEMS: MarqueeItem[] = [
   {
     image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=600&q=80',
@@ -192,9 +156,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('rendererCanvas', { static: true })
   private rendererCanvas!: ElementRef<HTMLCanvasElement>;
 
-  @ViewChildren('otpInput')
-  private otpInputs?: QueryList<ElementRef<HTMLInputElement>>;
-
   estatura: number | null = null;
   peso: number | null = null;
   complexion: Complexion = 'Atlética';
@@ -203,46 +164,35 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   isGenerating = false;
   modelReady = false;
   alertaValidacion: string | null = null;
+  modoInmersivo = false;
 
-  // Autenticación real contra /api/auth
   mostrarModalAuth = false;
   modoAuth: AuthMode = 'login';
   emailIngresado = '';
-  codigoEnviado = false;
-  codigoVerificacion = '';
   sesionIniciada = false;
   emailAutenticado = '';
   nombreAutenticado = '';
-  reenvioSegundos = 0;
   errorAuth: string | null = null;
-  errorCodigo: string | null = null;
   cargandoAuth = false;
   nombreIngresado = '';
   passwordIngresado = '';
-  passwordConfirmacion = '';
   registroExitoso = false;
   nombreRegistrado = '';
-  redirigiendoTienda: string | null = null;
   notificacion: { mensaje: string; tipo: NotificationType } | null = null;
   tipoAccionAuth: AuthAction | '' = '';
-  prendaPendiente: Prenda | null = null;
-  prendaSeleccionada: Prenda | null = null;
 
-  tiendas: Tienda[] = TIENDAS.map((tienda) => ({ ...tienda }));
-
-  get tiendasVinculadasCount(): number {
-    return this.tiendas.filter((tienda) => tienda.vinculada).length;
-  }
+  // Escáner Web de Prendas
+  urlEscaneo = '';
+  escaneando = false;
+  prendaEscaneada: PrendaEscaneada | null = null;
+  errorEscaneo: string | null = null;
 
   readonly faqs: Faq[] = FAQS;
   faqAbierto: number | null = null;
 
   readonly marqueeItems: MarqueeItem[] = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
-  readonly catalogos: TiendaCatalogo[] = CATALOGOS;
-  tiendaCatalogoActiva: string = TIENDA_CATALOGO_INICIAL.id;
 
-  modelosExportados = 0;
-  exportandoModelo = false;
+  prendaActiva: PrendaEscaneada | null = null;
 
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
@@ -256,12 +206,15 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   private animationId = 0;
   private webglReady = false;
   private lastFrameTime = 0;
-  private reenvioTimer?: ReturnType<typeof setInterval>;
   private notificacionTimer?: ReturnType<typeof setTimeout>;
   private registroTimer?: ReturnType<typeof setTimeout>;
-  private redireccionTimer?: ReturnType<typeof setTimeout>;
+  private layoutTimer?: ReturnType<typeof setTimeout>;
   private registroEnCurso = false;
   private authSubscription?: Subscription;
+  private garmentMeshes: THREE.Mesh[] = [];
+  private garmentTexture?: THREE.Texture;
+  private garmentMaterial?: THREE.MeshStandardMaterial;
+  private readonly textureLoader = new THREE.TextureLoader();
 
   private readonly basePositions = new Map<string, THREE.Vector3>();
   private readonly baseScales = new Map<string, THREE.Vector3>();
@@ -277,14 +230,12 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private readonly target: RigState = { ...this.current };
 
-  // Maniquí de estudio: porcelana mate / arcilla mineral
   private readonly mannequinMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe7e5e1,
+    color: 0xe2e8f0,
     roughness: 0.55,
     metalness: 0.05
   });
 
-  // Ropa interior sobria: verde oliva oscuro / carbón muteado
   private readonly underwearMaterial = new THREE.MeshStandardMaterial({
     color: 0x2d3728,
     roughness: 0.7,
@@ -319,31 +270,47 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     });
 
     this.setupResize();
+
+    this.layoutTimer = setTimeout(() => {
+      if (!this.webglReady) {
+        return;
+      }
+      const host = this.viewport ?? this.rendererCanvas?.nativeElement.parentElement;
+      this.updateModelProportions(
+        this.estatura ?? BASE_HEIGHT_CM,
+        this.peso ?? BASE_WEIGHT_KG,
+        this.complexion,
+        this.genero
+      );
+      if (host) {
+        this.updateSize(host);
+      }
+      this.updateFraming(this.target.height);
+    }, 100);
   }
 
   ngOnDestroy(): void {
     cancelAnimationFrame(this.animationId);
     this.authSubscription?.unsubscribe();
-    this.detenerReenvio();
+    this.desbloquearScroll();
     if (this.notificacionTimer) {
       clearTimeout(this.notificacionTimer);
     }
     if (this.registroTimer) {
       clearTimeout(this.registroTimer);
     }
-    if (this.redireccionTimer) {
-      clearTimeout(this.redireccionTimer);
+    if (this.layoutTimer) {
+      clearTimeout(this.layoutTimer);
     }
     this.resizeObserver?.disconnect();
     window.removeEventListener('resize', this.onWindowResize);
     this.controls?.dispose();
+    this.limpiarRopa();
     this.disposeSceneResources();
     this.renderer?.dispose();
     this.mannequinMaterial.dispose();
     this.underwearMaterial.dispose();
   }
-
-  // ---------- Entrada del formulario ----------
 
   onEstaturaChange(value: number | null): void {
     this.estatura = value;
@@ -372,55 +339,24 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.guardarMedidas();
   }
 
-  // ---------- Autenticación ----------
-
   get tituloAuth(): string {
-    if (this.tipoAccionAuth === 'escaneo') {
-      return 'Desbloquea el Motor Biométrico Local';
-    }
-    if (this.tipoAccionAuth === 'prenda') {
-      return this.prendaPendiente
-        ? `Prueba ${this.prendaPendiente.nombre} en tu avatar`
-        : 'Prueba esta prenda en tu avatar';
-    }
-    if (this.modoAuth === 'password-registro') {
-      return 'Crea tu cuenta clásica';
-    }
-    if (this.modoAuth === 'password-login') {
-      return 'Inicia sesión con contraseña';
-    }
     return this.modoAuth === 'registro' ? 'Crea tu cuenta' : 'Inicia sesión';
   }
 
   get descripcionAuth(): string {
-    if (this.tipoAccionAuth === 'escaneo') {
-      return 'El escaneo biométrico procesa tus medidas personales y requiere una cuenta para cifrarlas y mantenerlas privadas.';
-    }
-    if (this.tipoAccionAuth === 'prenda') {
-      return 'Inicia sesión para probar esta prenda sobre tu avatar y guardar tus selecciones.';
-    }
-    return 'Accede a tu cuenta para guardar tu avatar y sincronizar tus tiendas favoritas.';
+    return 'Accede a tu cuenta para guardar tus medidas y preferencias.';
   }
 
   abrirAuthModal(accion: AuthAction): void {
     this.tipoAccionAuth = accion;
-    if (accion !== 'prenda') {
-      this.prendaPendiente = null;
-    }
     this.modoAuth = accion === 'registro' ? 'registro' : 'login';
     this.mostrarModalAuth = true;
-    this.codigoEnviado = false;
-    this.codigoVerificacion = '';
     this.errorAuth = null;
-    this.errorCodigo = null;
     this.cargandoAuth = false;
     this.passwordIngresado = '';
-    this.passwordConfirmacion = '';
     this.nombreIngresado = '';
     this.registroExitoso = false;
     this.registroEnCurso = false;
-    this.detenerReenvio();
-    this.reenvioSegundos = 0;
   }
 
   cerrarModalAuth(): void {
@@ -435,19 +371,12 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.mostrarModalAuth = false;
     this.tipoAccionAuth = '';
-    this.prendaPendiente = null;
-    this.codigoEnviado = false;
-    this.codigoVerificacion = '';
     this.errorAuth = null;
-    this.errorCodigo = null;
     this.cargandoAuth = false;
     this.passwordIngresado = '';
-    this.passwordConfirmacion = '';
     this.registroExitoso = false;
     this.nombreRegistrado = '';
     this.registroEnCurso = false;
-    this.detenerReenvio();
-    this.reenvioSegundos = 0;
   }
 
   @HostListener('document:keydown.escape')
@@ -459,168 +388,9 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
   cambiarModoAuth(modo: AuthMode): void {
     this.modoAuth = modo;
-    this.codigoEnviado = modo === 'codigo';
-    this.codigoVerificacion = '';
     this.errorAuth = null;
-    this.errorCodigo = null;
     this.passwordIngresado = '';
-    this.passwordConfirmacion = '';
-    if (modo !== 'codigo') {
-      this.detenerReenvio();
-      this.reenvioSegundos = 0;
-    }
-  }
-
-  irAPasswordRegistro(): void {
-    this.cambiarModoAuth('password-registro');
-  }
-
-  irAPasswordLogin(): void {
-    this.cambiarModoAuth('password-login');
-  }
-
-  volverACodigo(): void {
-    this.cambiarModoAuth(this.tipoAccionAuth === 'registro' ? 'registro' : 'login');
-  }
-
-  enviarCodigo(): void {
-    this.solicitarCodigo(false);
-  }
-
-  reenviarCodigo(): void {
-    if (this.reenvioSegundos > 0 || this.cargandoAuth) {
-      return;
-    }
-    this.codigoVerificacion = '';
-    this.errorCodigo = null;
-    this.solicitarCodigo(true);
-  }
-
-  cambiarCorreo(): void {
-    this.modoAuth = this.tipoAccionAuth === 'registro' ? 'registro' : 'login';
-    this.codigoEnviado = false;
-    this.codigoVerificacion = '';
-    this.errorCodigo = null;
-    this.errorAuth = null;
-    this.detenerReenvio();
-    this.reenvioSegundos = 0;
-  }
-
-  private solicitarCodigo(esReenvio: boolean): void {
-    const email = this.emailIngresado.trim();
-
-    if (!EMAIL_REGEX.test(email)) {
-      this.errorAuth = 'Ingresa un correo electrónico válido.';
-      return;
-    }
-
-    this.emailIngresado = email;
-    this.errorAuth = null;
-    this.errorCodigo = null;
-    this.cargandoAuth = true;
-
-    this.auth.solicitarCodigo(email).subscribe({
-      next: () => {
-        this.cargandoAuth = false;
-        this.modoAuth = 'codigo';
-        this.codigoEnviado = true;
-        this.codigoVerificacion = '';
-        this.iniciarReenvio();
-        this.mostrarNotificacion(
-          esReenvio
-            ? `Código reenviado a ${email}.`
-            : `Código de verificación enviado a ${email}.`,
-          'exito'
-        );
-        this.enfocarOtp(0);
-        this.cdr.detectChanges();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.cargandoAuth = false;
-        this.errorAuth = this.mensajeError(
-          error,
-          'No se pudo enviar el código. Intenta nuevamente.'
-        );
-        this.cdr.detectChanges();
-      }
-    });
-  }
-
-  digitoCodigo(index: number): string {
-    return this.codigoVerificacion.padEnd(OTP_LENGTH, ' ').charAt(index).trim();
-  }
-
-  onCodigoInput(event: Event, index: number): void {
-    const input = event.target as HTMLInputElement;
-    const digits = this.codigoVerificacion.padEnd(OTP_LENGTH, ' ').split('');
-    digits[index] = input.value.replace(/\D/g, '').slice(-1);
-    this.codigoVerificacion = digits.join('');
-    input.value = digits[index].trim();
-    this.errorCodigo = null;
-
-    if (digits[index].trim() && index < OTP_LENGTH - 1) {
-      this.enfocarOtp(index + 1);
-    }
-
-    if (this.codigoCompleto()) {
-      this.verificarCodigo();
-    }
-  }
-
-  onCodigoKeydown(event: KeyboardEvent, index: number): void {
-    if (event.key === 'Backspace' && !this.digitoCodigo(index) && index > 0) {
-      const digits = this.codigoVerificacion.padEnd(OTP_LENGTH, ' ').split('');
-      digits[index - 1] = ' ';
-      this.codigoVerificacion = digits.join('');
-      this.enfocarOtp(index - 1);
-    }
-  }
-
-  onCodigoPaste(event: ClipboardEvent): void {
-    const digits = event.clipboardData?.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
-    if (!digits) {
-      return;
-    }
-
-    event.preventDefault();
-    this.codigoVerificacion = digits.padEnd(OTP_LENGTH, ' ');
-    this.errorCodigo = null;
-    this.enfocarOtp(Math.min(digits.length, OTP_LENGTH - 1));
-
-    if (this.codigoCompleto()) {
-      this.verificarCodigo();
-    }
-  }
-
-  verificarCodigo(): void {
-    if (this.cargandoAuth) {
-      return;
-    }
-
-    if (!this.codigoCompleto()) {
-      this.errorCodigo = 'Ingresa los 6 dígitos del código.';
-      return;
-    }
-
-    this.errorCodigo = null;
-    this.cargandoAuth = true;
-    const codigo = this.codigoVerificacion.replace(/\D/g, '');
-
-    this.auth.verificarCodigo(this.emailIngresado, codigo).subscribe({
-      next: () => {
-        this.cargandoAuth = false;
-        this.finalizarSesion();
-        this.cdr.detectChanges();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.cargandoAuth = false;
-        this.errorCodigo =
-          error.status === 401
-            ? 'Código inválido. Revisa los 6 dígitos e intenta nuevamente.'
-            : this.mensajeError(error, 'No se pudo verificar el código.');
-        this.cdr.detectChanges();
-      }
-    });
+    this.nombreIngresado = '';
   }
 
   registrarConPassword(): void {
@@ -643,11 +413,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (this.passwordIngresado.length < 8) {
       this.errorAuth = 'La contraseña debe tener al menos 8 caracteres.';
-      return;
-    }
-
-    if (this.passwordIngresado !== this.passwordConfirmacion) {
-      this.errorAuth = 'Las contraseñas no coinciden.';
       return;
     }
 
@@ -685,6 +450,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.registroTimer = setTimeout(() => {
       this.registroTimer = undefined;
       this.finalizarSesion();
+      this.cargarDatosUsuario();
       this.cdr.detectChanges();
     }, 2000);
   }
@@ -711,6 +477,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
         next: () => {
           this.cargandoAuth = false;
           this.finalizarSesion();
+          this.cargarDatosUsuario();
           this.cdr.detectChanges();
         },
         error: (error: HttpErrorResponse) => {
@@ -724,17 +491,134 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
+  private cargarDatosUsuario(): void {
+    const token = this.auth.obtenerToken();
+    if (!token) return;
+
+    this.http
+      .get<{ status: string; medidas: any }>(
+        `${environment.apiUrl}/api/medidas/medidas`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.medidas) {
+            this.aplicarMedidasBackend(res.medidas);
+          }
+        },
+        error: () => {
+        }
+      });
+  }
+
+  private aplicarMedidasBackend(medidas: { estatura?: number; peso?: number; complexion?: Complexion; genero?: Genero }): void {
+    if (medidas.estatura) this.estatura = medidas.estatura;
+    if (medidas.peso) this.peso = medidas.peso;
+    if (medidas.complexion) this.complexion = medidas.complexion;
+    if (medidas.genero) this.genero = medidas.genero;
+    this.validarMedidas();
+    this.syncModel();
+    this.guardarMedidas();
+  }
+
+  private guardarMedidasBackend(): void {
+    const token = this.auth.obtenerToken();
+    if (!token) return;
+
+    this.http
+      .post(
+        `${environment.apiUrl}/api/medidas/medidas`,
+        { estatura: this.estatura, peso: this.peso, complexion: this.complexion, genero: this.genero },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      .subscribe({ error: () => {} });
+  }
+
+  escanearProducto(): void {
+    const url = this.urlEscaneo.trim();
+    if (!url) {
+      this.errorEscaneo = 'Ingresa una URL válida.';
+      return;
+    }
+
+    this.escaneando = true;
+    this.errorEscaneo = null;
+    this.prendaEscaneada = null;
+
+    this.http
+      .post<{ success: boolean; prenda: PrendaEscaneada }>(
+        `${environment.apiUrl}/api/ropa/escanear-link`,
+        { url }
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.success && res.prenda) {
+            this.prendaEscaneada = res.prenda;
+          } else {
+            this.errorEscaneo = 'No se pudo escanear la prenda. Intenta con otra URL.';
+          }
+          this.escaneando = false;
+          this.cdr.detectChanges();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.escaneando = false;
+          this.errorEscaneo = err.error?.message || 'Error al escanear. Verifica la URL e intenta de nuevo.';
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  probarPrendaEscaneada(): void {
+    if (this.prendaEscaneada) {
+      this.probarPrenda(this.prendaEscaneada);
+    }
+  }
+
+  limpiarEscaneo(): void {
+    this.urlEscaneo = '';
+    this.prendaEscaneada = null;
+    this.errorEscaneo = null;
+  }
+
   cerrarSesion(): void {
     this.auth.cerrarSesion();
     this.emailAutenticado = '';
     this.nombreAutenticado = '';
     this.emailIngresado = '';
-    this.prendaSeleccionada = null;
-    this.mostrarNotificacion('Sesión cerrada correctamente.', 'exito');
+    this.reiniciarEstadoDemo();
+    this.mostrarNotificacion('Sesión cerrada. Medidas reiniciadas.', 'exito');
+  }
+
+  private reiniciarEstadoDemo(): void {
+    const storage = this.getStorage();
+    storage?.removeItem(MEASUREMENTS_STORAGE_KEY);
+
+    this.estatura = null;
+    this.peso = null;
+    this.complexion = 'Atlética';
+    this.genero = 'Masculino';
+    this.alertaValidacion = null;
+    this.modelReady = false;
+    this.prendaActiva = null;
+    this.limpiarRopa();
+
+    if (this.modoInmersivo) {
+      this.modoInmersivo = false;
+      this.desbloquearScroll();
+    }
+
+    if (this.webglReady) {
+      this.updateModelProportions(
+        BASE_HEIGHT_CM,
+        BASE_WEIGHT_KG,
+        this.complexion,
+        this.genero
+      );
+      this.buildMannequin();
+    }
   }
 
   private finalizarSesion(): void {
-    const prendaPendiente = this.prendaPendiente;
     const sesion = this.auth.sesionActual;
 
     this.registroEnCurso = false;
@@ -744,29 +628,12 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
       sesion?.user?.nombre?.trim() || this.nombreDesdeEmail(this.emailAutenticado);
     this.emailIngresado = this.emailAutenticado;
     this.mostrarModalAuth = false;
-    this.codigoEnviado = false;
-    this.codigoVerificacion = '';
     this.errorAuth = null;
-    this.errorCodigo = null;
-    this.detenerReenvio();
-    this.reenvioSegundos = 0;
     this.tipoAccionAuth = '';
-    this.prendaPendiente = null;
     this.passwordIngresado = '';
-    this.passwordConfirmacion = '';
     this.nombreIngresado = '';
     this.registroExitoso = false;
     this.nombreRegistrado = '';
-
-    if (prendaPendiente) {
-      this.prendaSeleccionada = prendaPendiente;
-      this.scrollToProbador();
-      this.mostrarNotificacion(
-        `${prendaPendiente.nombre} lista para probar en tu avatar.`,
-        'exito'
-      );
-      return;
-    }
 
     this.mostrarNotificacion(`Bienvenido/a, ${this.nombreAutenticado}.`, 'exito');
   }
@@ -786,7 +653,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     } else {
       this.emailIngresado = '';
       this.nombreAutenticado = '';
-      this.prendaSeleccionada = null;
     }
   }
 
@@ -811,85 +677,165 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     return error.error?.message ?? error.error?.error ?? fallback;
   }
 
-  private codigoCompleto(): boolean {
-    return this.codigoVerificacion.replace(/\D/g, '').length === OTP_LENGTH;
-  }
+  probarPrenda(prenda: PrendaEscaneada): void {
+    this.prendaActiva = prenda;
+    this.scrollToVisor();
 
-  private iniciarReenvio(): void {
-    this.detenerReenvio();
-    this.reenvioSegundos = RESEND_SECONDS;
-    this.reenvioTimer = setInterval(() => {
-      this.reenvioSegundos = Math.max(0, this.reenvioSegundos - 1);
-      this.cdr.detectChanges();
-      if (this.reenvioSegundos === 0) {
-        this.detenerReenvio();
-      }
-    }, 1000);
-  }
-
-  private detenerReenvio(): void {
-    if (this.reenvioTimer) {
-      clearInterval(this.reenvioTimer);
-      this.reenvioTimer = undefined;
-    }
-  }
-
-  private enfocarOtp(index: number): void {
-    setTimeout(() => {
-      this.otpInputs?.get(index)?.nativeElement.focus();
-    });
-  }
-
-  // ---------- Tiendas ----------
-
-  vincularTienda(tienda: Tienda): void {
-    if (this.redirigiendoTienda) {
-      return;
+    if (this.webglReady && this.modelGroup) {
+      this.aplicarPrendaVirtual(prenda);
     }
 
-    this.redirigiendoTienda = tienda.nombre;
-    this.redireccionTimer = setTimeout(() => {
-      this.redireccionTimer = undefined;
-      this.redirigiendoTienda = null;
-      this.marcarTiendaVinculada(tienda.nombre);
-      this.mostrarNotificacion(`${tienda.nombre} conectada correctamente.`, 'exito');
-      this.cdr.detectChanges();
-    }, 1500);
-  }
-
-  private marcarTiendaVinculada(nombre: string): void {
-    this.tiendas = this.tiendas.map((tienda) =>
-      tienda.nombre === nombre ? { ...tienda, vinculada: true } : tienda
-    );
-    this.guardarTiendas();
-  }
-
-  // ---------- Catálogo multi-tienda ----------
-
-  get catalogoActivo(): TiendaCatalogo {
-    return (
-      this.catalogos.find((tienda) => tienda.id === this.tiendaCatalogoActiva) ??
-      this.catalogos[0]
-    );
-  }
-
-  seleccionarTiendaCatalogo(id: string): void {
-    this.tiendaCatalogoActiva = id;
-  }
-
-  probarPrenda(prenda: Prenda): void {
-    if (!this.sesionIniciada) {
-      this.prendaPendiente = prenda;
-      this.abrirAuthModal('prenda');
-      return;
-    }
-
-    this.prendaSeleccionada = prenda;
-    this.scrollToProbador();
     this.mostrarNotificacion(
-      `${prenda.nombre} lista para probar en tu avatar.`,
+      `Probando: ${prenda.nombre}`,
       'exito'
     );
+  }
+
+  quitarRopa(): void {
+    this.limpiarRopa();
+    this.prendaActiva = null;
+    this.mostrarNotificacion('Prenda retirada. Maniquí restaurado.', 'exito');
+  }
+
+  private aplicarPrendaVirtual(prenda: PrendaEscaneada): void {
+    this.limpiarRopa();
+
+    if (!this.modelGroup) {
+      return;
+    }
+
+    const colorFallback = prenda.categoria === 'Torso' ? 0x3f4e3b : 0x2d3728;
+
+    this.garmentMaterial = new THREE.MeshStandardMaterial({
+      color: colorFallback,
+      roughness: 0.85,
+      metalness: 0.05,
+      side: THREE.DoubleSide
+    });
+
+    this.textureLoader.load(
+      prenda.imagenUrl,
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = true;
+        this.garmentTexture = texture;
+        if (this.garmentMaterial) {
+          this.garmentMaterial.map = texture;
+          this.garmentMaterial.needsUpdate = true;
+        }
+      },
+      undefined,
+      (err) => {
+        console.warn('No se pudo cargar la textura de la prenda, usando color de respaldo:', err);
+      }
+    );
+
+    const escala = prenda.categoria === 'Torso' ? 1.08 : 1.1;
+
+    for (const parte of this.partesParaPrenda(prenda)) {
+      const cuerpo = this.modelGroup.getObjectByName(parte) as THREE.Mesh | undefined;
+      if (!cuerpo) {
+        continue;
+      }
+
+      const capa = new THREE.Mesh(cuerpo.geometry.clone(), this.garmentMaterial);
+      capa.name = `${parte}_ropa`;
+      capa.scale.setScalar(escala);
+      capa.castShadow = true;
+      capa.receiveShadow = true;
+      cuerpo.add(capa);
+      this.garmentMeshes.push(capa);
+    }
+  }
+
+  private partesParaPrenda(prenda: PrendaEscaneada): string[] {
+    const esTorso = prenda.categoria === 'Torso';
+    const esLargo = /vestido|abrigo|trench/i.test(prenda.nombre);
+    const partes = new Set<string>();
+
+    if (esTorso || esLargo) {
+      for (const parte of this.partesTorsoRopa()) {
+        partes.add(parte);
+      }
+    }
+
+    if (!esTorso || esLargo) {
+      for (const parte of this.partesPiernasRopa()) {
+        partes.add(parte);
+      }
+    }
+
+    return [...partes];
+  }
+
+  private limpiarRopa(): void {
+    for (const capa of this.garmentMeshes) {
+      capa.parent?.remove(capa);
+      capa.geometry.dispose();
+    }
+
+    this.garmentMeshes = [];
+    this.garmentMaterial?.dispose();
+    this.garmentMaterial = undefined;
+    if (this.garmentTexture) {
+      this.garmentTexture.dispose();
+      this.garmentTexture = undefined;
+    }
+  }
+
+  private partesTorsoRopa(): string[] {
+    return [
+      'torso',
+      'busto_izq',
+      'busto_der',
+      'hombro_izq',
+      'hombro_der',
+      'brazo_izq',
+      'brazo_der',
+      'antebrazo_izq',
+      'antebrazo_der'
+    ];
+  }
+
+  private partesPiernasRopa(): string[] {
+    return ['pelvis', 'muslo_izq', 'muslo_der', 'pantorrilla_izq', 'pantorrilla_der'];
+  }
+
+  activarModoInmersivo(): void {
+    if (this.modoInmersivo) {
+      return;
+    }
+    this.modoInmersivo = true;
+    this.bloquearScroll();
+    this.cdr.detectChanges();
+    setTimeout(() => this.reajustarVisor());
+  }
+
+  salirModoInmersivo(): void {
+    if (!this.modoInmersivo) {
+      return;
+    }
+    this.modoInmersivo = false;
+    this.desbloquearScroll();
+    this.cdr.detectChanges();
+    setTimeout(() => this.reajustarVisor());
+    this.scrollToProbador();
+  }
+
+  private bloquearScroll(): void {
+    if (typeof document !== 'undefined') {
+      document.body.classList.add('overflow-hidden');
+    }
+  }
+
+  private desbloquearScroll(): void {
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('overflow-hidden');
+    }
   }
 
   private scrollToProbador(): void {
@@ -904,54 +850,9 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // ---------- Exportación del avatar ----------
-
-  exportarModelo(): void {
-    if (!this.modelReady || !this.modelGroup || this.exportandoModelo) {
-      this.mostrarNotificacion('Genera tu modelo 3D antes de exportarlo.', 'error');
-      return;
-    }
-
-    this.exportandoModelo = true;
-    const exporter = new GLTFExporter();
-
-    exporter.parse(
-      this.modelGroup,
-      (resultado) => {
-        const contenido =
-          resultado instanceof ArrayBuffer ? resultado : JSON.stringify(resultado);
-        const blob = new Blob([contenido], { type: 'model/gltf-binary' });
-        const url = URL.createObjectURL(blob);
-        const enlace = document.createElement('a');
-
-        enlace.href = url;
-        enlace.download = 'trender-avatar.glb';
-        enlace.click();
-        URL.revokeObjectURL(url);
-
-        this.modelosExportados += 1;
-        this.guardarModelosExportados();
-        this.exportandoModelo = false;
-        this.mostrarNotificacion('Avatar exportado en formato .GLB.', 'exito');
-        this.cdr.detectChanges();
-      },
-      (error) => {
-        console.error('No se pudo exportar el avatar:', error);
-        this.exportandoModelo = false;
-        this.mostrarNotificacion('No se pudo exportar el avatar.', 'error');
-        this.cdr.detectChanges();
-      },
-      { binary: true }
-    );
-  }
-
-  // ---------- FAQ ----------
-
   toggleFaq(index: number): void {
     this.faqAbierto = this.faqAbierto === index ? null : index;
   }
-
-  // ---------- Notificaciones ----------
 
   mostrarNotificacion(mensaje: string, tipo: NotificationType): void {
     if (this.notificacionTimer) {
@@ -971,8 +872,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.notificacion = null;
   }
 
-  // ---------- Persistencia local ----------
-
   private getStorage(): Storage | null {
     try {
       return typeof window !== 'undefined' && window.localStorage ? window.localStorage : null;
@@ -985,24 +884,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     const storage = this.getStorage();
     if (!storage) {
       return;
-    }
-
-    try {
-      const storesRaw = storage.getItem(STORES_STORAGE_KEY);
-      if (storesRaw) {
-        const vinculadas = JSON.parse(storesRaw);
-        if (Array.isArray(vinculadas)) {
-          const nombres = new Set(
-            vinculadas.filter((nombre): nombre is string => typeof nombre === 'string')
-          );
-          this.tiendas = this.tiendas.map((tienda) => ({
-            ...tienda,
-            vinculada: nombres.has(tienda.nombre)
-          }));
-        }
-      }
-    } catch {
-      storage.removeItem(STORES_STORAGE_KEY);
     }
 
     try {
@@ -1036,13 +917,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch {
       storage.removeItem(MEASUREMENTS_STORAGE_KEY);
     }
-
-    try {
-      const exportados = Number(storage.getItem(EXPORTED_MODELS_STORAGE_KEY));
-      this.modelosExportados = Number.isFinite(exportados) && exportados > 0 ? exportados : 0;
-    } catch {
-      storage.removeItem(EXPORTED_MODELS_STORAGE_KEY);
-    }
   }
 
   private guardarMedidas(): void {
@@ -1055,26 +929,15 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
         genero: this.genero
       })
     );
-  }
-
-  private guardarModelosExportados(): void {
-    this.guardarEnStorage(EXPORTED_MODELS_STORAGE_KEY, String(this.modelosExportados));
-  }
-
-  private guardarTiendas(): void {
-    const vinculadas = this.tiendas.filter((tienda) => tienda.vinculada).map((tienda) => tienda.nombre);
-    this.guardarEnStorage(STORES_STORAGE_KEY, JSON.stringify(vinculadas));
+    this.guardarMedidasBackend();
   }
 
   private guardarEnStorage(clave: string, valor: string): void {
     try {
       this.getStorage()?.setItem(clave, valor);
     } catch {
-      // Almacenamiento no disponible o sin cuota: la demo continúa en memoria
     }
   }
-
-  // ---------- Validación biológica ----------
 
   validarMedidas(): void {
     const fueraDeRango =
@@ -1097,19 +960,15 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
-  // ---------- Motor de complexión (clamping seguro) ----------
-
   updateModelProportions(
     estatura: number,
     peso: number,
     complexion: Complexion,
     genero: Genero
   ): void {
-    // Math.min(Math.max(...)): 800 kg o 40 cm se dibujan al límite seguro sin romper la matriz
     const estaturaSafe = clamp(estatura, LIMITS.estatura.min, LIMITS.estatura.max);
     const pesoSafe = clamp(peso, LIMITS.peso.min, LIMITS.peso.max);
 
-    // IMC dinámico: factorGrosor = peso(kg) / estatura(m)^2
     const estaturaM = estaturaSafe / 100;
     const factorGrosor = pesoSafe / (estaturaM * estaturaM);
     const grosor = clamp(factorGrosor / NEUTRAL_GROSOR, 0.55, 2.4);
@@ -1117,34 +976,29 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     const profile = COMPLEXION_PROFILE[complexion];
     const shoulderGender = GENDER_SHOULDER[genero];
 
-    // La estatura escala desde la planta de los pies (origen del grupo)
     this.target.height = clamp(estaturaSafe / BASE_HEIGHT_CM, 0.4, 1.6);
 
-    // Grasa: torso y pelvis se ensanchan con el IMC y la complexión
     this.target.torsoXZ = clamp(profile.torsoXZ * (0.8 + 0.2 * grosor), 0.7, 1.9);
     this.target.pelvisXZ = clamp(profile.pelvisXZ * (0.8 + 0.2 * grosor), 0.7, 1.9);
 
-    // Músculo / volumen de hombros
     this.target.shoulderX = clamp(
       profile.shoulderX * shoulderGender * (0.9 + 0.1 * grosor),
       0.7,
       1.7
     );
 
-    // Extremidades: multiplicadas directamente por el factor de grosor (IMC)
     this.target.armXZ = clamp(profile.armXZ * grosor, 0.7, 2.2);
     this.target.legXZ = clamp(profile.legXZ * grosor, 0.7, 2.2);
 
     this.updateFraming(this.target.height);
   }
 
-  // Reencuadra la cámara manteniendo el ángulo de órbita del usuario
   private updateFraming(heightScale: number): void {
     if (!this.controls || !this.camera) {
       return;
     }
 
-    const targetY = 0.9 * heightScale;
+    const targetY = 90 * heightScale;
     const deltaY = targetY - this.controls.target.y;
     this.controls.target.y = targetY;
     this.camera.position.y += deltaY;
@@ -1153,22 +1007,19 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
       this.camera.position,
       this.controls.target
     );
-    offset.setLength(3.05 * clamp(heightScale, 0.55, 1.5));
+    offset.setLength(250 * clamp(heightScale, 0.55, 1.5));
     this.camera.position.copy(this.controls.target).add(offset);
   }
-
-  // ---------- Inicialización WebGL ----------
 
   private initThree(): void {
     const canvas = this.rendererCanvas.nativeElement;
     const host = canvas.parentElement ?? canvas;
     this.viewport = host;
 
-    // Fondo transparente: el degradado de estudio del contenedor se ve detrás del maniquí
     this.scene = new THREE.Scene();
 
-    this.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-    this.camera.position.set(0, 1.1, 3.05);
+    this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 3000);
+    this.camera.position.set(0, 120, 250);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -1183,7 +1034,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.renderer.toneMappingExposure = 1.05;
 
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(0, 0.95, 0);
+    this.controls.target.set(0, 90, 0);
     this.controls.enableZoom = false;
     this.controls.enablePan = false;
     this.controls.enableDamping = true;
@@ -1193,6 +1044,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.controls.maxPolarAngle = Math.PI * 0.86;
 
     this.rootGroup = new THREE.Group();
+    this.rootGroup.scale.setScalar(SCENE_SCALE);
     this.scene.add(this.rootGroup);
 
     this.modelGroup = new THREE.Group();
@@ -1217,33 +1069,29 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private addLights(): void {
-    // Luz ambiental cálida y suave
     this.scene.add(new THREE.AmbientLight(0xfff4e6, 1.05));
 
-    // Luz principal cálida desde arriba a la derecha con sombras suaves
     const keyLight = new THREE.DirectionalLight(0xfff7ed, 1.35);
-    keyLight.position.set(4, 7, 4);
+    keyLight.position.set(400, 700, 400);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(1024, 1024);
-    keyLight.shadow.camera.near = 0.5;
-    keyLight.shadow.camera.far = 20;
-    keyLight.shadow.camera.left = -4;
-    keyLight.shadow.camera.right = 4;
-    keyLight.shadow.camera.top = 5;
-    keyLight.shadow.camera.bottom = -2;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 2000;
+    keyLight.shadow.camera.left = -300;
+    keyLight.shadow.camera.right = 300;
+    keyLight.shadow.camera.top = 500;
+    keyLight.shadow.camera.bottom = -200;
     keyLight.shadow.bias = -0.0004;
     this.scene.add(keyLight);
 
-    // Luz de relleno cálida tenue desde la izquierda
     const fillLight = new THREE.DirectionalLight(0xf5f0e6, 0.4);
-    fillLight.position.set(-4, 3, -2);
+    fillLight.position.set(-400, 300, -200);
     this.scene.add(fillLight);
   }
 
   private addStage(): void {
-    // Plano de sombra de estudio que integra el maniquí con el fondo
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(12, 12),
+      new THREE.PlaneGeometry(400, 400),
       new THREE.ShadowMaterial({ opacity: 0.15 })
     );
     floor.rotation.x = -Math.PI / 2;
@@ -1251,12 +1099,12 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.scene.add(floor);
   }
 
-  // ---------- Generación procedural del maniquí ----------
-
   private buildMannequin(): void {
     if (!this.modelGroup) {
       return;
     }
+
+    this.limpiarRopa();
 
     for (const child of [...this.modelGroup.children]) {
       this.modelGroup.remove(child);
@@ -1273,9 +1121,12 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
     Object.assign(this.current, this.target);
     this.applyRig();
+
+    if (this.prendaActiva) {
+      this.aplicarPrendaVirtual(this.prendaActiva);
+    }
   }
 
-  // Registra una pieza anclada por su posición absoluta (origen = planta de los pies)
   private part(
     geometry: THREE.BufferGeometry,
     name: string,
@@ -1305,7 +1156,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     group.add(this.part(new THREE.CylinderGeometry(0.05, 0.055, 0.11, 20), 'cuello', 0, 1.47, 0));
   }
 
-  // Ropa interior sobria que cubre la cadera (se deforma con la pelvis)
   private addUnderwear(group: THREE.Group, pelvisRadius: number): void {
     group.add(
       this.part(
@@ -1328,7 +1178,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const side of SIDES) {
       const sign = side === 'izq' ? -1 : 1;
 
-      // Hombro (esfera) + brazo + antebrazo + mano
       group.add(
         this.part(
           new THREE.SphereGeometry(0.072, 20, 16),
@@ -1366,7 +1215,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
         )
       );
 
-      // Pierna: muslo + pantorrilla + pie (planta en y = 0)
       group.add(
         this.part(
           new THREE.CylinderGeometry(leg.thighR, leg.thighR * 0.8, 0.38, 22),
@@ -1402,7 +1250,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     const group = new THREE.Group();
     group.name = 'maniqui_masculino';
 
-    // Espalda en V: torso ancho arriba, cintura/ pelvis estrecha
     group.add(this.part(new THREE.CylinderGeometry(0.21, 0.135, 0.4, 28), 'torso', 0, 1.2, 0));
     group.add(this.part(new THREE.CylinderGeometry(0.115, 0.1, 0.16, 24), 'pelvis', 0, 0.92, 0));
     this.addUnderwear(group, 0.14);
@@ -1421,12 +1268,10 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     const group = new THREE.Group();
     group.name = 'maniqui_femenino';
 
-    // Hombros estrechos y pelvis más ancha que el torso
     group.add(this.part(new THREE.CylinderGeometry(0.155, 0.115, 0.4, 28), 'torso', 0, 1.2, 0));
     group.add(this.part(new THREE.CylinderGeometry(0.15, 0.135, 0.16, 24), 'pelvis', 0, 0.92, 0));
     this.addUnderwear(group, 0.17);
 
-    // Busto: dos semi-esferas en la zona pectoral superior
     for (const side of SIDES) {
       const sign = side === 'izq' ? -1 : 1;
       const bust = new THREE.SphereGeometry(0.072, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -1452,8 +1297,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     return group;
   }
 
-  // ---------- Deformación dirigida por nombre de pieza ----------
-
   private applyRig(): void {
     const t = this.current;
 
@@ -1461,7 +1304,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
       this.modelGroup.scale.y = t.height;
     }
 
-    // Torso y pelvis (grasa / anchura)
     this.deform('torso', t.torsoXZ, 1, t.torsoXZ, 1);
     this.deform('pelvis', t.pelvisXZ, 1, t.pelvisXZ, 1);
     this.deform('ropa_interior', t.pelvisXZ, 1, t.pelvisXZ, 1);
@@ -1482,7 +1324,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  // Busca la pieza por nombre y aplica escala + desplazamiento lateral coherente con el torso
   private deform(
     name: string,
     scaleX: number,
@@ -1510,8 +1351,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  // ---------- Loop de render ----------
-
   private animate = (): void => {
     this.animationId = requestAnimationFrame(this.animate);
 
@@ -1519,7 +1358,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     const delta = Math.min((now - this.lastFrameTime) / 1000 || 0, 0.1);
     this.lastFrameTime = now;
 
-    // Interpolación orgánica hacia el objetivo (~1 segundo)
     const alpha = 1 - Math.exp(-delta / 0.28);
     this.current.height = THREE.MathUtils.lerp(this.current.height, this.target.height, alpha);
     this.current.torsoXZ = THREE.MathUtils.lerp(this.current.torsoXZ, this.target.torsoXZ, alpha);
@@ -1548,9 +1386,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.renderer.render(this.scene, this.camera);
   };
 
-  // ---------- Resize ----------
-
-  // Observa el contenedor del visor y la ventana para reencuadrar el render
   private setupResize(): void {
     const host = this.viewport ?? this.rendererCanvas?.nativeElement.parentElement;
     if (!host || !this.renderer || !this.camera) {
@@ -1573,14 +1408,22 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.renderer || !this.camera) {
       return;
     }
-    const width = host.clientWidth || 1;
-    const height = host.clientHeight || 1;
+
+    const width = this.modoInmersivo ? window.innerWidth : host.clientWidth || 1;
+    const height = this.modoInmersivo ? window.innerHeight : host.clientHeight || 1;
+
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
   }
 
-  // ---------- Liberación de memoria ----------
+  private reajustarVisor(): void {
+    const host = this.viewport ?? this.rendererCanvas?.nativeElement.parentElement;
+    if (host) {
+      this.updateSize(host);
+    }
+    this.updateFraming(this.target.height);
+  }
 
   private disposeGeometries(object: THREE.Object3D): void {
     object.traverse((child) => {
@@ -1606,8 +1449,6 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // ---------- Flujo de generación (webhook) ----------
-
   generarModelo(): void {
     this.validarMedidas();
 
@@ -1618,6 +1459,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.isGenerating = true;
     this.modelReady = false;
+    this.activarModoInmersivo();
 
     const payload = {
       transaction_id: crypto.randomUUID(),
@@ -1638,7 +1480,9 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
         this.isGenerating = false;
         this.modelReady = true;
         this.mostrarNotificacion('Modelo 3D generado con éxito.', 'exito');
-        this.scrollToVisor();
+        if (!this.modoInmersivo) {
+          this.scrollToVisor();
+        }
         this.cdr.detectChanges();
       },
       error: (err: HttpErrorResponse) => {
