@@ -165,16 +165,16 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
 
   private readonly target: RigState = { ...this.current };
 
-  // Maniquí de estudio: porcelana mate (arcilla)
+  // Maniquí de estudio: porcelana mate / arcilla mineral
   private readonly mannequinMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe2e8f0,
-    roughness: 0.6,
+    color: 0xe7e5e1,
+    roughness: 0.55,
     metalness: 0.05
   });
 
-  // Ropa interior sobria: azul marino mate
+  // Ropa interior sobria: verde oliva oscuro / carbón muteado
   private readonly underwearMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1e293b,
+    color: 0x2d3728,
     roughness: 0.7,
     metalness: 0.05
   });
@@ -390,12 +390,12 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
   }
 
   private addLights(): void {
-    // Iluminación neutra de estudio fotográfico
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    // Luz ambiental cálida y suave
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.1));
 
-    // Luz principal desde arriba a la derecha con sombras suaves
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    keyLight.position.set(3, 8, 5);
+    // Luz principal neutra desde arriba a la derecha con sombras suaves
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    keyLight.position.set(4, 7, 4);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(1024, 1024);
     keyLight.shadow.camera.near = 0.5;
@@ -407,9 +407,9 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     keyLight.shadow.bias = -0.0004;
     this.scene.add(keyLight);
 
-    // Luz de relleno neutra desde la izquierda
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    fillLight.position.set(-3, 4, -2);
+    // Luz de relleno cálida tenue desde la izquierda
+    const fillLight = new THREE.DirectionalLight(0xf5f0e6, 0.4);
+    fillLight.position.set(-4, 3, -2);
     this.scene.add(fillLight);
   }
 

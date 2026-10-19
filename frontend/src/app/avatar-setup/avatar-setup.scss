@@ -51,3 +51,16 @@ html {
 .animate-modal-pop {
   animation: modal-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Respeta la preferencia del sistema de reducir movimiento */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-marquee,
+  .animate-modal-fade,
+  .animate-modal-pop {
+    animation: none;
+  }
+}
