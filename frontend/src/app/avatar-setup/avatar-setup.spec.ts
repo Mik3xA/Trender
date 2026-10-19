@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, of } from 'rxjs';
+import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { AvatarSetupComponent } from './avatar-setup';
 import { AuthResponse, AuthService, StoredSession } from '../servicios/auth.service';
 import { environment } from '../../environments/environment';
@@ -200,7 +200,9 @@ describe('AvatarSetupComponent', () => {
     component.urlEscaneo = '';
     component.escanearProducto();
 
-    expect(component.errorEscaneo).toBe('Ingresa una URL válida.');
+    expect(component.errorEscaneo).toBe(
+      'No pudimos analizar este enlace. Intenta con una URL válida de una tienda.'
+    );
     expect(component.escaneando).toBe(false);
   });
 
@@ -225,6 +227,42 @@ describe('AvatarSetupComponent', () => {
     const callArgs = spy.mock.calls[0];
     expect(callArgs[0]).toBe(`${environment.apiUrl}/api/ropa/escanear-link`);
     expect(callArgs[1]).toEqual({ url: 'https://www.zara.com/blazer' });
+  });
+
+  it('detiene el loader y muestra un error limpio si falla el endpoint', () => {
+    vi.spyOn(component['http'], 'post').mockReturnValue(
+      throwError(() => new Error('Request failed'))
+    );
+
+    component.urlEscaneo = 'https://tienda.example/producto';
+    component.escanearProducto();
+
+    expect(component.escaneando).toBe(false);
+    expect(component.errorEscaneo).toBe(
+      'No pudimos analizar este enlace. Intenta con una URL válida de una tienda.'
+    );
+  });
+
+  it('asigna el calzado a ambos pies del maniquí', () => {
+    const partes = component['partesParaPrenda']({
+      id: 'shoe-1',
+      nombre: 'Calzado Deportivo/Casual',
+      precio: '$1,499',
+      categoria: 'Calzado',
+      imagenUrl: '/ropa/textura_calzado.png'
+    });
+
+    expect(partes).toEqual(['pie_izq', 'pie_der']);
+  });
+
+  it('restaura los materiales de porcelana y ropa interior', () => {
+    component['mannequinMaterial'].color.setHex(0x3f4e3b);
+    component['underwearMaterial'].color.setHex(0x1c1917);
+
+    component.quitarRopa();
+
+    expect(component['mannequinMaterial'].color.getHex()).toBe(0xe2e8f0);
+    expect(component['underwearMaterial'].color.getHex()).toBe(0x2d3728);
   });
 
   it('muestra la prenda escaneada y permite probarla', () => {
