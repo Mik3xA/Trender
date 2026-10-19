@@ -1,5 +1,15 @@
 const { randomUUID } = require('crypto');
-const { guardarDatos, obtenerEventos, obtenerEventoPorId } = require('../src/servicios/db.service');
+const {
+  guardarDatos,
+  obtenerEventos,
+  obtenerEventoPorId,
+  eliminarUsuarioPorEmail
+} = require('../src/servicios/db.service');
+const {
+  registrarUsuario,
+  iniciarSesion,
+  verificarCodigo
+} = require('../src/servicios/auth.service');
 const { enviarAlerta, enviarAlertaError } = require('../src/servicios/email.service');
 
 describe('db.service', () => {
@@ -53,6 +63,33 @@ describe('db.service', () => {
 
     expect(Array.isArray(eventos)).toBe(true);
     expect(eventos.length).toBeGreaterThan(0);
+  });
+});
+
+describe('auth.service', () => {
+  const email = `svc-${randomUUID()}@trender.com`;
+  const password = 'secreto-seguro-123';
+
+  afterAll(() => {
+    eliminarUsuarioPorEmail(email);
+  });
+
+  it('registra un usuario y valida sus credenciales', async () => {
+    const registro = await registrarUsuario({ nombre: 'Usuario Servicio', email, password });
+
+    expect(registro.token).toBeDefined();
+    expect(registro.user.email).toBe(email);
+
+    const sesion = await iniciarSesion({ email, password });
+    expect(sesion.user.nombre).toBe('Usuario Servicio');
+
+    const invalida = await iniciarSesion({ email, password: 'incorrecta' });
+    expect(invalida).toBeNull();
+  });
+
+  it('solo acepta el código OTP 123456', () => {
+    expect(verificarCodigo(email, '000000')).toBeNull();
+    expect(verificarCodigo(email, '123456').token).toBeDefined();
   });
 });
 

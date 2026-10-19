@@ -7,6 +7,7 @@ function errorHandler(err, req, res, next) {
   const response = { error: message };
 
   if (err.errors && Array.isArray(err.errors)) {
+    response.status = 'error';
     response.errors = err.errors;
   }
 

@@ -52,6 +52,22 @@ html {
   animation: modal-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Entrada de la notificación flotante */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast {
+  animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Respeta la preferencia del sistema de reducir movimiento */
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -60,7 +76,8 @@ html {
 
   .animate-marquee,
   .animate-modal-fade,
-  .animate-modal-pop {
+  .animate-modal-pop,
+  .animate-toast {
     animation: none;
   }
 }

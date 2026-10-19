@@ -93,3 +93,12 @@ describe('POST /webhooks/recibir', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('Rutas inexistentes', () => {
+  it('debe responder 404 con el handler global', async () => {
+    const res = await request(app).get('/ruta-inexistente');
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Not Found' });
+  });
+});

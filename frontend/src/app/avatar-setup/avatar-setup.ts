@@ -3,22 +3,91 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  HostListener,
   NgZone,
   OnDestroy,
+  OnInit,
+  QueryList,
   ViewChild,
+  ViewChildren,
   ViewEncapsulation
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Subscription } from 'rxjs';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { environment } from '../../environments/environment';
+import { AuthService, StoredSession } from '../servicios/auth.service';
+import {
+  CATALOGOS,
+  Prenda,
+  TIENDA_CATALOGO_INICIAL,
+  TiendaCatalogo
+} from '../data/catalogos.data';
 
-const WEBHOOK_URL = 'http://localhost:3000/webhooks/recibir';
 const DEFAULT_CUSTOMER_EMAIL = 'usuario@trender.com';
+const STORES_STORAGE_KEY = 'trender.stores';
+const MEASUREMENTS_STORAGE_KEY = 'trender.measurements';
+const EXPORTED_MODELS_STORAGE_KEY = 'trender.models.exported';
+const OTP_LENGTH = 6;
+const RESEND_SECONDS = 30;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type Complexion = 'Delgada' | 'Atlética' | 'Media' | 'Robusta';
 export type Genero = 'Masculino' | 'Femenino';
+type AuthMode = 'login' | 'registro' | 'codigo' | 'password-login' | 'password-registro';
+type AuthAction = 'login' | 'registro' | 'escaneo' | 'prenda';
+type NotificationType = 'exito' | 'error';
+
+interface Tienda {
+  nombre: string;
+  monograma: string;
+  vinculada: boolean;
+}
+
+interface Faq {
+  pregunta: string;
+  respuesta: string;
+}
+
+const TIENDAS: Tienda[] = [
+  { nombre: 'Shein', monograma: 'SH', vinculada: false },
+  { nombre: 'El Palacio de Hierro', monograma: 'PH', vinculada: false },
+  { nombre: 'Adidas', monograma: 'AD', vinculada: false },
+  { nombre: 'Studio F', monograma: 'SF', vinculada: false },
+  { nombre: 'Amazon Fashion', monograma: 'AF', vinculada: false },
+  { nombre: 'Zara', monograma: 'ZA', vinculada: false },
+  { nombre: 'H&M', monograma: 'H&M', vinculada: false },
+  { nombre: 'C&A Moda', monograma: 'C&A', vinculada: false },
+  { nombre: 'AliExpress', monograma: 'AE', vinculada: false },
+  { nombre: 'Bershka & Nike', monograma: 'B&N', vinculada: false }
+];
+
+const FAQS: Faq[] = [
+  {
+    pregunta: '¿Cómo calcula Trender las proporciones de mi avatar 3D?',
+    respuesta:
+      'Trender utiliza un motor gráfico paramétrico que convierte tus datos de estatura, peso y complexión en deformaciones geométricas reales sobre la malla 3D en tiempo real.'
+  },
+  {
+    pregunta: '¿Es seguro el escaneo de mi cuerpo con el Motor Biométrico Local?',
+    respuesta:
+      'Totalmente seguro. Las imágenes procesadas para la fotogrametría 3D no se almacenan en servidores públicos; se procesan de forma cifrada para generar únicamente los puntos de medición biométrica.'
+  },
+  {
+    pregunta: '¿Cómo funciona la sincronización con tiendas como Zara, Shein o Adidas?',
+    respuesta:
+      'Una vez vinculada tu cuenta, Trender mapea el tallaje oficial de cada marca con las medidas exactas de tu avatar 3D, mostrándote el porcentaje de ajuste y holgura de cada prenda.'
+  },
+  {
+    pregunta: '¿Puedo exportar mi modelo 3D a otras plataformas?',
+    respuesta:
+      'Sí, los usuarios registrados pueden exportar su avatar en formato .GLB estandarizado para usarlo en otras herramientas de modelado o metaverso.'
+  }
+];
 
 const BASE_HEIGHT_CM = 170;
 const BASE_WEIGHT_KG = 70;
@@ -119,9 +188,12 @@ const MARQUEE_ITEMS: MarqueeItem[] = [
   styleUrl: './avatar-setup.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
+export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('rendererCanvas', { static: true })
   private rendererCanvas!: ElementRef<HTMLCanvasElement>;
+
+  @ViewChildren('otpInput')
+  private otpInputs?: QueryList<ElementRef<HTMLInputElement>>;
 
   estatura: number | null = null;
   peso: number | null = null;
@@ -132,11 +204,45 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
   modelReady = false;
   alertaValidacion: string | null = null;
 
-  // Bloqueo de funciones avanzadas: requieren cuenta
+  // Autenticación real contra /api/auth
   mostrarModalAuth = false;
-  tipoAccionAuth: 'escaneo' | 'subir_modelo' | '' = '';
+  modoAuth: AuthMode = 'login';
+  emailIngresado = '';
+  codigoEnviado = false;
+  codigoVerificacion = '';
+  sesionIniciada = false;
+  emailAutenticado = '';
+  nombreAutenticado = '';
+  reenvioSegundos = 0;
+  errorAuth: string | null = null;
+  errorCodigo: string | null = null;
+  cargandoAuth = false;
+  nombreIngresado = '';
+  passwordIngresado = '';
+  passwordConfirmacion = '';
+  registroExitoso = false;
+  nombreRegistrado = '';
+  redirigiendoTienda: string | null = null;
+  notificacion: { mensaje: string; tipo: NotificationType } | null = null;
+  tipoAccionAuth: AuthAction | '' = '';
+  prendaPendiente: Prenda | null = null;
+  prendaSeleccionada: Prenda | null = null;
+
+  tiendas: Tienda[] = TIENDAS.map((tienda) => ({ ...tienda }));
+
+  get tiendasVinculadasCount(): number {
+    return this.tiendas.filter((tienda) => tienda.vinculada).length;
+  }
+
+  readonly faqs: Faq[] = FAQS;
+  faqAbierto: number | null = null;
 
   readonly marqueeItems: MarqueeItem[] = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+  readonly catalogos: TiendaCatalogo[] = CATALOGOS;
+  tiendaCatalogoActiva: string = TIENDA_CATALOGO_INICIAL.id;
+
+  modelosExportados = 0;
+  exportandoModelo = false;
 
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
@@ -150,6 +256,12 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
   private animationId = 0;
   private webglReady = false;
   private lastFrameTime = 0;
+  private reenvioTimer?: ReturnType<typeof setInterval>;
+  private notificacionTimer?: ReturnType<typeof setTimeout>;
+  private registroTimer?: ReturnType<typeof setTimeout>;
+  private redireccionTimer?: ReturnType<typeof setTimeout>;
+  private registroEnCurso = false;
+  private authSubscription?: Subscription;
 
   private readonly basePositions = new Map<string, THREE.Vector3>();
   private readonly baseScales = new Map<string, THREE.Vector3>();
@@ -182,8 +294,18 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
   constructor(
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
-    private zone: NgZone
+    private zone: NgZone,
+    private auth: AuthService
   ) {}
+
+  ngOnInit(): void {
+    this.cargarEstadoPersistido();
+    this.authSubscription = this.auth.sesion$.subscribe((sesion) => {
+      this.aplicarSesion(sesion);
+      this.cdr.detectChanges();
+    });
+    this.auth.refrescarSesion();
+  }
 
   ngAfterViewInit(): void {
     this.validarMedidas();
@@ -201,6 +323,17 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     cancelAnimationFrame(this.animationId);
+    this.authSubscription?.unsubscribe();
+    this.detenerReenvio();
+    if (this.notificacionTimer) {
+      clearTimeout(this.notificacionTimer);
+    }
+    if (this.registroTimer) {
+      clearTimeout(this.registroTimer);
+    }
+    if (this.redireccionTimer) {
+      clearTimeout(this.redireccionTimer);
+    }
     this.resizeObserver?.disconnect();
     window.removeEventListener('resize', this.onWindowResize);
     this.controls?.dispose();
@@ -216,35 +349,729 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     this.estatura = value;
     this.validarMedidas();
     this.syncModel();
+    this.guardarMedidas();
   }
 
   onPesoChange(value: number | null): void {
     this.peso = value;
     this.validarMedidas();
     this.syncModel();
+    this.guardarMedidas();
   }
 
   onComplexionChange(value: Complexion): void {
     this.complexion = value;
     this.syncModel();
+    this.guardarMedidas();
   }
 
   onGeneroChange(value: Genero): void {
     this.genero = value;
     this.buildMannequin();
     this.syncModel();
+    this.guardarMedidas();
   }
 
-  // ---------- Bloqueo de cuenta (funciones avanzadas) ----------
+  // ---------- Autenticación ----------
 
-  requerirCuenta(accion: 'escaneo' | 'subir_modelo'): void {
+  get tituloAuth(): string {
+    if (this.tipoAccionAuth === 'escaneo') {
+      return 'Desbloquea el Motor Biométrico Local';
+    }
+    if (this.tipoAccionAuth === 'prenda') {
+      return this.prendaPendiente
+        ? `Prueba ${this.prendaPendiente.nombre} en tu avatar`
+        : 'Prueba esta prenda en tu avatar';
+    }
+    if (this.modoAuth === 'password-registro') {
+      return 'Crea tu cuenta clásica';
+    }
+    if (this.modoAuth === 'password-login') {
+      return 'Inicia sesión con contraseña';
+    }
+    return this.modoAuth === 'registro' ? 'Crea tu cuenta' : 'Inicia sesión';
+  }
+
+  get descripcionAuth(): string {
+    if (this.tipoAccionAuth === 'escaneo') {
+      return 'El escaneo biométrico procesa tus medidas personales y requiere una cuenta para cifrarlas y mantenerlas privadas.';
+    }
+    if (this.tipoAccionAuth === 'prenda') {
+      return 'Inicia sesión para probar esta prenda sobre tu avatar y guardar tus selecciones.';
+    }
+    return 'Accede a tu cuenta para guardar tu avatar y sincronizar tus tiendas favoritas.';
+  }
+
+  abrirAuthModal(accion: AuthAction): void {
     this.tipoAccionAuth = accion;
+    if (accion !== 'prenda') {
+      this.prendaPendiente = null;
+    }
+    this.modoAuth = accion === 'registro' ? 'registro' : 'login';
     this.mostrarModalAuth = true;
+    this.codigoEnviado = false;
+    this.codigoVerificacion = '';
+    this.errorAuth = null;
+    this.errorCodigo = null;
+    this.cargandoAuth = false;
+    this.passwordIngresado = '';
+    this.passwordConfirmacion = '';
+    this.nombreIngresado = '';
+    this.registroExitoso = false;
+    this.registroEnCurso = false;
+    this.detenerReenvio();
+    this.reenvioSegundos = 0;
   }
 
   cerrarModalAuth(): void {
+    if (this.registroExitoso) {
+      return;
+    }
+
+    if (this.registroTimer) {
+      clearTimeout(this.registroTimer);
+      this.registroTimer = undefined;
+    }
+
     this.mostrarModalAuth = false;
     this.tipoAccionAuth = '';
+    this.prendaPendiente = null;
+    this.codigoEnviado = false;
+    this.codigoVerificacion = '';
+    this.errorAuth = null;
+    this.errorCodigo = null;
+    this.cargandoAuth = false;
+    this.passwordIngresado = '';
+    this.passwordConfirmacion = '';
+    this.registroExitoso = false;
+    this.nombreRegistrado = '';
+    this.registroEnCurso = false;
+    this.detenerReenvio();
+    this.reenvioSegundos = 0;
+  }
+
+  @HostListener('document:keydown.escape')
+  cerrarConEscape(): void {
+    if (this.mostrarModalAuth) {
+      this.cerrarModalAuth();
+    }
+  }
+
+  cambiarModoAuth(modo: AuthMode): void {
+    this.modoAuth = modo;
+    this.codigoEnviado = modo === 'codigo';
+    this.codigoVerificacion = '';
+    this.errorAuth = null;
+    this.errorCodigo = null;
+    this.passwordIngresado = '';
+    this.passwordConfirmacion = '';
+    if (modo !== 'codigo') {
+      this.detenerReenvio();
+      this.reenvioSegundos = 0;
+    }
+  }
+
+  irAPasswordRegistro(): void {
+    this.cambiarModoAuth('password-registro');
+  }
+
+  irAPasswordLogin(): void {
+    this.cambiarModoAuth('password-login');
+  }
+
+  volverACodigo(): void {
+    this.cambiarModoAuth(this.tipoAccionAuth === 'registro' ? 'registro' : 'login');
+  }
+
+  enviarCodigo(): void {
+    this.solicitarCodigo(false);
+  }
+
+  reenviarCodigo(): void {
+    if (this.reenvioSegundos > 0 || this.cargandoAuth) {
+      return;
+    }
+    this.codigoVerificacion = '';
+    this.errorCodigo = null;
+    this.solicitarCodigo(true);
+  }
+
+  cambiarCorreo(): void {
+    this.modoAuth = this.tipoAccionAuth === 'registro' ? 'registro' : 'login';
+    this.codigoEnviado = false;
+    this.codigoVerificacion = '';
+    this.errorCodigo = null;
+    this.errorAuth = null;
+    this.detenerReenvio();
+    this.reenvioSegundos = 0;
+  }
+
+  private solicitarCodigo(esReenvio: boolean): void {
+    const email = this.emailIngresado.trim();
+
+    if (!EMAIL_REGEX.test(email)) {
+      this.errorAuth = 'Ingresa un correo electrónico válido.';
+      return;
+    }
+
+    this.emailIngresado = email;
+    this.errorAuth = null;
+    this.errorCodigo = null;
+    this.cargandoAuth = true;
+
+    this.auth.solicitarCodigo(email).subscribe({
+      next: () => {
+        this.cargandoAuth = false;
+        this.modoAuth = 'codigo';
+        this.codigoEnviado = true;
+        this.codigoVerificacion = '';
+        this.iniciarReenvio();
+        this.mostrarNotificacion(
+          esReenvio
+            ? `Código reenviado a ${email}.`
+            : `Código de verificación enviado a ${email}.`,
+          'exito'
+        );
+        this.enfocarOtp(0);
+        this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.cargandoAuth = false;
+        this.errorAuth = this.mensajeError(
+          error,
+          'No se pudo enviar el código. Intenta nuevamente.'
+        );
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  digitoCodigo(index: number): string {
+    return this.codigoVerificacion.padEnd(OTP_LENGTH, ' ').charAt(index).trim();
+  }
+
+  onCodigoInput(event: Event, index: number): void {
+    const input = event.target as HTMLInputElement;
+    const digits = this.codigoVerificacion.padEnd(OTP_LENGTH, ' ').split('');
+    digits[index] = input.value.replace(/\D/g, '').slice(-1);
+    this.codigoVerificacion = digits.join('');
+    input.value = digits[index].trim();
+    this.errorCodigo = null;
+
+    if (digits[index].trim() && index < OTP_LENGTH - 1) {
+      this.enfocarOtp(index + 1);
+    }
+
+    if (this.codigoCompleto()) {
+      this.verificarCodigo();
+    }
+  }
+
+  onCodigoKeydown(event: KeyboardEvent, index: number): void {
+    if (event.key === 'Backspace' && !this.digitoCodigo(index) && index > 0) {
+      const digits = this.codigoVerificacion.padEnd(OTP_LENGTH, ' ').split('');
+      digits[index - 1] = ' ';
+      this.codigoVerificacion = digits.join('');
+      this.enfocarOtp(index - 1);
+    }
+  }
+
+  onCodigoPaste(event: ClipboardEvent): void {
+    const digits = event.clipboardData?.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (!digits) {
+      return;
+    }
+
+    event.preventDefault();
+    this.codigoVerificacion = digits.padEnd(OTP_LENGTH, ' ');
+    this.errorCodigo = null;
+    this.enfocarOtp(Math.min(digits.length, OTP_LENGTH - 1));
+
+    if (this.codigoCompleto()) {
+      this.verificarCodigo();
+    }
+  }
+
+  verificarCodigo(): void {
+    if (this.cargandoAuth) {
+      return;
+    }
+
+    if (!this.codigoCompleto()) {
+      this.errorCodigo = 'Ingresa los 6 dígitos del código.';
+      return;
+    }
+
+    this.errorCodigo = null;
+    this.cargandoAuth = true;
+    const codigo = this.codigoVerificacion.replace(/\D/g, '');
+
+    this.auth.verificarCodigo(this.emailIngresado, codigo).subscribe({
+      next: () => {
+        this.cargandoAuth = false;
+        this.finalizarSesion();
+        this.cdr.detectChanges();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.cargandoAuth = false;
+        this.errorCodigo =
+          error.status === 401
+            ? 'Código inválido. Revisa los 6 dígitos e intenta nuevamente.'
+            : this.mensajeError(error, 'No se pudo verificar el código.');
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  registrarConPassword(): void {
+    if (this.cargandoAuth) {
+      return;
+    }
+
+    const email = this.emailIngresado.trim();
+    const nombre = this.nombreIngresado.trim();
+
+    if (!nombre) {
+      this.errorAuth = 'Ingresa tu nombre.';
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      this.errorAuth = 'Ingresa un correo electrónico válido.';
+      return;
+    }
+
+    if (this.passwordIngresado.length < 8) {
+      this.errorAuth = 'La contraseña debe tener al menos 8 caracteres.';
+      return;
+    }
+
+    if (this.passwordIngresado !== this.passwordConfirmacion) {
+      this.errorAuth = 'Las contraseñas no coinciden.';
+      return;
+    }
+
+    this.emailIngresado = email;
+    this.errorAuth = null;
+    this.cargandoAuth = true;
+    this.registroEnCurso = true;
+
+    this.auth
+      .registrar({
+        nombre,
+        email,
+        password: this.passwordIngresado
+      })
+      .subscribe({
+        next: () => {
+          this.cargandoAuth = false;
+          this.mostrarExitoRegistro(nombre);
+          this.cdr.detectChanges();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.cargandoAuth = false;
+          this.registroEnCurso = false;
+          this.errorAuth = this.mensajeError(error, 'No se pudo crear la cuenta.');
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  private mostrarExitoRegistro(nombreIngresado: string): void {
+    const nombre = this.auth.sesionActual?.user?.nombre?.trim() || nombreIngresado;
+    this.nombreRegistrado = nombre;
+    this.registroExitoso = true;
+
+    this.registroTimer = setTimeout(() => {
+      this.registroTimer = undefined;
+      this.finalizarSesion();
+      this.cdr.detectChanges();
+    }, 2000);
+  }
+
+  iniciarSesionConPassword(): void {
+    if (this.cargandoAuth) {
+      return;
+    }
+
+    const email = this.emailIngresado.trim();
+
+    if (!EMAIL_REGEX.test(email) || !this.passwordIngresado) {
+      this.errorAuth = 'Ingresa tu correo y contraseña.';
+      return;
+    }
+
+    this.emailIngresado = email;
+    this.errorAuth = null;
+    this.cargandoAuth = true;
+
+    this.auth
+      .iniciarSesion({ email, password: this.passwordIngresado })
+      .subscribe({
+        next: () => {
+          this.cargandoAuth = false;
+          this.finalizarSesion();
+          this.cdr.detectChanges();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.cargandoAuth = false;
+          this.errorAuth =
+            error.status === 401
+              ? 'Credenciales inválidas. Revisa tu correo y contraseña.'
+              : this.mensajeError(error, 'No se pudo iniciar sesión.');
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  cerrarSesion(): void {
+    this.auth.cerrarSesion();
+    this.emailAutenticado = '';
+    this.nombreAutenticado = '';
+    this.emailIngresado = '';
+    this.prendaSeleccionada = null;
+    this.mostrarNotificacion('Sesión cerrada correctamente.', 'exito');
+  }
+
+  private finalizarSesion(): void {
+    const prendaPendiente = this.prendaPendiente;
+    const sesion = this.auth.sesionActual;
+
+    this.registroEnCurso = false;
+    this.sesionIniciada = true;
+    this.emailAutenticado = sesion?.email ?? this.emailIngresado;
+    this.nombreAutenticado =
+      sesion?.user?.nombre?.trim() || this.nombreDesdeEmail(this.emailAutenticado);
+    this.emailIngresado = this.emailAutenticado;
+    this.mostrarModalAuth = false;
+    this.codigoEnviado = false;
+    this.codigoVerificacion = '';
+    this.errorAuth = null;
+    this.errorCodigo = null;
+    this.detenerReenvio();
+    this.reenvioSegundos = 0;
+    this.tipoAccionAuth = '';
+    this.prendaPendiente = null;
+    this.passwordIngresado = '';
+    this.passwordConfirmacion = '';
+    this.nombreIngresado = '';
+    this.registroExitoso = false;
+    this.nombreRegistrado = '';
+
+    if (prendaPendiente) {
+      this.prendaSeleccionada = prendaPendiente;
+      this.scrollToProbador();
+      this.mostrarNotificacion(
+        `${prendaPendiente.nombre} lista para probar en tu avatar.`,
+        'exito'
+      );
+      return;
+    }
+
+    this.mostrarNotificacion(`Bienvenido/a, ${this.nombreAutenticado}.`, 'exito');
+  }
+
+  private aplicarSesion(sesion: StoredSession | null): void {
+    if (this.registroEnCurso) {
+      return;
+    }
+
+    this.sesionIniciada = Boolean(sesion?.sesionIniciada);
+    this.emailAutenticado = sesion?.email ?? '';
+    this.nombreAutenticado =
+      sesion?.user?.nombre?.trim() || this.nombreDesdeEmail(this.emailAutenticado);
+
+    if (sesion?.email) {
+      this.emailIngresado = sesion.email;
+    } else {
+      this.emailIngresado = '';
+      this.nombreAutenticado = '';
+      this.prendaSeleccionada = null;
+    }
+  }
+
+  private nombreDesdeEmail(email: string): string {
+    const base = email.split('@')[0]?.replace(/[._-]+/g, ' ').trim() ?? '';
+    if (!base) {
+      return 'Usuario Trender';
+    }
+
+    return base
+      .split(' ')
+      .filter(Boolean)
+      .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
+      .join(' ');
+  }
+
+  private mensajeError(error: HttpErrorResponse, fallback: string): string {
+    if (error.status === 0) {
+      return 'No se pudo conectar con el servidor. Verifica que el backend esté activo.';
+    }
+
+    return error.error?.message ?? error.error?.error ?? fallback;
+  }
+
+  private codigoCompleto(): boolean {
+    return this.codigoVerificacion.replace(/\D/g, '').length === OTP_LENGTH;
+  }
+
+  private iniciarReenvio(): void {
+    this.detenerReenvio();
+    this.reenvioSegundos = RESEND_SECONDS;
+    this.reenvioTimer = setInterval(() => {
+      this.reenvioSegundos = Math.max(0, this.reenvioSegundos - 1);
+      this.cdr.detectChanges();
+      if (this.reenvioSegundos === 0) {
+        this.detenerReenvio();
+      }
+    }, 1000);
+  }
+
+  private detenerReenvio(): void {
+    if (this.reenvioTimer) {
+      clearInterval(this.reenvioTimer);
+      this.reenvioTimer = undefined;
+    }
+  }
+
+  private enfocarOtp(index: number): void {
+    setTimeout(() => {
+      this.otpInputs?.get(index)?.nativeElement.focus();
+    });
+  }
+
+  // ---------- Tiendas ----------
+
+  vincularTienda(tienda: Tienda): void {
+    if (this.redirigiendoTienda) {
+      return;
+    }
+
+    this.redirigiendoTienda = tienda.nombre;
+    this.redireccionTimer = setTimeout(() => {
+      this.redireccionTimer = undefined;
+      this.redirigiendoTienda = null;
+      this.marcarTiendaVinculada(tienda.nombre);
+      this.mostrarNotificacion(`${tienda.nombre} conectada correctamente.`, 'exito');
+      this.cdr.detectChanges();
+    }, 1500);
+  }
+
+  private marcarTiendaVinculada(nombre: string): void {
+    this.tiendas = this.tiendas.map((tienda) =>
+      tienda.nombre === nombre ? { ...tienda, vinculada: true } : tienda
+    );
+    this.guardarTiendas();
+  }
+
+  // ---------- Catálogo multi-tienda ----------
+
+  get catalogoActivo(): TiendaCatalogo {
+    return (
+      this.catalogos.find((tienda) => tienda.id === this.tiendaCatalogoActiva) ??
+      this.catalogos[0]
+    );
+  }
+
+  seleccionarTiendaCatalogo(id: string): void {
+    this.tiendaCatalogoActiva = id;
+  }
+
+  probarPrenda(prenda: Prenda): void {
+    if (!this.sesionIniciada) {
+      this.prendaPendiente = prenda;
+      this.abrirAuthModal('prenda');
+      return;
+    }
+
+    this.prendaSeleccionada = prenda;
+    this.scrollToProbador();
+    this.mostrarNotificacion(
+      `${prenda.nombre} lista para probar en tu avatar.`,
+      'exito'
+    );
+  }
+
+  private scrollToProbador(): void {
+    const seccion = document.getElementById('probador-section');
+    seccion?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
+
+  private scrollToVisor(): void {
+    this.rendererCanvas?.nativeElement?.scrollIntoView?.({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
+
+  // ---------- Exportación del avatar ----------
+
+  exportarModelo(): void {
+    if (!this.modelReady || !this.modelGroup || this.exportandoModelo) {
+      this.mostrarNotificacion('Genera tu modelo 3D antes de exportarlo.', 'error');
+      return;
+    }
+
+    this.exportandoModelo = true;
+    const exporter = new GLTFExporter();
+
+    exporter.parse(
+      this.modelGroup,
+      (resultado) => {
+        const contenido =
+          resultado instanceof ArrayBuffer ? resultado : JSON.stringify(resultado);
+        const blob = new Blob([contenido], { type: 'model/gltf-binary' });
+        const url = URL.createObjectURL(blob);
+        const enlace = document.createElement('a');
+
+        enlace.href = url;
+        enlace.download = 'trender-avatar.glb';
+        enlace.click();
+        URL.revokeObjectURL(url);
+
+        this.modelosExportados += 1;
+        this.guardarModelosExportados();
+        this.exportandoModelo = false;
+        this.mostrarNotificacion('Avatar exportado en formato .GLB.', 'exito');
+        this.cdr.detectChanges();
+      },
+      (error) => {
+        console.error('No se pudo exportar el avatar:', error);
+        this.exportandoModelo = false;
+        this.mostrarNotificacion('No se pudo exportar el avatar.', 'error');
+        this.cdr.detectChanges();
+      },
+      { binary: true }
+    );
+  }
+
+  // ---------- FAQ ----------
+
+  toggleFaq(index: number): void {
+    this.faqAbierto = this.faqAbierto === index ? null : index;
+  }
+
+  // ---------- Notificaciones ----------
+
+  mostrarNotificacion(mensaje: string, tipo: NotificationType): void {
+    if (this.notificacionTimer) {
+      clearTimeout(this.notificacionTimer);
+    }
+    this.notificacion = { mensaje, tipo };
+    this.notificacionTimer = setTimeout(() => {
+      this.notificacion = null;
+      this.cdr.detectChanges();
+    }, 4000);
+  }
+
+  cerrarNotificacion(): void {
+    if (this.notificacionTimer) {
+      clearTimeout(this.notificacionTimer);
+    }
+    this.notificacion = null;
+  }
+
+  // ---------- Persistencia local ----------
+
+  private getStorage(): Storage | null {
+    try {
+      return typeof window !== 'undefined' && window.localStorage ? window.localStorage : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private cargarEstadoPersistido(): void {
+    const storage = this.getStorage();
+    if (!storage) {
+      return;
+    }
+
+    try {
+      const storesRaw = storage.getItem(STORES_STORAGE_KEY);
+      if (storesRaw) {
+        const vinculadas = JSON.parse(storesRaw);
+        if (Array.isArray(vinculadas)) {
+          const nombres = new Set(
+            vinculadas.filter((nombre): nombre is string => typeof nombre === 'string')
+          );
+          this.tiendas = this.tiendas.map((tienda) => ({
+            ...tienda,
+            vinculada: nombres.has(tienda.nombre)
+          }));
+        }
+      }
+    } catch {
+      storage.removeItem(STORES_STORAGE_KEY);
+    }
+
+    try {
+      const medidasRaw = storage.getItem(MEASUREMENTS_STORAGE_KEY);
+      if (medidasRaw) {
+        const medidas = JSON.parse(medidasRaw) as {
+          estatura?: unknown;
+          peso?: unknown;
+          complexion?: unknown;
+          genero?: unknown;
+        };
+
+        if (typeof medidas.estatura === 'number' && medidas.estatura > 0) {
+          this.estatura = medidas.estatura;
+        }
+        if (typeof medidas.peso === 'number' && medidas.peso > 0) {
+          this.peso = medidas.peso;
+        }
+        if (
+          medidas.complexion === 'Delgada' ||
+          medidas.complexion === 'Atlética' ||
+          medidas.complexion === 'Media' ||
+          medidas.complexion === 'Robusta'
+        ) {
+          this.complexion = medidas.complexion;
+        }
+        if (medidas.genero === 'Masculino' || medidas.genero === 'Femenino') {
+          this.genero = medidas.genero;
+        }
+      }
+    } catch {
+      storage.removeItem(MEASUREMENTS_STORAGE_KEY);
+    }
+
+    try {
+      const exportados = Number(storage.getItem(EXPORTED_MODELS_STORAGE_KEY));
+      this.modelosExportados = Number.isFinite(exportados) && exportados > 0 ? exportados : 0;
+    } catch {
+      storage.removeItem(EXPORTED_MODELS_STORAGE_KEY);
+    }
+  }
+
+  private guardarMedidas(): void {
+    this.guardarEnStorage(
+      MEASUREMENTS_STORAGE_KEY,
+      JSON.stringify({
+        estatura: this.estatura,
+        peso: this.peso,
+        complexion: this.complexion,
+        genero: this.genero
+      })
+    );
+  }
+
+  private guardarModelosExportados(): void {
+    this.guardarEnStorage(EXPORTED_MODELS_STORAGE_KEY, String(this.modelosExportados));
+  }
+
+  private guardarTiendas(): void {
+    const vinculadas = this.tiendas.filter((tienda) => tienda.vinculada).map((tienda) => tienda.nombre);
+    this.guardarEnStorage(STORES_STORAGE_KEY, JSON.stringify(vinculadas));
+  }
+
+  private guardarEnStorage(clave: string, valor: string): void {
+    try {
+      this.getStorage()?.setItem(clave, valor);
+    } catch {
+      // Almacenamiento no disponible o sin cuota: la demo continúa en memoria
+    }
   }
 
   // ---------- Validación biológica ----------
@@ -391,10 +1218,10 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
 
   private addLights(): void {
     // Luz ambiental cálida y suave
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+    this.scene.add(new THREE.AmbientLight(0xfff4e6, 1.05));
 
-    // Luz principal neutra desde arriba a la derecha con sombras suaves
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    // Luz principal cálida desde arriba a la derecha con sombras suaves
+    const keyLight = new THREE.DirectionalLight(0xfff7ed, 1.35);
     keyLight.position.set(4, 7, 4);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(1024, 1024);
@@ -785,7 +1612,7 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     this.validarMedidas();
 
     if (!this.estatura || !this.peso) {
-      alert('Ingresa estatura y peso');
+      this.mostrarNotificacion('Ingresa estatura y peso para generar tu avatar.', 'error');
       return;
     }
 
@@ -795,7 +1622,7 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
     const payload = {
       transaction_id: crypto.randomUUID(),
       amount: 100,
-      customer_email: DEFAULT_CUSTOMER_EMAIL,
+      customer_email: this.emailAutenticado || DEFAULT_CUSTOMER_EMAIL,
       currency: 'USD',
       avatar_data: {
         estatura: this.estatura,
@@ -805,11 +1632,13 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
       }
     };
 
-    this.http.post(WEBHOOK_URL, payload).subscribe({
+    this.http.post(`${environment.apiUrl}/webhooks/recibir`, payload).subscribe({
       next: (respuesta) => {
         console.log('Webhook procesado en backend:', respuesta);
         this.isGenerating = false;
         this.modelReady = true;
+        this.mostrarNotificacion('Modelo 3D generado con éxito.', 'exito');
+        this.scrollToVisor();
         this.cdr.detectChanges();
       },
       error: (err: HttpErrorResponse) => {
@@ -826,6 +1655,12 @@ export class AvatarSetupComponent implements AfterViewInit, OnDestroy {
           }
         }
         this.isGenerating = false;
+        this.mostrarNotificacion(
+          err.status === 400
+            ? 'Revisa tus medidas: el backend rechazó los datos del avatar.'
+            : 'No se pudo procesar el modelo 3D. Intenta nuevamente.',
+          'error'
+        );
         this.cdr.detectChanges();
       }
     });

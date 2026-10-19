@@ -1,8 +1,20 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
+const { body } = require('express-validator');
 const mainController = require('../controladores/main.controller');
+const manejarValidacion = require('../middlewares/validacion.middleware');
 
 const router = express.Router();
+
+const limitarPeticiones = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 'error', error: 'Too Many Requests' }
+});
+
+router.use(limitarPeticiones);
 
 const validarWebhook = [
   body('transaction_id')
@@ -54,17 +66,6 @@ const validarWebhook = [
     .notEmpty()
     .withMessage('avatar_data.complexion no puede estar vacío'),
 ];
-
-const manejarValidacion = (req, res, next) => {
-  const errores = validationResult(req);
-  if (!errores.isEmpty()) {
-    const err = new Error('Validación fallida');
-    err.statusCode = 400;
-    err.errors = errores.array().map(e => ({ field: e.path, message: e.msg }));
-    return next(err);
-  }
-  next();
-};
 
 router.post('/recibir', validarWebhook, manejarValidacion, mainController.procesarWebhook);
 
