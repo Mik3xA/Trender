@@ -10,10 +10,15 @@ const errorHandler = require('./controladores/error.controller');
 
 const app = express();
 
+// CORS: si ALLOWED_ORIGINS está definido solo esos orígenes (p. ej. el frontend
+// Angular en http://localhost:4200); si no, abierto (desarrollo). La app Flutter
+// nativa no envía cabecera Origin, así que no se ve afectada.
+const origenes = process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean);
+
 app.use(helmet());
-app.use(cors());
-app.use(morgan('dev'));
-app.use(express.json());
+app.use(cors(origenes?.length ? { origin: origenes } : undefined));
+app.use(morgan('dev', { skip: () => process.env.NODE_ENV === 'test' }));
+app.use(express.json({ limit: '100kb' }));
 
 const webhookLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -27,7 +32,7 @@ app.use('/api', indexRoutes);
 app.use('/webhooks', webhookLimiter, webhookRoutes);
 
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found' });
+  res.status(404).json({ status: 'error', error: 'Not Found' });
 });
 
 app.use(errorHandler);

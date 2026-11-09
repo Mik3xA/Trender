@@ -1,6 +1,7 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
 const mainController = require('../controladores/main.controller');
+const { manejarValidacion } = require('../middlewares/validacion.middleware');
 
 const router = express.Router();
 
@@ -34,18 +35,30 @@ const validarWebhook = [
     .optional()
     .isObject()
     .withMessage('metadata debe ser un objeto'),
+  // Datos del avatar que envía el frontend al generar el modelo 3D (opcional).
+  body('avatar_data')
+    .optional()
+    .isObject()
+    .withMessage('avatar_data debe ser un objeto'),
+  body('avatar_data.estatura')
+    .if(body('avatar_data').exists())
+    .isFloat({ gt: 0 })
+    .withMessage('avatar_data.estatura debe ser un número mayor a 0'),
+  body('avatar_data.peso')
+    .if(body('avatar_data').exists())
+    .isFloat({ gt: 0 })
+    .withMessage('avatar_data.peso debe ser un número mayor a 0'),
+  body('avatar_data.complexion')
+    .if(body('avatar_data').exists())
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage('avatar_data.complexion debe ser un texto no vacío'),
+  body('avatar_data.genero')
+    .optional()
+    .isString()
+    .withMessage('avatar_data.genero debe ser texto'),
 ];
-
-const manejarValidacion = (req, res, next) => {
-  const errores = validationResult(req);
-  if (!errores.isEmpty()) {
-    const err = new Error('Validación fallida');
-    err.statusCode = 400;
-    err.errors = errores.array().map(e => ({ field: e.path, message: e.msg }));
-    return next(err);
-  }
-  next();
-};
 
 router.post('/recibir', validarWebhook, manejarValidacion, mainController.procesarWebhook);
 
