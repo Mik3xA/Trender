@@ -159,7 +159,7 @@ tests/
 ├── webhooks.test.js   # POST /webhooks/recibir → 200 / 400
 └── servicios.test.js  # db.service, email.service unit tests
 ```
-Run: `npm test` (must pass before commit).
+Run: `npm test` (must pass before commit). Additional suites: `tests/auth.test.js`, `tests/closet.test.js` (see §9).
 
 ---
 
@@ -206,6 +206,88 @@ Run: `npm test` (must pass before commit).
 | **Real DB / Email** | Replace mocks in `db.service.js` / `email.service.js` | Keep controller unchanged |
 | **Auth on webhooks** | Middleware in `webhooks.routes.js` | Verify HMAC / API key before validator |
 
+
+---
+
+## 9. Trender — Cuentas, Perfil y Armario (API REST para Angular y Flutter)
+
+Todas las respuestas son JSON. Éxito: `{ "status": "success", "data": … }`. Error:
+`{ "status": "error", "error": "mensaje", "code"?: "CODIGO", "errors"?: [{ "field", "message" }] }`.
+
+### Autenticación
+
+JWT HS256 en `Authorization: Bearer <token>`. El token lleva `sub` (user id) y `sid` (fila de
+`sessions`); el middleware `requerirAuth` exige firma válida **y** sesión no revocada ni expirada,
+así el logout invalida el token aunque su firma siga vigente. Contraseñas con bcrypt (12 rondas).
+
+| Método | Ruta | Auth | Cuerpo | Respuesta |
+|---|---|---|---|---|
+| POST | `/api/auth/register` | — | `{ nombre?(1–80), email, password(8–72 bytes) }` | `201 { user, token, expires_at, session_id }` · `409 EMAIL_EN_USO` |
+| POST | `/api/auth/login` | — | `{ email, password }` | `200 { user, token, expires_at, session_id }` · `401 CREDENCIALES_INVALIDAS` |
+| POST | `/api/auth/logout` | ✅ | — | `200 { revoked: true }` — revoca la sesión y limpia la caché del usuario |
+| GET | `/api/auth/me` | ✅ | — | `200 { user, profile }` |
+| GET | `/api/profile` | ✅ | — | `200 { altura, pecho, cintura, cadera, avatar_config, updated_at }` |
+| PUT | `/api/profile` | ✅ | campos parciales (cm, `null` borra) + `avatar_config` objeto | `200` perfil |
+| GET | `/api/closet?category=top\|bottom\|shoes` | ✅ | — | `200 { items, count }` |
+| POST | `/api/closet/add-from-link` | ✅ | `{ url, category? }` (si falta se deduce del link) | `201` prenda `pending` · `409 PRENDA_DUPLICADA` |
+| GET | `/api/closet/:id` | ✅ | — | `200` prenda · `404` si no existe o es de otro usuario |
+| PATCH | `/api/closet/:id` | ✅ | `{ category }` | `200` prenda |
+| DELETE | `/api/closet/:id` | ✅ | — | `200 { id, deleted: true }` |
+| POST | `/api/ropa/escanear-link` | — | `{ url }` | `200 { prenda: { id, categoria, nombre, precio, imagenUrl } }` |
+
+`user` = `{ id, nombre, email, created_at }`. El frontend guarda estatura en `altura` y
+peso/complexión/género en `avatar_config`.
+
+`/api/auth/register` y `/api/auth/login` tienen su propio límite (30 req / 15 min / IP) contra fuerza bruta.
+Las cuentas del prototipo anterior (hash scrypt) siguen funcionando y pasan a bcrypt en su siguiente login.
+
+### Aislamiento por cuenta
+
+Los servicios reciben siempre `req.auth.userId` y toda consulta incluye `user_id = ?`. Un id de
+otro usuario responde `404` (igual que uno inexistente) para no revelar su existencia.
+
+### Esquema SQLite (migraciones en `src/servicios/migraciones.service.js`)
+
+| Tabla | Columnas |
+|---|---|
+| `users` | id (uuid), email (único, sin mayúsculas), password_hash, created_at |
+| `user_profiles` | id, user_id (FK único, cascade), altura, pecho, cintura, cadera (cm, CHECK de rango), avatar_config_json (JSON válido), updated_at |
+| `closet_items` | id, user_id (FK cascade), source_url (único por usuario), image_path (reservado `closet/<user>/<id>.png`), category (`top`/`bottom`/`shoes`), status (`pending`/`processing`/`ready`/`failed`), created_at, updated_at |
+| `sessions` | id (= claim `sid`), user_id (FK cascade), user_agent, created_at, expires_at, revoked_at |
+| `schema_migrations` | version, nombre, applied_at |
+
+Las migraciones se aplican solas al abrir la base (`db.service.js`) o con `npm run db:migrate`.
+Una base creada por el prototipo anterior (`users` + `user_measurements`) se migra conservando
+los datos: estatura → `altura`, peso/complexión/género → `avatar_config_json`.
+`dev.db` no se versiona (`.gitignore`): se crea sola al arrancar.
+
+### Ingesta por link
+
+`url.service.js` acepta solo http(s), sin credenciales embebidas ni hosts internos (localhost, IPs
+privadas/link-local, `.local`, etc.) y elimina el fragmento `#`. La prenda queda `pending` con su
+`image_path` reservado y la carpeta creada en `UPLOADS_DIR`; el servicio de recorte (pendiente)
+deberá volver a validar la resolución DNS al descargar.
+
+### Frontend
+
+La aplicación Angular vive en `frontend/` (rama de frontend) y consume esta API desde
+`environment.apiUrl` (`http://localhost:3000`). El escáner de links y la generación del modelo
+(`POST /webhooks/recibir` con `avatar_data`) no requieren sesión.
+
+### Variables de entorno adicionales
+
+| Key | Default | Descripción |
+|---|---|---|
+| `JWT_SECRET` | aleatorio por proceso (dev) | **Obligatorio en producción** |
+| `JWT_EXPIRES_IN_SECONDS` | `604800` | Vida del token / sesión |
+| `BCRYPT_ROUNDS` | `12` | Coste de bcrypt |
+| `DATABASE_URL` | `./dev.db` | Ruta SQLite (`:memory:` en pruebas) |
+| `UPLOADS_DIR` | `./uploads` | Imágenes procesadas del armario |
+| `AUTH_RATE_LIMIT` | `30` | Peticiones de login/registro por 15 min |
+| `SCAN_DELAY_MS` | `1200` | Retardo simulado del escáner de links |
+
+Pruebas: `tests/auth.test.js`, `tests/closet.test.js`, `tests/ropa.test.js`, `tests/servicios.test.js`, `tests/webhooks.test.js`
+(cada archivo con su propia base en memoria).
 ---
 
 *End of specification. Keep this file in sync with code changes.*
