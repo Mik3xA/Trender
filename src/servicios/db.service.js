@@ -1,31 +1,21 @@
 const Database = require('better-sqlite3');
+const crypto = require('crypto');
 const path = require('path');
+const { migrar } = require('./migraciones.service');
 
+// DATABASE_URL admite "file:./ruta.db" (estilo Prisma) o ":memory:" para pruebas.
 const dbPath = process.env.DATABASE_URL?.replace('file:', '') || path.join(__dirname, '../../dev.db');
 const db = new Database(dbPath);
 
-function initDb() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS webhook_events (
-      id TEXT PRIMARY KEY,
-      transaction_id TEXT UNIQUE NOT NULL,
-      amount REAL NOT NULL,
-      currency TEXT DEFAULT 'USD',
-      customer_email TEXT NOT NULL,
-      metadata TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
-}
+// Integridad referencial (ON DELETE CASCADE) y escrituras concurrentes más seguras.
+db.pragma('foreign_keys = ON');
+if (dbPath !== ':memory:') db.pragma('journal_mode = WAL');
 
-initDb();
+const aplicadas = migrar(db);
+if (aplicadas.length) console.log(`[DB] Migraciones aplicadas: ${aplicadas.join(', ')}`);
 
 function generarId() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return crypto.randomUUID();
 }
 
 async function guardarDatos(datos) {
@@ -43,7 +33,8 @@ async function guardarDatos(datos) {
   `);
 
   const id = generarId();
-  const metaJson = JSON.stringify(metadata);
+  // Los datos del avatar que envía el frontend al generar el modelo se guardan junto a metadata.
+  const metaJson = JSON.stringify(datos.avatar_data ? { ...metadata, avatar_data: datos.avatar_data } : metadata);
 
   try {
     stmt.run(id, transaction_id, amount, currency, customer_email, metaJson);
@@ -68,6 +59,8 @@ async function obtenerEventoPorId(transactionId) {
 }
 
 module.exports = {
+  db,
+  generarId,
   guardarDatos,
   obtenerEventos,
   obtenerEventoPorId
