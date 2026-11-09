@@ -1,28 +1,31 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, map, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
-
-export type AuthMethod = 'otp' | 'password';
 
 export interface AuthUser {
   id: string;
   nombre: string;
   email: string;
-  creadoEn?: string;
+  created_at?: string;
 }
 
+/** Respuesta de /api/auth/register y /api/auth/login: `{ status, data }`. */
 export interface AuthResponse {
   status: string;
-  token: string;
-  user: AuthUser;
+  data: {
+    user: AuthUser;
+    token: string;
+    expires_at: string;
+    session_id: string;
+  };
 }
 
 export interface StoredSession {
   sesionIniciada: boolean;
   email: string;
-  metodo: AuthMethod;
   token: string;
+  expiresAt?: string;
   user?: AuthUser;
 }
 
@@ -38,6 +41,8 @@ export interface LoginPayload {
 }
 
 const AUTH_STORAGE_KEY = 'trender.auth';
+/** Todo el estado local de la app usa este prefijo y se borra al cerrar sesión. */
+const STORAGE_PREFIX = 'trender.';
 const AUTH_URL = `${environment.apiUrl}/api/auth`;
 
 @Injectable({ providedIn: 'root' })
@@ -52,35 +57,24 @@ export class AuthService {
     return this.sesionSubject.value;
   }
 
-  solicitarCodigo(email: string): Observable<{ status: string; message: string }> {
-    return this.http.post<{ status: string; message: string }>(`${AUTH_URL}/solicitar-codigo`, {
-      email
-    });
-  }
-
-  verificarCodigo(email: string, codigo: string): Observable<AuthResponse> {
-    return this.http
-      .post<AuthResponse>(`${AUTH_URL}/verificar-codigo`, { email, codigo })
-      .pipe(tap((respuesta) => this.guardarSesion('otp', respuesta)));
-  }
-
   registrar(payload: RegistroPayload): Observable<AuthResponse> {
     return this.http
-      .post<AuthResponse>(`${AUTH_URL}/registro`, payload)
-      .pipe(tap((respuesta) => this.guardarSesion('password', respuesta)));
+      .post<AuthResponse>(`${AUTH_URL}/register`, payload)
+      .pipe(tap((respuesta) => this.guardarSesion(respuesta)));
   }
 
   iniciarSesion(payload: LoginPayload): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${AUTH_URL}/login`, payload)
-      .pipe(tap((respuesta) => this.guardarSesion('password', respuesta)));
+      .pipe(tap((respuesta) => this.guardarSesion(respuesta)));
   }
 
-  obtenerPerfil(): Observable<{ status: string; user: AuthUser }> {
-    const token = this.sesionSubject.value?.token ?? '';
-    return this.http.get<{ status: string; user: AuthUser }>(`${AUTH_URL}/me`, {
-      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
-    });
+  obtenerPerfil(): Observable<AuthUser> {
+    return this.http
+      .get<{ status: string; data: { user: AuthUser } }>(`${AUTH_URL}/me`, {
+        headers: this.cabecerasAuth()
+      })
+      .pipe(map((respuesta) => respuesta.data.user));
   }
 
   refrescarSesion(): void {
@@ -91,45 +85,68 @@ export class AuthService {
     }
 
     this.obtenerPerfil().subscribe({
-      next: ({ user }) => {
-        const actualizada: StoredSession = {
-          ...sesion,
-          email: user.email,
-          user
-        };
-        this.persistirSesion(actualizada);
+      next: (user) => {
+        this.persistirSesion({ ...sesion, email: user.email, user });
       },
       error: (error: { status?: number }) => {
         if (error?.status === 401) {
-          this.cerrarSesion();
+          this.limpiarSesionLocal();
         }
       }
     });
   }
 
+  /**
+   * Revoca la sesión en el servidor (POST /api/auth/logout) y limpia todo el
+   * estado local de Trender. La limpieza local ocurre aunque el servidor no responda.
+   */
   cerrarSesion(): void {
-    try {
-      this.getStorage()?.removeItem(AUTH_STORAGE_KEY);
-    } catch {
-      // Almacenamiento no disponible
+    const token = this.obtenerToken();
+    if (token) {
+      this.http
+        .post(`${AUTH_URL}/logout`, {}, { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) })
+        .subscribe({ error: () => undefined });
     }
-    this.sesionSubject.next(null);
+    this.limpiarSesionLocal();
   }
 
   obtenerToken(): string {
     return this.sesionSubject.value?.token ?? '';
   }
 
-  private guardarSesion(metodo: AuthMethod, respuesta: AuthResponse): void {
-    const sesion: StoredSession = {
-      sesionIniciada: true,
-      email: respuesta.user?.email ?? '',
-      metodo,
-      token: respuesta.token,
-      user: respuesta.user
-    };
+  /** Cabecera Authorization lista para las peticiones protegidas. */
+  cabecerasAuth(): HttpHeaders {
+    return new HttpHeaders({ Authorization: `Bearer ${this.obtenerToken()}` });
+  }
 
-    this.persistirSesion(sesion);
+  private limpiarSesionLocal(): void {
+    const storage = this.getStorage();
+    try {
+      if (storage) {
+        const claves: string[] = [];
+        for (let i = 0; i < storage.length; i += 1) {
+          const clave = storage.key(i);
+          if (clave?.startsWith(STORAGE_PREFIX)) {
+            claves.push(clave);
+          }
+        }
+        claves.forEach((clave) => storage.removeItem(clave));
+      }
+    } catch {
+      // Almacenamiento no disponible
+    }
+    this.sesionSubject.next(null);
+  }
+
+  private guardarSesion(respuesta: AuthResponse): void {
+    const { user, token, expires_at } = respuesta.data;
+    this.persistirSesion({
+      sesionIniciada: true,
+      email: user.email,
+      token,
+      expiresAt: expires_at,
+      user
+    });
   }
 
   private persistirSesion(sesion: StoredSession): void {
@@ -150,18 +167,26 @@ export class AuthService {
 
       const sesion = JSON.parse(raw) as Partial<StoredSession>;
 
-      if (!sesion.sesionIniciada || typeof sesion.email !== 'string' || !sesion.email.trim()) {
+      if (
+        !sesion.sesionIniciada ||
+        typeof sesion.email !== 'string' ||
+        !sesion.email.trim() ||
+        typeof sesion.token !== 'string' ||
+        !sesion.token
+      ) {
         return null;
       }
 
-      const metodo: AuthMethod =
-        sesion.metodo === 'otp' || sesion.metodo === 'password' ? sesion.metodo : 'otp';
+      if (sesion.expiresAt && new Date(sesion.expiresAt).getTime() <= Date.now()) {
+        this.getStorage()?.removeItem(AUTH_STORAGE_KEY);
+        return null;
+      }
 
       return {
         sesionIniciada: true,
         email: sesion.email,
-        metodo,
-        token: typeof sesion.token === 'string' ? sesion.token : '',
+        token: sesion.token,
+        expiresAt: sesion.expiresAt,
         user: sesion.user
       };
     } catch {
