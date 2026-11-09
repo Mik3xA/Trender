@@ -1,6 +1,7 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
 const mainController = require('../controladores/main.controller');
+const { manejarValidacion } = require('../middlewares/validacion.middleware');
 
 const router = express.Router();
 
@@ -35,17 +36,6 @@ const validarWebhook = [
     .isObject()
     .withMessage('metadata debe ser un objeto'),
 ];
-
-const manejarValidacion = (req, res, next) => {
-  const errores = validationResult(req);
-  if (!errores.isEmpty()) {
-    const err = new Error('Validación fallida');
-    err.statusCode = 400;
-    err.errors = errores.array().map(e => ({ field: e.path, message: e.msg }));
-    return next(err);
-  }
-  next();
-};
 
 router.post('/recibir', validarWebhook, manejarValidacion, mainController.procesarWebhook);
 

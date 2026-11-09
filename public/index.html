@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121311">
+  <title>Trender</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/trender.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <!-- Pantalla de acceso: lo único visible sin sesión -->
+  <section id="vista-login" class="login" hidden>
+    <div class="login__panel">
+      <h1 class="logo logo--grande">Trender</h1>
+      <div class="segmentado" role="tablist" aria-label="Acceso">
+        <button type="button" role="tab" data-modo="login" aria-selected="true">Iniciar sesión</button>
+        <button type="button" role="tab" data-modo="register" aria-selected="false">Crear cuenta</button>
+      </div>
+      <form id="form-login" class="formulario" novalidate>
+        <label class="campo">
+          <span>Email</span>
+          <input name="email" type="email" autocomplete="email" required maxlength="254">
+        </label>
+        <label class="campo">
+          <span>Contraseña</span>
+          <input name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="72">
+        </label>
+        <p class="aviso aviso--error" id="login-error" role="alert" hidden></p>
+        <button type="submit" class="boton boton--primario" id="login-enviar">Entrar</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Aplicación autenticada: barra lateral + lienzo central a pantalla completa -->
+  <div id="vista-app" class="app" hidden>
+    <aside class="lateral">
+      <span class="logo">Trender</span>
+      <nav class="nav" aria-label="Principal">
+        <a href="#/perfil" data-ruta="perfil" class="nav__item">Perfil</a>
+        <a href="#/armario" data-ruta="armario" class="nav__item">Armario</a>
+        <a href="#/visor" data-ruta="visor" class="nav__item">Visor</a>
+      </nav>
+      <div class="lateral__pie">
+        <span class="lateral__usuario" id="usuario-email"></span>
+        <button type="button" class="boton boton--borde" id="boton-logout">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="lienzo" id="lienzo" tabindex="-1">
+      <!-- Perfil -->
+      <section class="vista" data-vista="perfil" hidden>
+        <header class="vista__cabecera">
+          <p class="etiqueta">Perfil</p>
+          <h2>Tus medidas</h2>
+          <p class="texto-suave">Se usan para generar tu avatar en el visor. Valores en centímetros.</p>
+        </header>
+        <form id="form-perfil" class="formulario formulario--rejilla" novalidate>
+          <label class="campo"><span>Altura</span><input name="altura" type="number" min="50" max="260" step="0.5" inputmode="decimal"></label>
+          <label class="campo"><span>Pecho</span><input name="pecho" type="number" min="30" max="200" step="0.5" inputmode="decimal"></label>
+          <label class="campo"><span>Cintura</span><input name="cintura" type="number" min="30" max="200" step="0.5" inputmode="decimal"></label>
+          <label class="campo"><span>Cadera</span><input name="cadera" type="number" min="30" max="200" step="0.5" inputmode="decimal"></label>
+          <div class="formulario__acciones">
+            <button type="submit" class="boton boton--primario">Guardar medidas</button>
+            <p class="aviso" id="perfil-estado" role="status"></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- Armario -->
+      <section class="vista" data-vista="armario" hidden>
+        <header class="vista__cabecera">
+          <p class="etiqueta">Armario</p>
+          <h2>Tus prendas</h2>
+        </header>
+        <form id="form-link" class="ingesta" novalidate>
+          <label class="campo campo--ancho">
+            <span>Link de la prenda</span>
+            <input name="url" type="url" placeholder="https://tienda.com/producto" required maxlength="2048">
+          </label>
+          <label class="campo">
+            <span>Categoría</span>
+            <select name="category">
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="shoes">Zapatos</option>
+            </select>
+          </label>
+          <button type="submit" class="boton boton--primario">Agregar</button>
+        </form>
+        <p class="aviso aviso--error" id="armario-error" role="alert" hidden></p>
+        <div class="segmentado segmentado--filtro" id="filtro-armario" role="group" aria-label="Filtrar por categoría">
+          <button type="button" data-filtro="" aria-pressed="true">Todo</button>
+          <button type="button" data-filtro="top" aria-pressed="false">Top</button>
+          <button type="button" data-filtro="bottom" aria-pressed="false">Bottom</button>
+          <button type="button" data-filtro="shoes" aria-pressed="false">Zapatos</button>
+        </div>
+        <ul class="prendas" id="lista-prendas"></ul>
+        <p class="vacio" id="armario-vacio" hidden>Tu armario está vacío. Pega el link de una prenda para empezar.</p>
+      </section>
+
+      <!-- Visor -->
+      <section class="vista vista--visor" data-vista="visor" hidden>
+        <header class="vista__cabecera">
+          <p class="etiqueta">Visor</p>
+          <h2>Tu avatar</h2>
+        </header>
+        <div class="visor" id="visor"></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
