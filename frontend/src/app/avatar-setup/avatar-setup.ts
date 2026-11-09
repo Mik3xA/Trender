@@ -21,6 +21,7 @@ import { AuthService, StoredSession } from '../servicios/auth.service';
 
 const DEFAULT_CUSTOMER_EMAIL = 'usuario@trender.com';
 const MEASUREMENTS_STORAGE_KEY = 'trender.measurements';
+const PROFILE_SAVE_DELAY_MS = 500;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type Complexion = 'Delgada' | 'Atlética' | 'Media' | 'Robusta';
@@ -33,6 +34,12 @@ type CategoriaPrenda = 'Torso' | 'Piernas' | 'Calzado';
 interface Faq {
   pregunta: string;
   respuesta: string;
+}
+
+/** Respuesta de GET /api/profile. */
+interface PerfilBackend {
+  altura: number | null;
+  avatar_config: { peso?: number; complexion?: Complexion; genero?: Genero };
 }
 
 interface PrendaEscaneada {
@@ -209,6 +216,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   private webglReady = false;
   private lastFrameTime = 0;
   private notificacionTimer?: ReturnType<typeof setTimeout>;
+  private guardadoPerfilTimer?: ReturnType<typeof setTimeout>;
   private registroTimer?: ReturnType<typeof setTimeout>;
   private layoutTimer?: ReturnType<typeof setTimeout>;
   private registroEnCurso = false;
@@ -294,6 +302,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     cancelAnimationFrame(this.animationId);
+    clearTimeout(this.guardadoPerfilTimer);
     this.authSubscription?.unsubscribe();
     this.desbloquearScroll();
     if (this.notificacionTimer) {
@@ -495,22 +504,28 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private cargarDatosUsuario(): void {
-    const token = this.auth.obtenerToken();
-    if (!token) return;
+    if (!this.auth.obtenerToken()) return;
 
+    // Perfil del backend: estatura en `altura`; peso, complexión y género en `avatar_config`.
     this.http
-      .get<{ status: string; medidas: any }>(
-        `${environment.apiUrl}/api/medidas/medidas`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      .get<{ status: string; data: PerfilBackend }>(`${environment.apiUrl}/api/profile`, {
+        headers: this.auth.cabecerasAuth()
+      })
       .subscribe({
         next: (res) => {
-          if (res.medidas) {
-            this.aplicarMedidasBackend(res.medidas);
+          const config = res.data?.avatar_config ?? {};
+          if (res.data?.altura || config.peso) {
+            this.aplicarMedidasBackend({
+              estatura: res.data.altura ?? undefined,
+              peso: config.peso,
+              complexion: config.complexion,
+              genero: config.genero
+            });
+            // Sin zone.js la respuesta HTTP no refresca la vista por sí sola.
+            this.cdr.detectChanges();
           }
         },
-        error: () => {
-        }
+        error: () => undefined
       });
   }
 
@@ -524,17 +539,28 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.guardarMedidas();
   }
 
+  /** Guarda en el perfil con un pequeño retardo para no enviar una petición por tecla. */
   private guardarMedidasBackend(): void {
-    const token = this.auth.obtenerToken();
-    if (!token) return;
+    clearTimeout(this.guardadoPerfilTimer);
+    // Valores fuera de rango (p. ej. "18" mientras se escribe "181") los rechazaría el backend.
+    if (!this.auth.obtenerToken() || this.alertaValidacion) return;
+
+    this.guardadoPerfilTimer = setTimeout(() => this.enviarMedidasBackend(), PROFILE_SAVE_DELAY_MS);
+  }
+
+  private enviarMedidasBackend(): void {
+    if (!this.auth.obtenerToken()) return;
 
     this.http
-      .post(
-        `${environment.apiUrl}/api/medidas/medidas`,
-        { estatura: this.estatura, peso: this.peso, complexion: this.complexion, genero: this.genero },
-        { headers: { Authorization: `Bearer ${token}` } }
+      .put(
+        `${environment.apiUrl}/api/profile`,
+        {
+          altura: this.estatura,
+          avatar_config: { peso: this.peso, complexion: this.complexion, genero: this.genero }
+        },
+        { headers: this.auth.cabecerasAuth() }
       )
-      .subscribe({ error: () => {} });
+      .subscribe({ error: () => undefined });
   }
 
   escanearProducto(): void {
@@ -550,18 +576,19 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
 
     try {
       this.http
-        .post<{ success: boolean; prenda: PrendaEscaneada }>(
+        .post<{ status: string; data: { prenda: PrendaEscaneada } }>(
           `${environment.apiUrl}/api/ropa/escanear-link`,
           { url }
         )
         .subscribe({
           next: (res) => {
             try {
-              if (!res.success || !res.prenda) {
+              const prenda = res.data?.prenda;
+              if (res.status !== 'success' || !prenda) {
                 throw new Error(SCAN_ERROR_MESSAGE);
               }
 
-              void this.finalizarEscaneo(res.prenda);
+              void this.finalizarEscaneo(prenda);
             } catch {
               this.finalizarErrorEscaneo();
             }
@@ -699,6 +726,10 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
       return 'No se pudo conectar con el servidor. Verifica que el backend esté activo.';
     }
 
+    const detalles = error.error?.errors;
+    if (Array.isArray(detalles) && detalles.length) {
+      return detalles.map((d: { message?: string }) => d.message).filter(Boolean).join(' · ');
+    }
     return error.error?.message ?? error.error?.error ?? fallback;
   }
 
@@ -1102,7 +1133,7 @@ export class AvatarSetupComponent implements OnInit, AfterViewInit, OnDestroy {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
 

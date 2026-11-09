@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { HttpHeaders, provideHttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { AvatarSetupComponent } from './avatar-setup';
-import { AuthResponse, AuthService, StoredSession } from '../servicios/auth.service';
+import { AuthResponse, AuthService, AuthUser, StoredSession } from '../servicios/auth.service';
 import { environment } from '../../environments/environment';
 
 describe('AvatarSetupComponent', () => {
@@ -15,18 +15,25 @@ describe('AvatarSetupComponent', () => {
     refrescarSesion: () => void;
     registrar: (payload: { nombre?: string; email: string; password: string }) => Observable<AuthResponse>;
     iniciarSesion: (payload: { email: string; password: string }) => Observable<AuthResponse>;
-    obtenerPerfil: () => Observable<{ status: string; user: { id: string; nombre: string; email: string; medidas?: any } }>;
+    obtenerPerfil: () => Observable<AuthUser>;
     cerrarSesion: () => void;
     obtenerToken: () => string;
+    cabecerasAuth: () => HttpHeaders;
   };
 
-  function crearSesion(email: string, metodo: StoredSession['metodo']): StoredSession {
+  function crearSesion(email: string): StoredSession {
     return {
       sesionIniciada: true,
       email,
-      metodo,
-      token: `token-${metodo}`,
-      user: { id: `user-${metodo}`, nombre: 'Usuario Demo', email }
+      token: 'token-demo',
+      user: { id: 'user-demo', nombre: 'Usuario Demo', email }
+    };
+  }
+
+  function respuesta(sesion: StoredSession): AuthResponse {
+    return {
+      status: 'success',
+      data: { user: sesion.user!, token: sesion.token, expires_at: '2999-01-01T00:00:00Z', session_id: 's1' }
     };
   }
 
@@ -46,22 +53,19 @@ describe('AvatarSetupComponent', () => {
       sesionActual: null,
       refrescarSesion: () => undefined,
       obtenerToken: () => 'test-token',
+      cabecerasAuth: () => new HttpHeaders({ Authorization: 'Bearer test-token' }),
       registrar: ({ nombre, email }) => {
-        const sesion = crearSesion(email, 'password');
+        const sesion = crearSesion(email);
         sesion.user!.nombre = nombre || 'Usuario Demo';
         persistirSesion(sesion);
-        return of({ status: 'success', token: sesion.token, user: sesion.user! });
+        return of(respuesta(sesion));
       },
       iniciarSesion: ({ email }) => {
-        const sesion = crearSesion(email, 'password');
+        const sesion = crearSesion(email);
         persistirSesion(sesion);
-        return of({ status: 'success', token: sesion.token, user: sesion.user! });
+        return of(respuesta(sesion));
       },
-      obtenerPerfil: () =>
-        of({
-          status: 'success',
-          user: { id: 'user-password', nombre: 'Usuario Demo', email: 'demo@trender.com', medidas: null }
-        }),
+      obtenerPerfil: () => of({ id: 'user-demo', nombre: 'Usuario Demo', email: 'demo@trender.com' }),
       cerrarSesion: () => {
         authMock.sesionActual = null;
         localStorage.removeItem('trender.auth');
@@ -141,7 +145,7 @@ describe('AvatarSetupComponent', () => {
 
     expect(component.sesionIniciada).toBe(true);
     expect(component.mostrarModalAuth).toBe(false);
-    expect(JSON.parse(localStorage.getItem('trender.auth') || '{}').metodo).toBe('password');
+    expect(JSON.parse(localStorage.getItem('trender.auth') || '{}').token).toBe('token-demo');
   });
 
   it('exige una contraseña de al menos 8 caracteres', () => {
@@ -168,7 +172,7 @@ describe('AvatarSetupComponent', () => {
   });
 
   it('reinicia medidas al cerrar sesión', () => {
-    persistirSesion(crearSesion('demo@trender.com', 'password'));
+    persistirSesion(crearSesion('demo@trender.com'));
 
     component.estatura = 182;
     component.peso = 84;
@@ -209,13 +213,15 @@ describe('AvatarSetupComponent', () => {
   it('llama al endpoint de escaneo con URL válida', () => {
     const spy = vi.spyOn(component['http'], 'post').mockReturnValue(
       of({
-        success: true,
-        prenda: {
-          id: 'scanned_1',
-          nombre: 'Blazer Estructurado',
-          precio: '$2,590',
-          categoria: 'Torso',
-          imagenUrl: 'https://example.com/blazer.jpg'
+        status: 'success',
+        data: {
+          prenda: {
+            id: 'scanned_1',
+            nombre: 'Blazer Estructurado',
+            precio: '$2,590',
+            categoria: 'Torso',
+            imagenUrl: 'https://example.com/blazer.jpg'
+          }
         }
       })
     );
@@ -227,6 +233,60 @@ describe('AvatarSetupComponent', () => {
     const callArgs = spy.mock.calls[0];
     expect(callArgs[0]).toBe(`${environment.apiUrl}/api/ropa/escanear-link`);
     expect(callArgs[1]).toEqual({ url: 'https://www.zara.com/blazer' });
+    expect(component.prendaEscaneada?.nombre).toBe('Blazer Estructurado');
+    expect(component.errorEscaneo).toBeNull();
+  });
+
+  it('carga las medidas guardadas en el perfil del backend al iniciar sesión', () => {
+    const get = vi.spyOn(component['http'], 'get').mockReturnValue(
+      of({
+        status: 'success',
+        data: { altura: 181, avatar_config: { peso: 77, complexion: 'Media', genero: 'Femenino' } }
+      })
+    );
+
+    component.abrirAuthModal('login');
+    component.emailIngresado = 'clasica@trender.com';
+    component.passwordIngresado = 'secreto-seguro';
+    component.iniciarSesionConPassword();
+
+    expect(get.mock.calls[0][0]).toBe(`${environment.apiUrl}/api/profile`);
+    expect(component.estatura).toBe(181);
+    expect(component.peso).toBe(77);
+    expect(component.complexion).toBe('Media');
+    expect(component.genero).toBe('Femenino');
+  });
+
+  it('no envía al perfil medidas fuera de rango mientras se escriben', () => {
+    persistirSesion(crearSesion('demo@trender.com'));
+    const put = vi.spyOn(component['http'], 'put').mockReturnValue(of({}));
+
+    component.onEstaturaChange(18);
+    vi.advanceTimersByTime(600);
+    expect(put).not.toHaveBeenCalled();
+
+    component.onEstaturaChange(181);
+    vi.advanceTimersByTime(600);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect((put.mock.calls[0][1] as { altura: number }).altura).toBe(181);
+  });
+
+  it('guarda las medidas en el perfil (altura + avatar_config)', () => {
+    persistirSesion(crearSesion('demo@trender.com'));
+    const put = vi.spyOn(component['http'], 'put').mockReturnValue(of({}));
+    component.estatura = 175;
+    component.peso = 70;
+
+    component['guardarMedidasBackend']();
+    expect(put).not.toHaveBeenCalled(); // se agrupa con un pequeño retardo
+    vi.advanceTimersByTime(600);
+
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put.mock.calls[0][0]).toBe(`${environment.apiUrl}/api/profile`);
+    expect(put.mock.calls[0][1]).toEqual({
+      altura: 175,
+      avatar_config: { peso: 70, complexion: component.complexion, genero: component.genero }
+    });
   });
 
   it('detiene el loader y muestra un error limpio si falla el endpoint', () => {
@@ -303,14 +363,14 @@ describe('AvatarSetupComponent', () => {
   it('renderiza la sección Mi Espacio de Medición solo con sesión', () => {
     expect(fixture.nativeElement.querySelector('#mi-espacio')).toBeNull();
 
-    persistirSesion(crearSesion('demo@trender.com', 'password'));
+    persistirSesion(crearSesion('demo@trender.com'));
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('#mi-espacio')).toBeTruthy();
   });
 
   it('muestra el nombre del usuario en el Navbar al iniciar sesión', () => {
-    persistirSesion(crearSesion('demo@trender.com', 'password'));
+    persistirSesion(crearSesion('demo@trender.com'));
     fixture.detectChanges();
 
     expect(component.nombreAutenticado).toBe('Usuario Demo');
