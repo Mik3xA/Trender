@@ -1,2 +1,8 @@
-node_modules/
+node_modules
 .env
+uploads/
+# Base SQLite local: se crea y migra sola al arrancar
+dev.db
+dev.db-*
+*.db-wal
+*.db-shm
