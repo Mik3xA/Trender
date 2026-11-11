@@ -20,48 +20,43 @@ describe('PerfilService', () => {
 
   afterEach(() => http.verify());
 
-  it('lee medidas y conjunto del perfil', () => {
-    let resultado: unknown;
+  it('lee los perfiles de cada apartado y sanea los datos', () => {
+    let resultado: any;
     servicio.obtener().subscribe((r) => (resultado = r));
     http.expectOne(url).flush({
       status: 'success',
       data: {
-        altura: 181, pecho: 100, cintura: null, cadera: null,
-        avatar_config: { peso: 80, genero: 'Masculino', tipoCuerpo: 'ovalo', conjunto: [MUESTRAS[0]] },
+        altura: 181, pecho: null, cintura: null, cadera: null,
+        avatar_config: {
+          genero: 'Masculino',
+          perfiles: {
+            Masculino: { medidas: { altura: 181, peso: 80, tipoCuerpo: 'ovalo' }, conjunto: [MUESTRAS[0]], tono: 'medio' },
+          },
+        },
       },
     });
-    expect(resultado).toMatchObject({
-      medidas: { genero: 'Masculino', altura: 181, peso: 80, tipoCuerpo: 'ovalo', pecho: 100, cintura: null },
+    expect(resultado.activo).toBe('Masculino');
+    expect(resultado.perfiles.Masculino).toMatchObject({
+      medidas: { genero: 'Masculino', altura: 181, peso: 80, tipoCuerpo: 'sobrepeso' },
       conjunto: [MUESTRAS[0]],
+      tono: 'medio',
     });
+    expect(resultado.perfiles.Femenino).toBeUndefined();
   });
 
-  it('convierte la complexión del prototipo anterior en tipo de cuerpo', () => {
-    let resultado: { medidas: { tipoCuerpo: string } } | null = null;
-    servicio.obtener().subscribe((r) => (resultado = r));
-    http.expectOne(url).flush({
-      status: 'success',
-      data: { altura: 170, pecho: null, cintura: null, cadera: null, avatar_config: { peso: 70, complexion: 'Atlética', genero: 'Masculino' } },
-    });
-    expect(resultado!.medidas.tipoCuerpo).toBe('triangulo-invertido');
-  });
-
-  it('devuelve null si la cuenta aún no tiene medidas', () => {
-    let resultado: unknown = 'sin respuesta';
-    servicio.obtener().subscribe((r) => (resultado = r));
-    http.expectOne(url).flush({ status: 'success', data: { altura: null, pecho: null, cintura: null, cadera: null, avatar_config: {} } });
-    expect(resultado).toBeNull();
-  });
-
-  it('guarda altura y contornos en columnas y el resto en avatar_config (sin imágenes)', () => {
-    servicio.guardar({ medidas: { ...MEDIDAS_INICIALES.Femenino, cintura: 66 }, conjunto: [{ ...MUESTRAS[1], imagen: 'https://x/y.jpg' }] }).subscribe();
+  it('guarda ambos apartados y las medidas del activo en las columnas', () => {
+    const perfiles = {
+      Femenino: { medidas: { ...MEDIDAS_INICIALES.Femenino, cintura: 66 }, conjunto: [], tono: 'claro' },
+      Masculino: { medidas: MEDIDAS_INICIALES.Masculino, conjunto: [MUESTRAS[1]], tono: 'maniqui' },
+    };
+    servicio.guardar('Femenino', perfiles).subscribe();
     const req = http.expectOne(url);
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toMatchObject({
-      altura: 163, pecho: null, cintura: 66,
-      avatar_config: { peso: 58, genero: 'Femenino', tipoCuerpo: 'reloj-de-arena' },
+      altura: 163,
+      cintura: 66,
+      avatar_config: { genero: 'Femenino', perfiles: { Masculino: { conjunto: [MUESTRAS[1]] } } },
     });
-    expect(req.request.body.avatar_config.conjunto[0].imagen).toBeUndefined();
     req.flush({ status: 'success' });
   });
 });
