@@ -75,6 +75,9 @@ function obtenerPrenda(userId, itemId) {
 function agregarDesdeLink(userId, { url, category }) {
   const sourceUrl = normalizarUrlProducto(url);
   category = category ?? categoriaArmario(sourceUrl);
+  if (!category) {
+    throw errorOperacional(422, 'No se pudo deducir la categoría del link: indica category (top, bottom o shoes)', 'CATEGORIA_REQUERIDA');
+  }
   const itemId = generarId();
   const imagePath = rutaImagenReservada(userId, itemId);
 
