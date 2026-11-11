@@ -14,6 +14,16 @@ async function registrar(req, res, next) {
   }
 }
 
+/** POST /api/auth/invitado — sesión anónima para usar el probador sin registro. */
+async function invitado(req, res, next) {
+  try {
+    const sesion = await authService.crearInvitado({ userAgent: req.get('user-agent') });
+    res.status(201).json({ status: 'success', data: sesion });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function iniciarSesion(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -44,4 +54,4 @@ async function usuarioActual(req, res, next) {
   }
 }
 
-module.exports = { registrar, iniciarSesion, cerrarSesion, usuarioActual };
+module.exports = { invitado, registrar, iniciarSesion, cerrarSesion, usuarioActual };

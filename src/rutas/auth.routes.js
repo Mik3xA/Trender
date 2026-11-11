@@ -55,6 +55,16 @@ router.post(
   authController.iniciarSesion
 );
 
+// Sesiones de invitado: un límite propio evita crear usuarios en masa.
+const limitadorInvitados = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: Number(process.env.GUEST_RATE_LIMIT) || 20,
+  message: { status: 'error', error: 'Demasiadas sesiones nuevas, intenta más tarde' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.post('/invitado', limitadorInvitados, authController.invitado);
+
 router.post('/logout', requerirAuth, authController.cerrarSesion);
 router.get('/me', requerirAuth, authController.usuarioActual);
 

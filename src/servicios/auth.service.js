@@ -36,6 +36,7 @@ const scrypt = promisify(crypto.scrypt);
 
 const consultas = {
   insertarUsuario: db.prepare('INSERT INTO users (id, nombre, email, password_hash) VALUES (?, ?, ?, ?)'),
+  insertarInvitado: db.prepare('INSERT INTO users (id, nombre, email, password_hash, es_invitado) VALUES (?, ?, ?, ?, 1)'),
   insertarPerfil: db.prepare('INSERT INTO user_profiles (id, user_id) VALUES (?, ?)'),
   usuarioPorEmail: db.prepare('SELECT id, nombre, email, password_hash, created_at FROM users WHERE email = ?'),
   usuarioPorId: db.prepare('SELECT id, nombre, email, created_at FROM users WHERE id = ?'),
@@ -135,6 +136,22 @@ async function registrar({ nombre, email, password, userAgent }) {
   return { user: usuario, ...crearSesion(userId, userAgent) };
 }
 
+/**
+ * Crea un usuario invitado y abre su sesión: la app se usa sin registro y aun
+ * así cada persona tiene su propio armario y medidas en el servidor.
+ * No tiene contraseña utilizable (hash de un secreto aleatorio que se descarta).
+ */
+async function crearInvitado({ userAgent } = {}) {
+  const userId = generarId();
+  const hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 4);
+  db.transaction(() => {
+    consultas.insertarInvitado.run(userId, 'Invitado', `invitado-${userId}@invitados.trender.local`, hash);
+    consultas.insertarPerfil.run(generarId(), userId);
+  })();
+  const usuario = serializarUsuario(consultas.usuarioPorId.get(userId));
+  return { user: usuario, ...crearSesion(userId, userAgent) };
+}
+
 /** Verifica credenciales. Mismo error (401) para email inexistente o contraseña errónea. */
 async function iniciarSesion({ email, password, userAgent }) {
   const fila = consultas.usuarioPorEmail.get(normalizarEmail(email));
@@ -184,6 +201,7 @@ function obtenerUsuario(userId) {
 }
 
 module.exports = {
+  crearInvitado,
   registrar,
   iniciarSesion,
   verificarToken,
