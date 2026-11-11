@@ -52,7 +52,7 @@ describe('migraciones.service', () => {
       INSERT INTO user_measurements (user_id, estatura, peso, complexion, genero) VALUES ('u1', 165, 60, 'Media', 'Femenino');
     `);
 
-    expect(migrar(legado)).toEqual([1, 2]);
+    expect(migrar(legado)).toEqual([1, 2, 3]);
     const perfil = legado.prepare('SELECT altura, avatar_config_json FROM user_profiles WHERE user_id = ?').get('u1');
     expect(perfil.altura).toBe(165);
     expect(JSON.parse(perfil.avatar_config_json)).toEqual({ peso: 60, complexion: 'Media', genero: 'Femenino' });
@@ -171,10 +171,11 @@ describe('auth.service / perfil.service / closet.service', () => {
     expect(perfil).toMatchObject({ altura: 180, cintura: 82, pecho: null, avatar_config: { pose: 'A' } });
   });
 
-  it('nunca expone prendas de otro usuario', () => {
-    const prenda = closetService.agregarDesdeLink(beto.user.id, { url: 'https://shop.example.com/a', category: 'top' });
-    expect(prenda).toMatchObject({ status: 'pending', category: 'top' });
-    expect(prenda.image_path).toBe(`closet/${beto.user.id}/${prenda.id}.png`);
+  it('nunca expone prendas de otro usuario', async () => {
+    const { prenda, terminado } = closetService.importarDesdeLink(beto.user.id, { url: 'https://shop.example.com/camisa-a', genero: 'Masculino' });
+    expect(prenda).toMatchObject({ status: 'processing', genero: 'Masculino' });
+    await terminado;
+    expect(closetService.obtenerPrenda(beto.user.id, prenda.id)).toMatchObject({ status: 'ready', category: 'top', tipo: 'camisa' });
 
     expect(closetService.listarPrendas(ana.user.id)).toEqual([]);
     expect(() => closetService.obtenerPrenda(ana.user.id, prenda.id)).toThrow(expect.objectContaining({ statusCode: 404 }));

@@ -11,3 +11,7 @@ process.env.AUTH_RATE_LIMIT = '1000';
 process.env.UPLOADS_DIR = path.join(os.tmpdir(), `trender-test-${process.pid}-${Math.random().toString(36).slice(2)}`);
 // Las pruebas nunca salen a internet: el escáner solo analiza la URL salvo que el test lo pida.
 process.env.SCAN_FETCH_PAGES = 'false';
+process.env.SCRAPER_BROWSER = 'false';
+process.env.GUEST_RATE_LIMIT = '1000';
+process.env.IMPORT_RATE_LIMIT = '1000';
+delete process.env.REMOVE_BG_API_KEY;

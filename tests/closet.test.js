@@ -20,62 +20,63 @@ describe('Armario /api/closet', () => {
     beto = await crearUsuario(app, 'beto');
   });
 
-  it('agrega una prenda por link, en estado pending y con carpeta preparada', async () => {
-    const res = await request(app)
-      .post('/api/closet/add-from-link')
-      .set(ana.auth)
-      .send({ url: 'https://shop.example.com/camisa-lino#fotos', category: 'top' });
-    expect(res.status).toBe(201);
-    expect(res.body.data).toMatchObject({
-      id: expect.any(String),
-      source_url: 'https://shop.example.com/camisa-lino',
-      category: 'top',
-      status: 'pending',
-    });
+  /** Consulta la prenda hasta que termine su análisis, como hace el frontend. */
+  async function esperar(auth, id) {
+    for (let i = 0; i < 100; i += 1) {
+      const res = await request(app).get(`/api/closet/${id}`).set(auth);
+      if (res.body.data.status !== 'processing') return res.body.data;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error('no terminó');
+  }
+
+  async function importar(usuario, url, extra = {}) {
+    const res = await request(app).post('/api/closet/add-from-link').set(usuario.auth).send({ url, ...extra });
+    return { res, prenda: res.status === 202 ? await esperar(usuario.auth, res.body.data.id) : null };
+  }
+
+  it('importa una prenda por link: 202 "processing" y luego "ready" con categoría y tipo', async () => {
+    const { res, prenda } = await importar(ana, 'https://shop.example.com/camisa-lino#fotos', { genero: 'Femenino' });
+    expect(res.status).toBe(202);
+    expect(res.body.data).toMatchObject({ status: 'processing', source_url: 'https://shop.example.com/camisa-lino' });
     expect(res.body.data).not.toHaveProperty('user_id');
-    expect(fs.existsSync(path.join(UPLOADS_DIR, path.dirname(res.body.data.image_path)))).toBe(true);
+    expect(prenda).toMatchObject({ status: 'ready', category: 'top', tipo: 'camisa', genero: 'Femenino' });
   });
 
-  it('deduce la categoría del link si no se envía', async () => {
-    const res = await request(app)
-      .post('/api/closet/add-from-link')
-      .set(beto.auth)
-      .send({ url: 'https://shop.example.com/pantalones-cargo' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.category).toBe('bottom');
-    await request(app).delete(`/api/closet/${res.body.data.id}`).set(beto.auth);
+  it('deduce la categoría del link (pantalones -> bottom) si no se envía', async () => {
+    const { prenda } = await importar(beto, 'https://shop.example.com/pantalones-cargo');
+    expect(prenda).toMatchObject({ category: 'bottom', tipo: 'pantalon' });
+    await request(app).delete(`/api/closet/${prenda.id}`).set(beto.auth);
   });
 
-  it('pide la categoría si no se puede deducir del link', async () => {
-    const res = await request(app)
-      .post('/api/closet/add-from-link')
-      .set(beto.auth)
-      .send({ url: 'https://shop.example.com/producto/88231' });
-    expect(res.status).toBe(422);
-    expect(res.body.code).toBe('CATEGORIA_REQUERIDA');
+  it('respeta la categoría que indica el usuario', async () => {
+    const { prenda } = await importar(beto, 'https://shop.example.com/producto/77', { category: 'shoes' });
+    expect(prenda).toMatchObject({ status: 'ready', category: 'shoes' });
+    await request(app).delete(`/api/closet/${prenda.id}`).set(beto.auth);
   });
 
-  it('valida url y categoría', async () => {
-    const res = await request(app).post('/api/closet/add-from-link').set(ana.auth).send({ url: 'nada', category: 'hat' });
+  it('si no se puede deducir la categoría queda en revisión', async () => {
+    const { prenda } = await importar(beto, 'https://shop.example.com/producto/88231');
+    expect(prenda).toMatchObject({ status: 'review', category: null });
+    await request(app).delete(`/api/closet/${prenda.id}`).set(beto.auth);
+  });
+
+  it('valida url, categoría y género', async () => {
+    const res = await request(app).post('/api/closet/importar').set(ana.auth).send({ url: 'nada', category: 'hat', genero: 'X' });
     expect(res.status).toBe(400);
-    expect(res.body.errors.map((e) => e.field).sort()).toEqual(['category', 'url']);
-
-    const interna = await request(app)
-      .post('/api/closet/add-from-link')
-      .set(ana.auth)
-      .send({ url: 'http://169.254.169.254/latest', category: 'top' });
+    expect(res.body.errors.map((e) => e.field).sort()).toEqual(['category', 'genero', 'url']);
+    const interna = await request(app).post('/api/closet/importar').set(ana.auth).send({ url: 'http://169.254.169.254/latest' });
     expect(interna.status).toBe(400);
   });
 
-  it('no duplica el mismo link para un usuario, pero otro usuario sí puede guardarlo', async () => {
+  it('no duplica el mismo link en un armario, pero otro usuario sí puede guardarlo', async () => {
     const url = 'https://shop.example.com/zapatilla';
-    expect((await request(app).post('/api/closet/add-from-link').set(ana.auth).send({ url, category: 'shoes' })).status).toBe(201);
-    const repetida = await request(app).post('/api/closet/add-from-link').set(ana.auth).send({ url, category: 'shoes' });
-    expect(repetida.status).toBe(409);
-    expect((await request(app).post('/api/closet/add-from-link').set(beto.auth).send({ url, category: 'shoes' })).status).toBe(201);
+    expect((await importar(ana, url)).prenda.category).toBe('shoes');
+    expect((await request(app).post('/api/closet/importar').set(ana.auth).send({ url })).status).toBe(409);
+    expect((await importar(beto, url)).res.status).toBe(202);
   });
 
-  it('lista solo las prendas del usuario y filtra por categoría', async () => {
+  it('lista solo las prendas del usuario y filtra por categoría y género', async () => {
     const todas = await request(app).get('/api/closet').set(ana.auth);
     expect(todas.status).toBe(200);
     expect(todas.body.data.count).toBe(2);
@@ -83,6 +84,7 @@ describe('Armario /api/closet', () => {
 
     const zapatos = await request(app).get('/api/closet?category=shoes').set(ana.auth);
     expect(zapatos.body.data.items.map((i) => i.category)).toEqual(['shoes']);
+    expect((await request(app).get('/api/closet?genero=Masculino').set(ana.auth)).body.data.count).toBe(0);
 
     expect((await request(app).get('/api/closet').set(beto.auth)).body.data.count).toBe(1);
     expect((await request(app).get('/api/closet?category=gorra').set(ana.auth)).status).toBe(400);
@@ -99,11 +101,8 @@ describe('Armario /api/closet', () => {
   });
 
   it('actualiza la categoría y elimina; la caché se invalida en cada cambio', async () => {
-    const creada = await request(app)
-      .post('/api/closet/add-from-link')
-      .set(ana.auth)
-      .send({ url: 'https://shop.example.com/pantalon', category: 'top' });
-    const id = creada.body.data.id;
+    const { prenda: creada } = await importar(ana, 'https://shop.example.com/pantalon', { category: 'top' });
+    const id = creada.id;
 
     const cambiada = await request(app).patch(`/api/closet/${id}`).set(ana.auth).send({ category: 'bottom' });
     expect(cambiada.status).toBe(200);
