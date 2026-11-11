@@ -238,7 +238,8 @@ function nombreDesdeUrl(url) {
     tramo
       .replace(/\.(html?|php|aspx?)$/i, '')
       .split(/[-_.+]+/)
-      .filter((w) => w.length > 1 && !/\d{3,}/.test(w) && !SEGMENTOS_GENERICOS.has(w.toLowerCase()))
+      // Fuera códigos de producto ("p01", "1234567001", "sku88") y segmentos genéricos.
+      .filter((w) => w.length > 1 && !/\d{3,}|^[a-z]{0,3}\d+$/i.test(w) && !SEGMENTOS_GENERICOS.has(w.toLowerCase()))
   );
   const mejor = candidatos.sort((a, b) => b.length - a.length)[0] ?? [];
   if (mejor.length < 2) return null;

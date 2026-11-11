@@ -202,6 +202,11 @@ describe('POST /api/ropa/escanear-link', () => {
     });
   });
 
+  it('arma un nombre legible desde la URL sin códigos de producto', async () => {
+    const res = await escanear('https://tienda.example/es/jeans-rectos-azul-p01.html');
+    expect(res.body.data.prenda.nombre).toBe('Jeans rectos azul');
+  });
+
   it('responde categoria null con un motivo cuando no reconoce la prenda', async () => {
     const res = await escanear('https://tienda.example/producto-generico');
     expect(res.status).toBe(200);
