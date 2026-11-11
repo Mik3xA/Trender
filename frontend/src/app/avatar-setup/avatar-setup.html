@@ -1,0 +1,376 @@
+<div class="min-h-screen bg-sand text-stone-900 antialiased">
+
+  <!-- Navegación superior -->
+  <header class="sticky top-0 z-40 border-b border-stone-200/70 bg-sand/90 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 lg:px-8">
+      <a href="#inicio" class="text-lg font-semibold tracking-[0.2em]">TRENDER</a>
+      <nav class="hidden items-center gap-8 text-sm text-stone-500 md:flex">
+        <a href="#probador" class="transition-colors hover:text-stone-900">Probador</a>
+        <a href="#como-funciona" class="transition-colors hover:text-stone-900">Cómo funciona</a>
+      </nav>
+      @if (sesionIniciada()) {
+        <div class="flex items-center gap-4 text-sm">
+          <span class="hidden text-stone-600 sm:inline">Hola, {{ nombreAutenticado() }}</span>
+          <button type="button" (click)="cerrarSesion()" class="text-stone-500 transition-colors hover:text-stone-900">Cerrar sesión</button>
+        </div>
+      } @else {
+        <div class="flex items-center gap-2 text-sm">
+          <button type="button" (click)="abrirAuthModal('login')" class="rounded-full px-4 py-2 text-stone-700 transition-colors hover:text-stone-900">Iniciar sesión</button>
+          <button type="button" (click)="abrirAuthModal('registro')" class="rounded-full bg-stone-900 px-4 py-2 font-medium text-white transition-colors hover:bg-olive">Crear cuenta</button>
+        </div>
+      }
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section id="inicio" class="mx-auto max-w-7xl px-5 pb-8 pt-14 lg:px-8 lg:pt-20">
+      <p class="text-xs font-medium uppercase tracking-[0.25em] text-olive">Probador virtual</p>
+      <h1 class="mt-4 max-w-3xl text-4xl font-medium leading-[1.1] tracking-tight md:text-6xl">Pruébatelo antes de comprarlo.</h1>
+      <p class="mt-5 max-w-xl text-base leading-relaxed text-stone-500">
+        Ingresa tus medidas, pega el enlace de cualquier prenda y mira cómo te queda en un avatar 3D hecho a tu cuerpo.
+      </p>
+    </section>
+
+    <!-- Probador -->
+    <section id="probador" class="mx-auto grid max-w-7xl scroll-mt-20 gap-6 px-5 pb-20 lg:grid-cols-[400px_1fr] lg:px-8">
+
+      <!-- Panel de control -->
+      <aside class="flex flex-col rounded-3xl border border-stone-200 bg-white">
+        @if (sesionIniciada()) {
+          <div id="mi-espacio" class="border-b border-stone-100 px-6 pt-5 pb-4">
+            <p class="text-[11px] font-medium uppercase tracking-[0.2em] text-stone-400">Mi Espacio de Medición</p>
+            <p class="mt-1 text-sm text-stone-700">{{ nombreAutenticado() }} · tus cambios se guardan en tu cuenta</p>
+          </div>
+        }
+
+        <div class="flex gap-1 p-2" role="tablist" aria-label="Pasos del probador">
+          @for (p of [['cuerpo', '1', 'Cuerpo'], ['prenda', '2', 'Prenda'], ['talla', '3', 'Talla']]; track p[0]) {
+            <button type="button" role="tab" [attr.aria-selected]="paso() === p[0]" (click)="paso.set($any(p[0]))"
+                    class="flex flex-1 items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-sm transition-colors"
+                    [class]="paso() === p[0] ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-900'">
+              <span class="text-xs opacity-60">{{ p[1] }}</span>{{ p[2] }}
+            </button>
+          }
+        </div>
+
+        <div class="flex-1 px-6 pb-6 pt-3">
+          @switch (paso()) {
+
+            <!-- Paso 1: cuerpo -->
+            @case ('cuerpo') {
+              <div class="space-y-7">
+                <div>
+                  <p class="etiqueta">Género</p>
+                  <div class="mt-2 grid grid-cols-2 gap-1 rounded-2xl bg-stone-100 p-1">
+                    @for (g of ['Femenino', 'Masculino']; track g) {
+                      <button type="button" (click)="cambiarGenero($any(g))" [attr.aria-pressed]="medidas().genero === g"
+                              class="rounded-xl py-2 text-sm transition-all"
+                              [class]="medidas().genero === g ? 'bg-white font-medium shadow-sm' : 'text-stone-500 hover:text-stone-900'">
+                        {{ g }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-baseline justify-between">
+                    <label for="altura" class="etiqueta">Altura</label>
+                    <span class="text-sm tabular-nums"><input type="number" [min]="LIMITES.altura.min" [max]="LIMITES.altura.max"
+                      [value]="medidas().altura" (change)="cambiarNumero('altura', $any($event.target).value)"
+                      class="numero" aria-label="Altura en centímetros"> cm</span>
+                  </div>
+                  <input id="altura" name="estatura" type="range" [min]="LIMITES.altura.min" [max]="LIMITES.altura.max" step="1"
+                         [value]="medidas().altura" (input)="cambiarNumero('altura', $any($event.target).value)" class="deslizador mt-3">
+                </div>
+
+                <div>
+                  <div class="flex items-baseline justify-between">
+                    <label for="peso" class="etiqueta">Peso</label>
+                    <span class="text-sm tabular-nums"><input type="number" [min]="LIMITES.peso.min" [max]="LIMITES.peso.max"
+                      [value]="medidas().peso" (change)="cambiarNumero('peso', $any($event.target).value)"
+                      class="numero" aria-label="Peso en kilogramos"> kg</span>
+                  </div>
+                  <input id="peso" name="peso" type="range" [min]="LIMITES.peso.min" [max]="LIMITES.peso.max" step="0.5"
+                         [value]="medidas().peso" (input)="cambiarNumero('peso', $any($event.target).value)" class="deslizador mt-3">
+                  <p class="mt-2 text-xs text-stone-400">IMC {{ indiceMasa() }}</p>
+                </div>
+
+                <div>
+                  <p class="etiqueta">Tipo de cuerpo</p>
+                  <div class="mt-2 grid grid-cols-5 gap-1.5">
+                    @for (tipo of TIPOS_CUERPO; track tipo.id) {
+                      <button type="button" (click)="cambiarTipoCuerpo(tipo.id)" [attr.aria-pressed]="medidas().tipoCuerpo === tipo.id"
+                              [title]="tipo.nombre + ': ' + tipo.descripcion"
+                              class="flex flex-col items-center gap-1 rounded-xl border px-1 py-2.5 transition-colors"
+                              [class]="medidas().tipoCuerpo === tipo.id ? 'border-olive bg-olive/5 text-olive' : 'border-stone-200 text-stone-400 hover:border-stone-300 hover:text-stone-700'">
+                        <svg class="h-9 w-6" viewBox="0 0 24 36" fill="currentColor" aria-hidden="true">
+                          @switch (tipo.id) {
+                            @case ('rectangulo') { <path d="M6 2h12l-1 11 1 11-2 10H8L6 24l1-11z" /> }
+                            @case ('triangulo') { <path d="M8 2h8l1 11 4 11-2 10H5L3 24l4-11z" /> }
+                            @case ('triangulo-invertido') { <path d="M3 2h18l-3 11-1 11-1 10H8L7 24 6 13z" /> }
+                            @case ('reloj-de-arena') { <path d="M5 2h14l-3 11 3 11-2 10H7L5 24l3-11z" /> }
+                            @case ('ovalo') { <path d="M7 2h10l2 11-1 11-2 10H8L6 24 5 13z" /> }
+                          }
+                        </svg>
+                        <span class="text-[10px] leading-tight">{{ tipo.nombre }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <details class="group rounded-2xl border border-stone-200 px-4 py-3">
+                  <summary class="flex cursor-pointer list-none items-center justify-between text-sm text-stone-600">
+                    Medidas exactas <span class="text-xs text-stone-400">opcional</span>
+                  </summary>
+                  <p class="mt-2 text-xs leading-relaxed text-stone-400">
+                    Si las dejas vacías las estimamos con tu altura, peso y tipo de cuerpo.
+                  </p>
+                  <div class="mt-3 grid grid-cols-3 gap-2">
+                    @for (c of [['pecho', medidas().genero === 'Femenino' ? 'Busto' : 'Pecho'], ['cintura', 'Cintura'], ['cadera', 'Cadera']]; track c[0]) {
+                      <label class="text-xs text-stone-500">
+                        {{ c[1] }}
+                        <input type="number" [min]="LIMITES.contorno.min" [max]="LIMITES.contorno.max" step="0.5"
+                               [value]="$any(medidas())[c[0]] ?? ''" [placeholder]="$any(contornos())[c[0]]"
+                               (change)="cambiarContorno($any(c[0]), $any($event.target).value)"
+                               class="mt-1 w-full rounded-lg border border-stone-200 px-2 py-1.5 text-sm text-stone-900 outline-none focus:border-olive">
+                      </label>
+                    }
+                  </div>
+                </details>
+
+                <div class="flex items-center justify-between">
+                  <button type="button" (click)="restablecerMedidas()" class="text-xs text-stone-400 hover:text-stone-700">Restablecer</button>
+                  <button type="button" (click)="paso.set('prenda')" class="boton-primario">Elegir prenda</button>
+                </div>
+              </div>
+            }
+
+            <!-- Paso 2: prenda -->
+            @case ('prenda') {
+              <div class="space-y-7" id="escaner">
+                <div>
+                  <label for="url-prenda" class="etiqueta">Enlace de la tienda</label>
+                  <form class="mt-2 flex gap-2" (ngSubmit)="escanearProducto()">
+                    <input id="url-prenda" name="url" type="url" [ngModel]="urlEscaneo()" (ngModelChange)="urlEscaneo.set($event)"
+                           placeholder="https://tienda.com/producto" autocomplete="off"
+                           class="min-w-0 flex-1 rounded-xl border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-olive">
+                    <button type="submit" [disabled]="escaneando() || !urlEscaneo().trim()" class="boton-primario shrink-0">
+                      {{ escaneando() ? 'Analizando…' : 'Probar' }}
+                    </button>
+                  </form>
+                  @if (errorEscaneo()) {
+                    <p class="mt-2 text-xs text-red-700" role="alert">{{ errorEscaneo() }}</p>
+                  }
+                </div>
+
+                @if (prendaEscaneada(); as e) {
+                  <div class="rounded-2xl border border-stone-200 p-4" data-prenda-escaneada>
+                    <div class="flex gap-3">
+                      @if (e.imagen) {
+                        <img [src]="e.imagen" alt="" class="h-16 w-14 shrink-0 rounded-lg object-cover" referrerpolicy="no-referrer">
+                      } @else {
+                        <span class="h-16 w-14 shrink-0 rounded-lg border border-stone-200" [style.background]="e.color?.hex ?? '#f4f4f2'"></span>
+                      }
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium">{{ e.nombre }}</p>
+                        <p class="mt-0.5 text-xs text-stone-500">
+                          {{ e.tienda }}@if (e.precio) { · {{ e.precio }} }@if (e.color) { · {{ e.color.nombre }} }
+                        </p>
+                        @if (e.categoria) {
+                          <p class="mt-1.5 text-xs text-olive">{{ NOMBRE_CATEGORIA[e.categoria] }} · {{ e.tipo }}</p>
+                        }
+                      </div>
+                    </div>
+                    @if (!e.categoria) {
+                      <p class="mt-3 text-xs text-stone-500">{{ e.motivo }}</p>
+                    } @else {
+                      <p class="mt-3 text-xs text-stone-400">¿No es correcto? Elige qué es:</p>
+                    }
+                    <div class="mt-2 grid grid-cols-4 gap-1.5">
+                      @for (cat of CATEGORIAS; track cat) {
+                        <button type="button" (click)="elegirCategoria(cat)"
+                                class="rounded-lg border py-1.5 text-xs transition-colors"
+                                [class]="e.categoria === cat ? 'border-olive text-olive' : 'border-stone-200 text-stone-500 hover:border-stone-400'">
+                          {{ NOMBRE_CATEGORIA[cat] }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <div>
+                  <p class="etiqueta">O prueba un básico</p>
+                  <div class="mt-3 grid grid-cols-2 gap-2">
+                    @for (m of MUESTRAS; track m.id) {
+                      <button type="button" (click)="estaPuesta(m.id) ? quitar(m.id) : vestir(m)" [attr.aria-pressed]="estaPuesta(m.id)"
+                              class="flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-xs transition-colors"
+                              [class]="estaPuesta(m.id) ? 'border-olive bg-olive/5' : 'border-stone-200 hover:border-stone-300'">
+                        <span class="h-4 w-4 shrink-0 rounded-full border border-black/10" [style.background]="m.color"></span>
+                        <span class="truncate">{{ m.nombre }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <div class="flex justify-end">
+                  <button type="button" (click)="paso.set('talla')" class="boton-primario">Ver mi talla</button>
+                </div>
+              </div>
+            }
+
+            <!-- Paso 3: talla -->
+            @case ('talla') {
+              <div class="space-y-5">
+                <div class="grid grid-cols-3 gap-2 text-center">
+                  @for (c of [['Pecho', contornos().pecho], ['Cintura', contornos().cintura], ['Cadera', contornos().cadera]]; track c[0]) {
+                    <div class="rounded-2xl bg-stone-50 py-3">
+                      <p class="text-lg font-medium tabular-nums">{{ c[1] }}</p>
+                      <p class="text-[11px] text-stone-400">{{ c[0] }} cm</p>
+                    </div>
+                  }
+                </div>
+                @if (contornos().estimados) {
+                  <p class="text-xs text-stone-400">Medidas estimadas. Para más precisión ingrésalas en el paso 1.</p>
+                }
+
+                @if (recomendaciones().length) {
+                  <ul class="divide-y divide-stone-100" aria-label="Prendas puestas">
+                    @for (r of recomendaciones(); track r.prenda.id) {
+                      <li class="flex items-center gap-3 py-3">
+                        <span class="h-8 w-8 shrink-0 rounded-full border border-black/10" [style.background]="r.prenda.color"></span>
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm">{{ r.prenda.nombre }}</p>
+                          <p class="text-xs text-stone-400">{{ r.talla.base }}</p>
+                          @if (r.talla.nota) { <p class="mt-0.5 text-xs text-olive">{{ r.talla.nota }}</p> }
+                        </div>
+                        <span class="rounded-lg bg-stone-900 px-2.5 py-1 text-sm font-medium text-white" data-talla>{{ r.talla.talla }}</span>
+                        <button type="button" (click)="quitar(r.prenda.id)" [attr.aria-label]="'Quitar ' + r.prenda.nombre"
+                                class="text-stone-300 transition-colors hover:text-stone-700">
+                          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                  <button type="button" (click)="quitarTodo()" class="text-xs text-stone-400 hover:text-stone-700">Quitar todo</button>
+                } @else {
+                  <p class="rounded-2xl border border-dashed border-stone-200 p-6 text-center text-sm text-stone-400">
+                    Ponte una prenda para ver la talla que te recomendamos.
+                  </p>
+                }
+              </div>
+            }
+          }
+        </div>
+      </aside>
+
+      <!-- Visor 3D -->
+      <div class="visor" [class.visor--completo]="pantallaCompleta()">
+        <tr-visor-3d [medidas]="medidas()" [conjunto]="conjunto()" class="block h-full w-full" />
+        <div class="pointer-events-none absolute left-5 top-5 flex flex-wrap gap-2 text-xs text-stone-500">
+          <span class="chip">{{ medidas().altura }} cm</span>
+          <span class="chip">{{ medidas().peso }} kg</span>
+          <span class="chip hidden sm:inline">{{ medidas().genero }}</span>
+        </div>
+        <button type="button" (click)="alternarPantallaCompleta()"
+                class="absolute right-5 top-5 rounded-full border border-stone-200 bg-white/90 px-3 py-1.5 text-xs text-stone-600 transition hover:text-stone-900">
+          {{ pantallaCompleta() ? 'Salir' : 'Pantalla completa' }}
+        </button>
+      </div>
+    </section>
+
+    <!-- Cómo funciona -->
+    <section id="como-funciona" class="border-t border-stone-200/70 bg-white">
+      <div class="mx-auto grid max-w-7xl gap-10 px-5 py-16 md:grid-cols-3 lg:px-8">
+        @for (s of [
+          ['01', 'Tus medidas', 'Altura, peso y tipo de cuerpo construyen un avatar con tus proporciones. Puedes afinarlo con busto, cintura y cadera.'],
+          ['02', 'Cualquier tienda', 'Pega el enlace del producto: leemos el nombre, la categoría, el color y el precio de la página.'],
+          ['03', 'Tu talla', 'Te mostramos cómo te queda y qué talla elegir según una guía de tallas estándar.']
+        ]; track s[0]) {
+          <div>
+            <p class="text-xs tabular-nums text-olive">{{ s[0] }}</p>
+            <h2 class="mt-3 text-lg font-medium">{{ s[1] }}</h2>
+            <p class="mt-2 text-sm leading-relaxed text-stone-500">{{ s[2] }}</p>
+          </div>
+        }
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-stone-200/70">
+    <div class="mx-auto flex max-w-7xl flex-col justify-between gap-2 px-5 py-6 text-xs text-stone-400 sm:flex-row lg:px-8">
+      <span class="tracking-[0.2em] text-stone-600">TRENDER</span>
+      <span>© 2026 Trender. Las tallas son una recomendación orientativa.</span>
+    </div>
+  </footer>
+
+  <!-- Modal de cuenta -->
+  @if (mostrarModalAuth) {
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-sm" (click)="cerrarModalAuth()">
+      <div class="relative w-full max-w-sm rounded-3xl bg-white p-8" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-label]="tituloAuth">
+        @if (!registroExitoso()) {
+          <button type="button" (click)="cerrarModalAuth()" aria-label="Cerrar"
+                  class="absolute right-5 top-5 text-stone-300 transition-colors hover:text-stone-900">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <h3 class="text-xl font-medium">{{ tituloAuth }}</h3>
+          <p class="mt-1.5 text-sm text-stone-500">{{ descripcionAuth }}</p>
+
+          <form class="mt-6 space-y-3" (ngSubmit)="modoAuth === 'registro' ? registrarConPassword() : iniciarSesionConPassword()">
+            @if (modoAuth === 'registro') {
+              <input id="auth-name" name="authName" type="text" [(ngModel)]="nombreIngresado" [disabled]="cargandoAuth()"
+                     placeholder="Nombre" autocomplete="name" class="campo">
+            }
+            <input id="auth-email" name="authEmail" type="email" [(ngModel)]="emailIngresado" [disabled]="cargandoAuth()"
+                   placeholder="Correo electrónico" autocomplete="email" class="campo">
+            <input id="auth-password" name="authPassword" type="password" [(ngModel)]="passwordIngresado" [disabled]="cargandoAuth()"
+                   placeholder="Contraseña (mínimo 8 caracteres)"
+                   [attr.autocomplete]="modoAuth === 'registro' ? 'new-password' : 'current-password'" class="campo">
+            @if (errorAuth()) {
+              <p class="text-xs text-red-700" role="alert">{{ errorAuth() }}</p>
+            }
+            <button type="submit" [disabled]="cargandoAuth()" class="boton-primario w-full justify-center py-3">
+              {{ cargandoAuth() ? 'Procesando…' : (modoAuth === 'registro' ? 'Crear cuenta' : 'Iniciar sesión') }}
+            </button>
+          </form>
+
+          <p class="mt-5 text-center text-xs text-stone-500">
+            @if (modoAuth === 'login') {
+              ¿No tienes cuenta? <button type="button" (click)="cambiarModoAuth('registro')" class="text-olive hover:underline">Crear cuenta</button>
+            } @else {
+              ¿Ya tienes cuenta? <button type="button" (click)="cambiarModoAuth('login')" class="text-olive hover:underline">Iniciar sesión</button>
+            }
+          </p>
+          <p class="mt-4 text-center text-[11px] text-stone-400">Tus medidas solo se usan para tu avatar y tus tallas.</p>
+        } @else {
+          <div class="py-6 text-center">
+            <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-olive/10 text-olive">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </span>
+            <p class="mt-4 font-medium">Cuenta creada</p>
+            <p class="mt-1 text-sm text-stone-500">Bienvenido/a, {{ nombreRegistrado() }}</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Notificación -->
+  @if (notificacion(); as n) {
+    <div class="fixed bottom-6 left-1/2 z-[120] flex -translate-x-1/2 items-center gap-3 rounded-full bg-stone-900 py-2.5 pl-5 pr-3 text-sm text-white shadow-lg"
+         role="status" aria-live="polite" [class.!bg-red-800]="n.tipo === 'error'">
+      {{ n.mensaje }}
+      <button type="button" (click)="cerrarNotificacion()" aria-label="Cerrar notificación" class="text-white/60 hover:text-white">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  }
+</div>
