@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
 const indexRoutes = require('./rutas/index.routes');
+const { UPLOADS_DIR } = require('./servicios/closet.service');
 const webhookRoutes = require('./rutas/webhooks.routes');
 const errorHandler = require('./controladores/error.controller');
 
@@ -27,6 +28,14 @@ const webhookLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Recortes de prendas (PNG). Rutas con UUID del usuario y de la prenda, no adivinables.
+// cross-origin: el visor 3D (otro origen en desarrollo) los carga como textura WebGL.
+app.use(
+  '/media',
+  helmet.crossOriginResourcePolicy({ policy: 'cross-origin' }),
+  express.static(UPLOADS_DIR, { index: false, dotfiles: 'deny', maxAge: '7d', fallthrough: false })
+);
 
 app.use('/api', indexRoutes);
 app.use('/webhooks', webhookLimiter, webhookRoutes);

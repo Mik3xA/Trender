@@ -157,6 +157,7 @@ function clasificar(fuentes) {
   };
 
   const puntos = new Map();
+  const fuentesPorTipo = new Map();
   let primeroEnTitulo = { tipo: null, posicion: Infinity };
 
   for (const def of TIPOS) {
@@ -175,6 +176,7 @@ function clasificar(fuentes) {
         }
       }
       total += PESOS[fuente] * factor;
+      if (factor > 0) fuentesPorTipo.set(def.tipo, [...(fuentesPorTipo.get(def.tipo) ?? []), fuente]);
     }
     if (total > 0) puntos.set(def.tipo, total);
   }
@@ -186,7 +188,7 @@ function clasificar(fuentes) {
 
   const ranking = [...puntos.entries()].sort((a, b) => b[1] - a[1]);
   if (!ranking.length) {
-    return { tipo: null, categoria: null, confianza: 'ninguna', accesorio: accesorio ?? null };
+    return { tipo: null, categoria: null, confianza: 'ninguna', accesorio: accesorio ?? null, fuentes: [] };
   }
 
   let [[tipo, mejor], segundo] = ranking;
@@ -205,12 +207,12 @@ function clasificar(fuentes) {
   // Si el accesorio domina el inicio del título ("Cinturón para pantalón") no es una prenda.
   const posAccesorio = accesorio ? buscarTermino(textos.titulo, accesorio) : -1;
   if (accesorio && (posAccesorio >= 0 ? posAccesorio < primeroEnTitulo.posicion : mejor < PESOS.titulo)) {
-    return { tipo: null, categoria: null, confianza: 'ninguna', accesorio };
+    return { tipo: null, categoria: null, confianza: 'ninguna', accesorio, fuentes: [] };
   }
 
   const margen = mejor - (segundo?.[1] ?? 0);
   const confianza = mejor >= 5 && margen >= 2 ? 'alta' : mejor >= 2 && margen >= 1 ? 'media' : 'baja';
-  return { tipo, categoria: def.categoria, confianza, accesorio: null };
+  return { tipo, categoria: def.categoria, confianza, accesorio: null, fuentes: fuentesPorTipo.get(tipo) ?? [] };
 }
 
 function detectarColor(...textos) {
@@ -302,6 +304,7 @@ function categoriaArmario(url) {
 
 module.exports = {
   escanearUrl,
+  nombreDesdeUrl,
   clasificar,
   categoriaArmario,
   detectarColor,

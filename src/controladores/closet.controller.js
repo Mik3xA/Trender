@@ -4,7 +4,8 @@ const closetService = require('../servicios/closet.service');
 
 async function listar(req, res, next) {
   try {
-    const items = closetService.listarPrendas(req.auth.userId, { category: req.query.category });
+    const { genero, category } = req.query;
+    const items = closetService.listarPrendas(req.auth.userId, { genero, category });
     res.status(200).json({ status: 'success', data: { items, count: items.length } });
   } catch (err) {
     next(err);
@@ -19,21 +20,25 @@ async function obtener(req, res, next) {
   }
 }
 
-/** POST /api/closet/add-from-link — registra la prenda como "pending" de recorte. */
-async function agregarDesdeLink(req, res, next) {
+/**
+ * POST /api/closet/importar (y su alias /add-from-link).
+ * 202 Accepted: la prenda queda "processing" y se analiza en segundo plano;
+ * el cliente consulta GET /api/closet/:id hasta "ready", "review" o "failed".
+ */
+async function importar(req, res, next) {
   try {
-    const { url, category } = req.body;
-    const item = closetService.agregarDesdeLink(req.auth.userId, { url, category });
-    res.status(201).json({ status: 'success', data: item });
+    const { url, genero, category } = req.body;
+    const { prenda } = closetService.importarDesdeLink(req.auth.userId, { url, genero, category });
+    res.status(202).location(`/api/closet/${prenda.id}`).json({ status: 'success', data: prenda });
   } catch (err) {
     next(err);
   }
 }
 
-async function actualizarCategoria(req, res, next) {
+async function actualizar(req, res, next) {
   try {
-    const item = closetService.actualizarCategoria(req.auth.userId, req.params.id, req.body.category);
-    res.status(200).json({ status: 'success', data: item });
+    const { category, tipo } = req.body;
+    res.status(200).json({ status: 'success', data: closetService.actualizarPrenda(req.auth.userId, req.params.id, { category, tipo }) });
   } catch (err) {
     next(err);
   }
@@ -47,4 +52,4 @@ async function eliminar(req, res, next) {
   }
 }
 
-module.exports = { listar, obtener, agregarDesdeLink, actualizarCategoria, eliminar };
+module.exports = { listar, obtener, importar, actualizar, eliminar };
