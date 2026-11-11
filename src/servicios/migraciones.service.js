@@ -119,6 +119,45 @@ const MIGRACIONES = [
       db.exec('DROP TABLE IF EXISTS wardrobe_items');
     },
   },
+  {
+    version: 3,
+    nombre: 'armario_por_genero_importacion_e_invitados',
+    up(db) {
+      // Usuarios invitados: se usan sin registrarse (sin pantalla de login).
+      db.exec('ALTER TABLE users ADD COLUMN es_invitado INTEGER NOT NULL DEFAULT 0');
+
+      // SQLite no permite cambiar un CHECK: se reconstruye la tabla (procedimiento oficial).
+      db.exec(`
+        CREATE TABLE closet_items_nueva (
+          id            TEXT PRIMARY KEY,
+          user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          genero        TEXT NOT NULL DEFAULT 'Femenino' CHECK (genero IN ('Femenino', 'Masculino')),
+          source_url    TEXT,
+          image_path    TEXT,
+          category      TEXT CHECK (category IS NULL OR category IN ('top', 'bottom', 'dress', 'shoes')),
+          tipo          TEXT,
+          nombre        TEXT,
+          color         TEXT,
+          tienda        TEXT,
+          precio        TEXT,
+          imagen_origen TEXT,
+          analisis_json TEXT CHECK (analisis_json IS NULL OR json_valid(analisis_json)),
+          error         TEXT,
+          -- review = no se pudo identificar la prenda: el usuario elige la categoría.
+          status        TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('pending', 'processing', 'ready', 'review', 'failed')),
+          created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        INSERT INTO closet_items_nueva (id, user_id, source_url, image_path, category, status, created_at, updated_at)
+          SELECT id, user_id, source_url, image_path, category, status, created_at, updated_at FROM closet_items;
+        DROP TABLE closet_items;
+        ALTER TABLE closet_items_nueva RENAME TO closet_items;
+        CREATE INDEX idx_closet_items_user_genero ON closet_items(user_id, genero, created_at DESC);
+        -- Un mismo link no se repite dentro del armario de un género.
+        CREATE UNIQUE INDEX idx_closet_items_user_genero_url ON closet_items(user_id, genero, source_url) WHERE source_url IS NOT NULL;
+      `);
+    },
+  },
 ];
 
 /**
