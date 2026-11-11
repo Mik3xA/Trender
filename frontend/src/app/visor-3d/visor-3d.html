@@ -3,21 +3,21 @@
           aria-label="Avatar 3D. Arrastra para girar y usa la rueda para acercar."></canvas>
 
   @if (!webglDisponible()) {
-    <div class="absolute inset-0 flex items-center justify-center p-8 text-center text-sm text-stone-500">
+    <div class="absolute inset-0 flex items-center justify-center p-8 text-center text-sm text-hueso-3">
       Tu navegador no tiene WebGL activo, así que no podemos mostrar el avatar 3D.
     </div>
   }
 
   <div class="absolute bottom-4 right-4 flex gap-2">
     <button type="button" (click)="alternarRotacion()" [attr.aria-pressed]="autoRotar()"
-            class="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 bg-white/90 text-stone-600 transition hover:text-stone-900"
-            [class.!text-olive]="autoRotar()" title="Girar automáticamente">
+            class="flex h-8 w-8 items-center justify-center border border-linea bg-negro text-hueso-2 transition-colors hover:text-hueso"
+            [class.!border-oliva]="autoRotar()" title="Girar automáticamente">
       <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
       </svg>
     </button>
     <button type="button" (click)="restablecerCamara()"
-            class="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 bg-white/90 text-stone-600 transition hover:text-stone-900"
+            class="flex h-8 w-8 items-center justify-center border border-linea bg-negro text-hueso-2 transition-colors hover:text-hueso"
             title="Centrar vista">
       <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />

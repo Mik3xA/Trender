@@ -130,3 +130,91 @@ export function liberarTexturas(): void {
   for (const textura of cache.values()) textura?.dispose();
   cache.clear();
 }
+
+// ------------------------------------------------------------------ foto real de la prenda
+
+const LADO_TEXTURA = 1024;
+const fotos = new Map<string, Promise<HTMLImageElement | null>>();
+
+function cargarFoto(url: string): Promise<HTMLImageElement | null> {
+  if (!fotos.has(url)) {
+    fotos.set(
+      url,
+      new THREE.ImageLoader()
+        .setCrossOrigin('anonymous')
+        .loadAsync(url)
+        .catch(() => null) // sin CORS o 404: la prenda se queda con su color
+    );
+  }
+  return fotos.get(url)!;
+}
+
+/**
+ * Material con la foto recortada de la prenda. La foto se dibuja "contain"
+ * sobre el color dominante en un lienzo cuadrado: donde la malla 3D se sale
+ * de la silueta de la foto se ve el color de la tela, no un hueco.
+ * El material se devuelve al instante con el color y la foto se aplica al cargar.
+ */
+export function materialConFoto(url: string, colorBase: string, tela: Tela): THREE.MeshPhysicalMaterial {
+  const material = materialTela(colorBase, tela);
+  material.map = null;
+  cargarFoto(url).then((foto) => {
+    const ctx = lienzo(LADO_TEXTURA);
+    if (!foto || !ctx) return;
+    ctx.fillStyle = colorBase;
+    ctx.fillRect(0, 0, LADO_TEXTURA, LADO_TEXTURA);
+    const escala = Math.min(LADO_TEXTURA / foto.width, LADO_TEXTURA / foto.height);
+    const [w, h] = [foto.width * escala, foto.height * escala];
+    ctx.drawImage(foto, (LADO_TEXTURA - w) / 2, (LADO_TEXTURA - h) / 2, w, h);
+    const textura = new THREE.CanvasTexture(ctx.canvas);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    textura.anisotropy = 8;
+    material.map = textura;
+    material.color.set('#ffffff'); // el color ya viene en la foto
+    material.needsUpdate = true;
+  });
+  return material;
+}
+
+/**
+ * Proyección planar de la foto sobre la prenda 3D (como un proyector):
+ * - 'frente': la foto de catálogo (vista frontal) cubre la prenda en X/Y,
+ *   mangas y perneras incluidas, centrada y sin deformar (misma escala en
+ *   ambos ejes, igual que el "contain" del lienzo).
+ * - 'lado': para calzado, cuya foto de tienda suele ser de perfil (Z/Y).
+ * Reescribe el atributo `uv` de cada malla con material de tela.
+ */
+export function proyectarFoto(grupo: THREE.Object3D, modo: 'frente' | 'lado', esTela: (m: THREE.Mesh) => boolean): void {
+  grupo.updateMatrixWorld(true);
+  const mallas: THREE.Mesh[] = [];
+  grupo.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && esTela(m)) mallas.push(m);
+  });
+  if (!mallas.length) return;
+
+  const caja = new THREE.Box3();
+  for (const m of mallas) caja.expandByObject(m);
+  const centro = caja.getCenter(new THREE.Vector3());
+  const tam = caja.getSize(new THREE.Vector3());
+  const ancho = modo === 'frente' ? tam.x : tam.z;
+  const escala = Math.max(ancho, tam.y) * 1.02;
+  const v = new THREE.Vector3();
+
+  for (const malla of mallas) {
+    const pos = malla.geometry.getAttribute('position');
+    const uv = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i += 1) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(malla.matrixWorld).applyMatrix4(grupo.matrixWorld.clone().invert());
+      const horizontal = modo === 'frente' ? v.x - centro.x : centro.z - v.z;
+      uv[i * 2] = 0.5 + horizontal / escala;
+      uv[i * 2 + 1] = 0.5 + (v.y - centro.y) / escala;
+    }
+    malla.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  }
+}
+
+/** Libera las fotos cargadas (al destruir el visor). */
+export function liberarFotos(): void {
+  fotos.clear();
+}

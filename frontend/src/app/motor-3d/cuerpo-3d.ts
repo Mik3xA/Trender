@@ -96,7 +96,7 @@ export function construirEsqueleto(p: Proporciones): Esqueleto {
   const radioCuello = (p.femenino ? 0.031 : 0.034) * H * p.masa ** 0.35;
   const torso = anillosTorso(p, radioCuello);
 
-  const rBrazo = (p.femenino ? 0.0245 : 0.0285) * H * p.masa ** 0.6;
+  const rBrazo = (p.femenino ? 0.0245 : 0.0285) * H * p.masa ** 0.6 * p.musculo;
   const brazos: Extremidad[] = ([1, -1] as const).map((lado) => {
     const x = p.hombros - rBrazo * 0.9;
     const hombro = new THREE.Vector3(lado * x, p.y.hombro - 0.03 * H, -0.004 * H);
@@ -118,7 +118,7 @@ export function construirEsqueleto(p: Proporciones): Esqueleto {
   // Muslo tan ancho como media cadera en el pliegue glúteo (sin escalón con el torso).
   const rMuslo = p.cadera.ancho * (p.femenino ? 0.56 : 0.53);
   const rRodilla = 0.03 * H * p.masa ** 0.4;
-  const rPantorrilla = 0.034 * H * p.masa ** 0.55 * (p.femenino ? 0.95 : 1);
+  const rPantorrilla = 0.034 * H * p.masa ** 0.55 * (p.femenino ? 0.95 : 1) * Math.sqrt(p.musculo);
   const rTobillo = 0.0185 * H;
   const xCadera = p.cadera.ancho * 0.45;
   const tobillos: THREE.Vector3[] = [];
@@ -421,7 +421,8 @@ export function construirInferior(esq: Esqueleto, estilo: Estilo, tipo: string, 
   if (tipo === 'falda') {
     grupo.add(malla(loft(anillosPrenda(esq, bajo, cintura, estilo)), mat.tela, 'falda'));
   } else {
-    const pelvis = anillosPrenda(esq, p.y.entrepierna + 0.002 * H, cintura, estilo, 'ajusta');
+    // La holgura de un jogger o pantalón suelto está en las perneras; en la cadera se ajusta.
+    const pelvis = anillosPrenda(esq, p.y.entrepierna + 0.002 * H, cintura, { ...estilo, holgura: Math.min(estilo.holgura, 1.05) }, 'ajusta');
     grupo.add(malla(loft(pelvis, { tapaInferior: true }), mat.tela, 'pelvis'));
     const hasta = fraccionPierna(esq, Math.max(bajo, p.y.tobillo - 0.004 * H));
     for (const pierna of esq.piernas) {
@@ -430,7 +431,7 @@ export function construirInferior(esq: Esqueleto, estilo: Estilo, tipo: string, 
     }
   }
   // Pretina.
-  const pretina = anillosPrenda(esq, cintura - 0.014 * H, cintura + 0.002 * H, { ...estilo, holgura: estilo.holgura + 0.01 }, 'ajusta');
+  const pretina = anillosPrenda(esq, cintura - 0.014 * H, cintura + 0.002 * H, { ...estilo, holgura: Math.min(estilo.holgura, 1.05) + 0.012 }, 'ajusta');
   grupo.add(malla(loft(pretina), tipo === 'jeans' ? mat.tela : mat.detalle, 'pretina'));
   return grupo;
 }

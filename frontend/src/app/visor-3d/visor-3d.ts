@@ -25,6 +25,7 @@ import { PrendaVirtual } from '../probador/prendas';
 export class Visor3dComponent implements OnDestroy {
   readonly medidas = input.required<Medidas>();
   readonly conjunto = input<PrendaVirtual[]>([]);
+  readonly tono = input('maniqui');
 
   protected readonly webglDisponible = signal(true);
   protected readonly autoRotar = signal(false);
@@ -43,6 +44,10 @@ export class Visor3dComponent implements OnDestroy {
       this.motor?.actualizar(medidas, conjunto);
     });
     effect(() => this.motor?.setAutoRotar(this.autoRotar()));
+    effect(() => {
+      const tono = this.tono();
+      this.motor?.setTono(tono);
+    });
   }
 
   restablecerCamara(): void {
@@ -75,6 +80,7 @@ export class Visor3dComponent implements OnDestroy {
       this.observador = new ResizeObserver(ajustar);
       this.observador.observe(host);
     }
+    this.motor.setTono(this.tono());
     this.motor.actualizar(this.medidas(), this.conjunto());
   }
 }
