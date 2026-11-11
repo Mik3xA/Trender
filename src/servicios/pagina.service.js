@@ -28,7 +28,11 @@ function lookupSeguro(hostname, opciones, callback) {
   });
 }
 
-function pedir(url, { permitirRedesPrivadas = false } = {}) {
+/**
+ * Petición GET segura. Devuelve el cuerpo como Buffer (como mucho `maxBytes`)
+ * junto con el estado y el tipo de contenido; las redirecciones se resuelven fuera.
+ */
+function pedir(url, { permitirRedesPrivadas = false, maxBytes = BYTES_MAXIMOS, aceptar = 'text/html,application/xhtml+xml', tiempoMs = TIEMPO_MAXIMO_MS } = {}) {
   return new Promise((resolve, reject) => {
     const destino = new URL(url);
     // Con una IP literal Node no llama a `lookup`: se valida aquí.
@@ -40,9 +44,9 @@ function pedir(url, { permitirRedesPrivadas = false } = {}) {
     const solicitud = cliente.get(
       destino,
       {
-        headers: { 'User-Agent': AGENTE, Accept: 'text/html,application/xhtml+xml', 'Accept-Language': 'es,en;q=0.8' },
+        headers: { 'User-Agent': AGENTE, Accept: aceptar, 'Accept-Language': 'es-MX,es;q=0.9,en;q=0.8' },
         lookup: permitirRedesPrivadas ? undefined : lookupSeguro,
-        timeout: TIEMPO_MAXIMO_MS,
+        timeout: tiempoMs,
       },
       (respuesta) => {
         const { statusCode = 0, headers } = respuesta;
@@ -50,27 +54,22 @@ function pedir(url, { permitirRedesPrivadas = false } = {}) {
           respuesta.resume();
           return resolve({ redireccion: new URL(headers.location, destino).href });
         }
-        if (statusCode >= 400) {
-          respuesta.resume();
-          return reject(errorOperacional(502, `La tienda respondió ${statusCode}`));
-        }
-        const tipo = String(headers['content-type'] || '');
-        if (!/text\/html|application\/xhtml/i.test(tipo)) {
-          respuesta.resume();
-          return reject(errorOperacional(415, 'El enlace no es una página de producto'));
-        }
         const trozos = [];
         let total = 0;
+        let truncado = false;
         respuesta.on('data', (trozo) => {
+          if (truncado) return;
           total += trozo.length;
-          if (total > BYTES_MAXIMOS) {
+          if (total > maxBytes) {
+            truncado = true;
             solicitud.destroy();
-            // Lo leído basta: los metadatos de producto están en el <head>.
-            return resolve({ html: Buffer.concat(trozos).toString('utf8') });
+            return resolve({ estado: statusCode, tipo: String(headers['content-type'] || ''), cuerpo: Buffer.concat(trozos), truncado });
           }
           trozos.push(trozo);
         });
-        respuesta.on('end', () => resolve({ html: Buffer.concat(trozos).toString('utf8') }));
+        respuesta.on('end', () => {
+          if (!truncado) resolve({ estado: statusCode, tipo: String(headers['content-type'] || ''), cuerpo: Buffer.concat(trozos), truncado });
+        });
         respuesta.on('error', reject);
       }
     );
@@ -79,12 +78,8 @@ function pedir(url, { permitirRedesPrivadas = false } = {}) {
   });
 }
 
-/**
- * Descarga el HTML de una página de producto (solo http/https públicos).
- * Sigue hasta 3 redirecciones; cada salto pasa por la misma validación.
- * @returns {Promise<{ url: string, html: string }>}
- */
-async function obtenerHtml(url, opciones = {}) {
+/** Sigue hasta 3 redirecciones; cada salto pasa por la misma validación SSRF. */
+async function pedirSiguiendo(url, opciones) {
   let actual = url;
   for (let salto = 0; salto <= REDIRECCIONES_MAXIMAS; salto += 1) {
     const protocolo = new URL(actual).protocol;
@@ -92,10 +87,40 @@ async function obtenerHtml(url, opciones = {}) {
       throw errorOperacional(400, 'Solo se admiten URLs http o https');
     }
     const resultado = await pedir(actual, opciones);
-    if (!resultado.redireccion) return { url: actual, html: resultado.html };
+    if (!resultado.redireccion) return { url: actual, ...resultado };
     actual = resultado.redireccion;
   }
   throw errorOperacional(502, 'Demasiadas redirecciones');
+}
+
+/**
+ * Descarga el HTML de una página de producto (solo http/https públicos).
+ * @returns {Promise<{ url: string, html: string, estado: number }>}
+ */
+async function obtenerHtml(url, opciones = {}) {
+  const r = await pedirSiguiendo(url, opciones);
+  if (r.estado >= 400) {
+    const err = errorOperacional(502, `La tienda respondió ${r.estado}`, r.estado === 403 || r.estado === 429 ? 'TIENDA_BLOQUEADA' : 'TIENDA_ERROR');
+    err.html = r.cuerpo.toString('utf8');
+    throw err;
+  }
+  if (!/text\/html|application\/xhtml/i.test(r.tipo)) {
+    throw errorOperacional(415, 'El enlace no es una página de producto');
+  }
+  // Truncada o completa: los metadatos del producto están al principio.
+  return { url: r.url, html: r.cuerpo.toString('utf8'), estado: r.estado };
+}
+
+/**
+ * Descarga una imagen (jpg/png/webp/avif/gif) con las mismas protecciones.
+ * @returns {Promise<{ url: string, buffer: Buffer, tipo: string }>}
+ */
+async function obtenerImagen(url, { maxBytes = 8 * 1024 * 1024, ...opciones } = {}) {
+  const r = await pedirSiguiendo(url, { ...opciones, maxBytes, aceptar: 'image/avif,image/webp,image/png,image/jpeg,image/*' });
+  if (r.estado >= 400) throw errorOperacional(502, `La imagen respondió ${r.estado}`);
+  if (!/^image\//i.test(r.tipo)) throw errorOperacional(415, 'El recurso no es una imagen');
+  if (r.truncado) throw errorOperacional(413, 'La imagen es demasiado grande');
+  return { url: r.url, buffer: r.cuerpo, tipo: r.tipo };
 }
 
 // ------------------------------------------------------------ extracción de metadatos
@@ -205,4 +230,4 @@ function extraerMetadatos(html) {
   return datos;
 }
 
-module.exports = { obtenerHtml, extraerMetadatos, lookupSeguro };
+module.exports = { obtenerHtml, obtenerImagen, extraerMetadatos, lookupSeguro };
