@@ -1,112 +1,37 @@
-/* Desplazamiento suave al navegar entre secciones */
-html {
-  scroll-behavior: smooth;
+// Utilidades del probador (el resto es Tailwind).
+.etiqueta {
+  @apply text-[11px] font-medium uppercase tracking-[0.2em] text-stone-400;
 }
 
-/* Carrusel infinito: la animación recorre la mitad del track duplicado */
-@keyframes marquee {
-  0% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(-50%);
+.numero {
+  @apply w-14 rounded-md border border-transparent bg-transparent px-1 text-right font-medium outline-none;
+  &:focus,
+  &:hover {
+    @apply border-stone-200;
   }
 }
 
-.animate-marquee {
-  display: flex;
-  width: 200%;
-  animation: marquee 25s linear infinite;
+.deslizador {
+  @apply h-1 w-full cursor-pointer appearance-none rounded-full bg-stone-200 accent-olive;
 }
 
-.animate-marquee:hover {
-  animation-play-state: paused;
+.boton-primario {
+  @apply inline-flex items-center rounded-full bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-olive disabled:cursor-not-allowed disabled:opacity-40;
 }
 
-/* Aparición del diálogo de autenticación */
-@keyframes modal-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.campo {
+  @apply w-full rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none transition-colors focus:border-olive disabled:opacity-60;
 }
 
-@keyframes modal-pop {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.chip {
+  @apply rounded-full border border-stone-200 bg-white/80 px-3 py-1;
 }
 
-.animate-modal-fade {
-  animation: modal-fade 0.2s ease-out;
+.visor {
+  @apply relative h-[70vh] min-h-[520px] overflow-hidden rounded-3xl border border-stone-200 lg:sticky lg:top-24 lg:h-[calc(100vh-8rem)];
+  background: radial-gradient(120% 80% at 50% 15%, #ffffff 0%, #f1efe9 60%, #e9e6de 100%);
 }
 
-.animate-modal-pop {
-  animation: modal-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Entrada de la notificación flotante */
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.animate-toast {
-  animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Scroll discreto para las listas y pestañas del studio */
-.overflow-y-auto::-webkit-scrollbar,
-.overflow-x-auto::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.overflow-y-auto::-webkit-scrollbar-thumb,
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  border-radius: 9999px;
-  background-color: rgba(63, 78, 59, 0.25);
-}
-
-.overflow-y-auto::-webkit-scrollbar-track,
-.overflow-x-auto::-webkit-scrollbar-track {
-  background-color: transparent;
-}
-
-.no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-/* Respeta la preferencia del sistema de reducir movimiento */
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  .animate-marquee,
-  .animate-modal-fade,
-  .animate-modal-pop,
-  .animate-toast {
-    animation: none;
-  }
+.visor--completo {
+  @apply fixed inset-0 z-50 h-screen rounded-none border-0;
 }

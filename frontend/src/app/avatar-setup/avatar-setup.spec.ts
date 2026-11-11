@@ -1,410 +1,261 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpHeaders, provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
+
+import { MEDIDAS_INICIALES } from '../probador/cuerpo';
+import { MUESTRAS, PrendaEscaneada } from '../probador/prendas';
+import { AuthResponse, AuthService, StoredSession } from '../servicios/auth.service';
+import { PerfilProbador, PerfilService } from '../servicios/perfil.service';
+import { RopaService } from '../servicios/ropa.service';
 import { AvatarSetupComponent } from './avatar-setup';
-import { AuthResponse, AuthService, AuthUser, StoredSession } from '../servicios/auth.service';
-import { environment } from '../../environments/environment';
+
+const escaneo = (extra: Partial<PrendaEscaneada> = {}): PrendaEscaneada => ({
+  id: 'scanned_1',
+  nombre: 'Men Drawstring Sweatpants',
+  categoria: 'Piernas',
+  tipo: 'jogger',
+  confianza: 'media',
+  color: { nombre: 'gris', hex: '#8b8b88' },
+  precio: null,
+  marca: null,
+  imagen: null,
+  tienda: 'shop.example',
+  fuente: 'url',
+  motivo: null,
+  ...extra,
+});
 
 describe('AvatarSetupComponent', () => {
   let fixture: ComponentFixture<AvatarSetupComponent>;
-  let component: AvatarSetupComponent;
-  let sesionSubject: BehaviorSubject<StoredSession | null>;
-  let authMock: {
-    sesion$: Observable<StoredSession | null>;
-    sesionActual: StoredSession | null;
-    refrescarSesion: () => void;
-    registrar: (payload: { nombre?: string; email: string; password: string }) => Observable<AuthResponse>;
-    iniciarSesion: (payload: { email: string; password: string }) => Observable<AuthResponse>;
-    obtenerPerfil: () => Observable<AuthUser>;
-    cerrarSesion: () => void;
-    obtenerToken: () => string;
-    cabecerasAuth: () => HttpHeaders;
+  let componente: AvatarSetupComponent;
+  let sesion$: BehaviorSubject<StoredSession | null>;
+  let auth: Partial<Record<keyof AuthService, unknown>> & { sesionActual: StoredSession | null };
+  let perfil: { obtener: ReturnType<typeof vi.fn>; guardar: ReturnType<typeof vi.fn> };
+  let ropa: { escanear: ReturnType<typeof vi.fn> };
+
+  const sesion = (email: string, nombre = 'Michael'): StoredSession => ({
+    sesionIniciada: true,
+    email,
+    token: 'token-demo',
+    user: { id: 'u1', nombre, email },
+  });
+  const respuesta = (s: StoredSession): AuthResponse => ({
+    status: 'success',
+    data: { user: s.user!, token: s.token, expires_at: '2999-01-01T00:00:00Z', session_id: 's1' },
+  });
+  const iniciar = (s: StoredSession) => {
+    auth.sesionActual = s;
+    sesion$.next(s);
   };
 
-  function crearSesion(email: string): StoredSession {
-    return {
-      sesionIniciada: true,
-      email,
-      token: 'token-demo',
-      user: { id: 'user-demo', nombre: 'Usuario Demo', email }
-    };
-  }
-
-  function respuesta(sesion: StoredSession): AuthResponse {
-    return {
-      status: 'success',
-      data: { user: sesion.user!, token: sesion.token, expires_at: '2999-01-01T00:00:00Z', session_id: 's1' }
-    };
-  }
-
-  function persistirSesion(sesion: StoredSession): void {
-    authMock.sesionActual = sesion;
-    localStorage.setItem('trender.auth', JSON.stringify(sesion));
-    sesionSubject.next(sesion);
+  async function crear(): Promise<void> {
+    await TestBed.configureTestingModule({
+      imports: [AvatarSetupComponent],
+      providers: [
+        { provide: AuthService, useValue: auth },
+        { provide: PerfilService, useValue: perfil },
+        { provide: RopaService, useValue: ropa },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(AvatarSetupComponent);
+    componente = fixture.componentInstance;
+    fixture.detectChanges();
   }
 
   beforeEach(async () => {
     vi.useFakeTimers();
     localStorage.clear();
-    sesionSubject = new BehaviorSubject<StoredSession | null>(null);
-
-    authMock = {
-      sesion$: sesionSubject.asObservable(),
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined); // sin WebGL en jsdom
+    sesion$ = new BehaviorSubject<StoredSession | null>(null);
+    auth = {
+      sesion$: sesion$.asObservable(),
       sesionActual: null,
       refrescarSesion: () => undefined,
-      obtenerToken: () => 'test-token',
-      cabecerasAuth: () => new HttpHeaders({ Authorization: 'Bearer test-token' }),
-      registrar: ({ nombre, email }) => {
-        const sesion = crearSesion(email);
-        sesion.user!.nombre = nombre || 'Usuario Demo';
-        persistirSesion(sesion);
-        return of(respuesta(sesion));
+      obtenerToken: () => auth.sesionActual?.token ?? '',
+      cabecerasAuth: () => new HttpHeaders(),
+      registrar: ({ nombre, email }: { nombre: string; email: string }): Observable<AuthResponse> => {
+        const s = sesion(email, nombre);
+        iniciar(s);
+        return of(respuesta(s));
       },
-      iniciarSesion: ({ email }) => {
-        const sesion = crearSesion(email);
-        persistirSesion(sesion);
-        return of(respuesta(sesion));
+      iniciarSesion: ({ email }: { email: string }): Observable<AuthResponse> => {
+        const s = sesion(email);
+        iniciar(s);
+        return of(respuesta(s));
       },
-      obtenerPerfil: () => of({ id: 'user-demo', nombre: 'Usuario Demo', email: 'demo@trender.com' }),
       cerrarSesion: () => {
-        authMock.sesionActual = null;
-        localStorage.removeItem('trender.auth');
-        sesionSubject.next(null);
-      }
+        auth.sesionActual = null;
+        localStorage.clear();
+        sesion$.next(null);
+      },
     };
-
-    await TestBed.configureTestingModule({
-      imports: [AvatarSetupComponent],
-      providers: [provideHttpClient(), { provide: AuthService, useValue: authMock }]
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(AvatarSetupComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
+    perfil = { obtener: vi.fn(() => of(null)), guardar: vi.fn(() => of({})) };
+    ropa = { escanear: vi.fn(() => of(escaneo())) };
+    await crear();
   });
 
   afterEach(() => {
     fixture.destroy();
     vi.useRealTimers();
+    vi.restoreAllMocks();
     localStorage.clear();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  const texto = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+  it('arranca con medidas por defecto y el visor 3D', () => {
+    expect(componente.medidas()).toMatchObject(MEDIDAS_INICIALES.Femenino);
+    expect(fixture.nativeElement.querySelector('tr-visor-3d')).not.toBeNull();
+    expect(texto()).toContain('Pruébatelo antes de comprarlo.');
   });
 
-  it('abre el modal de inicio de sesión', () => {
-    component.abrirAuthModal('login');
-
-    expect(component.mostrarModalAuth).toBe(true);
-    expect(component.modoAuth).toBe('login');
-    expect(component.tipoAccionAuth).toBe('login');
+  it('ajusta altura y peso dentro de los límites y cambia el tipo de cuerpo', () => {
+    componente.cambiarNumero('altura', 400);
+    componente.cambiarNumero('peso', '72.5');
+    componente.cambiarTipoCuerpo('ovalo');
+    expect(componente.medidas()).toMatchObject({ altura: 210, peso: 72.5, tipoCuerpo: 'ovalo' });
   });
 
-  it('muestra la pantalla de éxito antes de cerrar el modal de registro', () => {
-    component.abrirAuthModal('registro');
-    component.nombreIngresado = 'Michael';
-    component.emailIngresado = 'michael@trender.com';
-    component.passwordIngresado = 'secreto-seguro';
-
-    component.registrarConPassword();
-
-    expect(component.registroExitoso).toBe(true);
-    expect(component.nombreRegistrado).toBe('Michael');
-    expect(component.mostrarModalAuth).toBe(true);
-    expect(component.sesionIniciada).toBe(false);
-
-    vi.advanceTimersByTime(2000);
-
-    expect(component.registroExitoso).toBe(false);
-    expect(component.mostrarModalAuth).toBe(false);
-    expect(component.sesionIniciada).toBe(true);
-    expect(component.nombreAutenticado).toBe('Michael');
+  it('al cambiar de género parte de proporciones típicas conservando altura y peso', () => {
+    componente.cambiarNumero('altura', 180);
+    componente.cambiarContorno('cintura', 70);
+    componente.cambiarGenero('Masculino');
+    expect(componente.medidas()).toMatchObject({ genero: 'Masculino', altura: 180, tipoCuerpo: 'rectangulo' });
+    expect(componente.medidas().cintura).toBeUndefined();
   });
 
-  it('inicia sesión con correo y contraseña', () => {
-    component.abrirAuthModal('login');
-    component.emailIngresado = 'clasica@trender.com';
-    component.passwordIngresado = 'secreto-seguro';
-
-    component.iniciarSesionConPassword();
-
-    expect(component.sesionIniciada).toBe(true);
-    expect(component.mostrarModalAuth).toBe(false);
-    expect(component.emailAutenticado).toBe('clasica@trender.com');
+  it('las medidas exactas fuera de rango vuelven a la estimación', () => {
+    componente.cambiarContorno('pecho', 92);
+    expect(componente.contornos().pecho).toBe(92);
+    componente.cambiarContorno('pecho', 900);
+    expect(componente.medidas().pecho).toBeNull();
   });
 
-  it('crea una cuenta clásica con contraseña', () => {
-    component.abrirAuthModal('registro');
-    component.nombreIngresado = 'Estudio Trender';
-    component.emailIngresado = 'clasica@trender.com';
-    component.passwordIngresado = 'secreto-seguro';
-
-    component.registrarConPassword();
-    vi.advanceTimersByTime(2000);
-
-    expect(component.sesionIniciada).toBe(true);
-    expect(component.mostrarModalAuth).toBe(false);
-    expect(JSON.parse(localStorage.getItem('trender.auth') || '{}').token).toBe('token-demo');
+  it('guarda medidas y conjunto en este dispositivo', () => {
+    componente.cambiarNumero('altura', 170);
+    componente.vestir(MUESTRAS[0]);
+    TestBed.tick();
+    expect(JSON.parse(localStorage.getItem('trender.measurements')!).altura).toBe(170);
+    expect(JSON.parse(localStorage.getItem('trender.outfit')!)).toHaveLength(1);
   });
 
-  it('exige una contraseña de al menos 8 caracteres', () => {
-    component.abrirAuthModal('registro');
-    component.nombreIngresado = 'Usuario Demo';
-    component.emailIngresado = 'clasica@trender.com';
-    component.passwordIngresado = 'corta';
-
-    component.registrarConPassword();
-
-    expect(component.errorAuth).toBe('La contraseña debe tener al menos 8 caracteres.');
-    expect(component.sesionIniciada).toBe(false);
+  it('viste y quita básicos, y recomienda talla para cada prenda puesta', () => {
+    componente.vestir(MUESTRAS.find((m) => m.id === 'm-camiseta')!);
+    componente.vestir(MUESTRAS.find((m) => m.id === 'm-jeans')!);
+    expect(componente.recomendaciones().map((r) => r.talla.talla)).toEqual(['M', 'L']);
+    componente.quitar('m-camiseta');
+    expect(componente.conjunto().map((p) => p.id)).toEqual(['m-jeans']);
   });
 
-  it('exige un nombre para crear la cuenta', () => {
-    component.abrirAuthModal('registro');
-    component.emailIngresado = 'clasica@trender.com';
-    component.passwordIngresado = 'secreto-seguro';
-
-    component.registrarConPassword();
-
-    expect(component.errorAuth).toBe('Ingresa tu nombre.');
-    expect(component.sesionIniciada).toBe(false);
+  it('escanea un link y viste la prenda detectada', () => {
+    componente.urlEscaneo.set('https://shop.example/Men-Drawstring-Sweatpants-p-1.html');
+    componente.escanearProducto();
+    expect(ropa.escanear).toHaveBeenCalledWith('https://shop.example/Men-Drawstring-Sweatpants-p-1.html');
+    expect(componente.conjunto()).toEqual([expect.objectContaining({ categoria: 'Piernas', tipo: 'jogger' })]);
+    expect(componente.notificacion()?.mensaje).toContain('Probando');
   });
 
-  it('reinicia medidas al cerrar sesión', () => {
-    persistirSesion(crearSesion('demo@trender.com'));
+  it('si el escáner no reconoce la prenda, el usuario elige la categoría', () => {
+    ropa.escanear.mockReturnValue(of(escaneo({ categoria: null, tipo: null, motivo: 'Elige la categoría.' })));
+    componente.urlEscaneo.set('https://www2.hm.com/es_mx/productpage.1234.html');
+    componente.escanearProducto();
+    expect(componente.conjunto()).toEqual([]);
+    componente.elegirCategoria('Calzado');
+    expect(componente.conjunto()).toEqual([expect.objectContaining({ categoria: 'Calzado', tipo: 'tenis' })]);
+  });
 
-    component.estatura = 182;
-    component.peso = 84;
-    localStorage.setItem(
-      'trender.measurements',
-      JSON.stringify({ estatura: 182, peso: 84, complexion: 'Atlética', genero: 'Masculino' })
+  it('valida el link antes de llamar al backend y muestra sus errores', () => {
+    componente.urlEscaneo.set('zara pantalon');
+    componente.escanearProducto();
+    expect(ropa.escanear).not.toHaveBeenCalled();
+    expect(componente.errorEscaneo()).toContain('https://');
+
+    ropa.escanear.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 400, error: { error: 'La URL apunta a una red interna' } }))
     );
-
-    component.cerrarSesion();
-
-    expect(component.estatura).toBeNull();
-    expect(component.peso).toBeNull();
-    expect(component.prendaActiva).toBeNull();
-    expect(localStorage.getItem('trender.measurements')).toBeNull();
+    componente.urlEscaneo.set('http://192.168.0.2/x');
+    componente.escanearProducto();
+    expect(componente.errorEscaneo()).toBe('La URL apunta a una red interna');
+    expect(componente.escaneando()).toBe(false);
   });
 
-  it('renderiza la sección Escáner Web de Prendas', () => {
+  it('crea la cuenta, muestra la confirmación y guarda las medidas actuales en ella', () => {
+    componente.abrirAuthModal('registro');
+    componente.nombreIngresado = 'Michael';
+    componente.emailIngresado = 'michael@trender.test';
+    componente.passwordIngresado = 'secreto-seguro';
+    componente.registrarConPassword();
+
+    expect(componente.registroExitoso()).toBe(true);
+    expect(componente.sesionIniciada()).toBe(false);
+    vi.advanceTimersByTime(2000);
     fixture.detectChanges();
 
-    const escaner = fixture.nativeElement.querySelector('#escaner') as HTMLElement;
-    expect(escaner).toBeTruthy();
-    expect(escaner.textContent).toContain('Escáner Web de Prendas');
-    expect(escaner.textContent).toContain('Importa cualquier prenda por URL');
-    expect(escaner.querySelector('input[type="url"]')).toBeTruthy();
-    expect(escaner.querySelector('button')).toBeTruthy();
+    expect(componente.sesionIniciada()).toBe(true);
+    expect(componente.mostrarModalAuth).toBe(false);
+    expect(texto()).toContain('Hola, Michael');
+    expect(texto()).toContain('Mi Espacio de Medición');
+    expect(perfil.guardar).toHaveBeenCalled();
   });
 
-  it('muestra error si URL está vacía al escanear', () => {
-    component.urlEscaneo = '';
-    component.escanearProducto();
-
-    expect(component.errorEscaneo).toBe(
-      'No pudimos analizar este enlace. Intenta con una URL válida de una tienda.'
-    );
-    expect(component.escaneando).toBe(false);
+  it('valida nombre, correo y contraseña al registrarse', () => {
+    componente.abrirAuthModal('registro');
+    componente.emailIngresado = 'michael@trender.test';
+    componente.passwordIngresado = 'secreto-seguro';
+    componente.registrarConPassword();
+    expect(componente.errorAuth()).toBe('Ingresa tu nombre.');
+    componente.nombreIngresado = 'Michael';
+    componente.passwordIngresado = 'corta';
+    componente.registrarConPassword();
+    expect(componente.errorAuth()).toBe('La contraseña debe tener al menos 8 caracteres.');
   });
 
-  it('llama al endpoint de escaneo con URL válida', () => {
-    const spy = vi.spyOn(component['http'], 'post').mockReturnValue(
-      of({
-        status: 'success',
-        data: {
-          prenda: {
-            id: 'scanned_1',
-            nombre: 'Blazer Estructurado',
-            precio: '$2,590',
-            categoria: 'Torso',
-            imagenUrl: 'https://example.com/blazer.jpg'
-          }
-        }
-      })
-    );
-
-    component.urlEscaneo = 'https://www.zara.com/blazer';
-    component.escanearProducto();
-
-    expect(spy).toHaveBeenCalledTimes(1);
-    const callArgs = spy.mock.calls[0];
-    expect(callArgs[0]).toBe(`${environment.apiUrl}/api/ropa/escanear-link`);
-    expect(callArgs[1]).toEqual({ url: 'https://www.zara.com/blazer' });
-    expect(component.prendaEscaneada?.nombre).toBe('Blazer Estructurado');
-    expect(component.errorEscaneo).toBeNull();
-  });
-
-  it('carga las medidas guardadas en el perfil del backend al iniciar sesión', () => {
-    const get = vi.spyOn(component['http'], 'get').mockReturnValue(
-      of({
-        status: 'success',
-        data: { altura: 181, avatar_config: { peso: 77, complexion: 'Media', genero: 'Femenino' } }
-      })
-    );
-
-    component.abrirAuthModal('login');
-    component.emailIngresado = 'clasica@trender.com';
-    component.passwordIngresado = 'secreto-seguro';
-    component.iniciarSesionConPassword();
-
-    expect(get.mock.calls[0][0]).toBe(`${environment.apiUrl}/api/profile`);
-    expect(component.estatura).toBe(181);
-    expect(component.peso).toBe(77);
-    expect(component.complexion).toBe('Media');
-    expect(component.genero).toBe('Femenino');
-  });
-
-  it('no envía al perfil medidas fuera de rango mientras se escriben', () => {
-    persistirSesion(crearSesion('demo@trender.com'));
-    const put = vi.spyOn(component['http'], 'put').mockReturnValue(of({}));
-
-    component.onEstaturaChange(18);
-    vi.advanceTimersByTime(600);
-    expect(put).not.toHaveBeenCalled();
-
-    component.onEstaturaChange(181);
-    vi.advanceTimersByTime(600);
-    expect(put).toHaveBeenCalledTimes(1);
-    expect((put.mock.calls[0][1] as { altura: number }).altura).toBe(181);
-  });
-
-  it('guarda las medidas en el perfil (altura + avatar_config)', () => {
-    persistirSesion(crearSesion('demo@trender.com'));
-    const put = vi.spyOn(component['http'], 'put').mockReturnValue(of({}));
-    component.estatura = 175;
-    component.peso = 70;
-
-    component['guardarMedidasBackend']();
-    expect(put).not.toHaveBeenCalled(); // se agrupa con un pequeño retardo
-    vi.advanceTimersByTime(600);
-
-    expect(put).toHaveBeenCalledTimes(1);
-    expect(put.mock.calls[0][0]).toBe(`${environment.apiUrl}/api/profile`);
-    expect(put.mock.calls[0][1]).toEqual({
-      altura: 175,
-      avatar_config: { peso: 70, complexion: component.complexion, genero: component.genero }
-    });
-  });
-
-  it('detiene el loader y muestra un error limpio si falla el endpoint', () => {
-    vi.spyOn(component['http'], 'post').mockReturnValue(
-      throwError(() => new Error('Request failed'))
-    );
-
-    component.urlEscaneo = 'https://tienda.example/producto';
-    component.escanearProducto();
-
-    expect(component.escaneando).toBe(false);
-    expect(component.errorEscaneo).toBe(
-      'No pudimos analizar este enlace. Intenta con una URL válida de una tienda.'
-    );
-  });
-
-  it('asigna el calzado a ambos pies del maniquí', () => {
-    const partes = component['partesParaPrenda']({
-      id: 'shoe-1',
-      nombre: 'Calzado Deportivo/Casual',
-      precio: '$1,499',
-      categoria: 'Calzado',
-      imagenUrl: '/ropa/textura_calzado.png'
-    });
-
-    expect(partes).toEqual(['pie_izq', 'pie_der']);
-  });
-
-  it('restaura los materiales de porcelana y ropa interior', () => {
-    component['mannequinMaterial'].color.setHex(0x3f4e3b);
-    component['underwearMaterial'].color.setHex(0x1c1917);
-
-    component.quitarRopa();
-
-    expect(component['mannequinMaterial'].color.getHex()).toBe(0xe2e8f0);
-    expect(component['underwearMaterial'].color.getHex()).toBe(0x2d3728);
-  });
-
-  it('muestra la prenda escaneada y permite probarla', () => {
-    const prendaMock = {
-      id: 'scanned_1',
-      nombre: 'Blazer Estructurado',
-      precio: '$2,590',
-      categoria: 'Torso' as const,
-      imagenUrl: 'https://example.com/blazer.jpg'
+  it('al iniciar sesión recupera medidas y conjunto de la cuenta sin reenviarlos', () => {
+    const guardado: PerfilProbador = {
+      medidas: { ...MEDIDAS_INICIALES.Masculino, altura: 188, peso: 85 },
+      conjunto: [MUESTRAS.find((m) => m.id === 'm-abrigo')!],
     };
+    perfil.obtener.mockReturnValue(of(guardado));
+    componente.abrirAuthModal('login');
+    componente.emailIngresado = 'michael@trender.test';
+    componente.passwordIngresado = 'secreto-seguro';
+    componente.iniciarSesionConPassword();
+    TestBed.tick();
+    vi.advanceTimersByTime(1000);
 
-    component.prendaEscaneada = prendaMock;
+    expect(componente.medidas()).toMatchObject({ genero: 'Masculino', altura: 188, peso: 85 });
+    expect(componente.conjunto().map((p) => p.id)).toEqual(['m-abrigo']);
+    expect(perfil.guardar).not.toHaveBeenCalled();
+  });
+
+  it('muestra un error claro con credenciales inválidas', () => {
+    auth.iniciarSesion = () => throwError(() => new HttpErrorResponse({ status: 401 }));
+    componente.abrirAuthModal('login');
+    componente.emailIngresado = 'michael@trender.test';
+    componente.passwordIngresado = 'incorrecta-1';
+    componente.iniciarSesionConPassword();
+    expect(componente.errorAuth()).toBe('Credenciales inválidas. Revisa tu correo y contraseña.');
+  });
+
+  it('cerrar sesión reinicia el probador y no deja datos en el dispositivo', () => {
+    iniciar(sesion('michael@trender.test'));
+    componente.vestir(MUESTRAS[0]);
+    componente.cambiarNumero('altura', 190);
+    TestBed.tick();
+
+    componente.cerrarSesion();
+    TestBed.tick();
     fixture.detectChanges();
 
-    const escaner = fixture.nativeElement.querySelector('#escaner') as HTMLElement;
-    expect(escaner.textContent).toContain('Blazer Estructurado');
-    expect(escaner.textContent).toContain('$2,590');
-    expect(escaner.textContent).toContain('Probar en mi Avatar 3D');
-
-    component.probarPrendaEscaneada();
-
-    expect(component.prendaActiva?.id).toBe('scanned_1');
-    expect(component.prendaActiva?.nombre).toBe('Blazer Estructurado');
+    expect(componente.sesionIniciada()).toBe(false);
+    expect(componente.conjunto()).toEqual([]);
+    expect(componente.medidas().altura).toBe(MEDIDAS_INICIALES.Femenino.altura);
+    expect(localStorage.length).toBe(0);
+    expect(texto()).not.toContain('Mi Espacio de Medición');
   });
 
-  it('limpia el escaneo y permite escanear otra prenda', () => {
-    component.urlEscaneo = 'https://test.com';
-    component.prendaEscaneada = { id: 's1', nombre: 'Test', precio: '$100', categoria: 'Torso', imagenUrl: 'img.jpg' };
-    component.errorEscaneo = null;
-
-    component.limpiarEscaneo();
-
-    expect(component.urlEscaneo).toBe('');
-    expect(component.prendaEscaneada).toBeNull();
-    expect(component.errorEscaneo).toBeNull();
-  });
-
-  it('renderiza la sección Mi Espacio de Medición solo con sesión', () => {
-    expect(fixture.nativeElement.querySelector('#mi-espacio')).toBeNull();
-
-    persistirSesion(crearSesion('demo@trender.com'));
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('#mi-espacio')).toBeTruthy();
-  });
-
-  it('muestra el nombre del usuario en el Navbar al iniciar sesión', () => {
-    persistirSesion(crearSesion('demo@trender.com'));
-    fixture.detectChanges();
-
-    expect(component.nombreAutenticado).toBe('Usuario Demo');
-    expect(fixture.nativeElement.textContent).toContain('Hola, Usuario Demo');
-  });
-
-  it('activa y desactiva el modo inmersivo del visor', () => {
-    component.activarModoInmersivo();
-
-    expect(component.modoInmersivo).toBe(true);
-    expect(document.body.classList.contains('overflow-hidden')).toBe(true);
-
-    component.salirModoInmersivo();
-
-    expect(component.modoInmersivo).toBe(false);
-    expect(document.body.classList.contains('overflow-hidden')).toBe(false);
-  });
-
-  it('renderiza métricas del hero y footer institucional', () => {
-    const texto = fixture.nativeElement.textContent as string;
-
-    expect(texto).toContain('99.2%');
-    expect(texto).toContain('Precisión Biométrica');
-    expect(texto).toContain('Escáner Web');
-    expect(texto).toContain('0.0s');
-    expect(texto).toContain('© 2026 Trender');
-  });
-
-  it('no expone exportación GLB ni inputs OTP', () => {
-    const texto = (fixture.nativeElement.textContent as string).toLowerCase();
-
-    expect(texto).not.toContain('.glb');
-    expect(texto).not.toContain('exportar avatar');
-    expect(texto).not.toContain('escanear mi cuerpo');
-    expect(fixture.nativeElement.querySelectorAll('input[autocomplete="one-time-code"]').length).toBe(0);
+  it('no usa "IA" en la interfaz ni expone acceso por código', () => {
+    expect(texto()).not.toMatch(/\bIA\b|Inteligencia Artificial/);
+    expect(fixture.nativeElement.querySelector('input[name="codigo"]')).toBeNull();
   });
 });
