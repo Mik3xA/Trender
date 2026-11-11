@@ -222,17 +222,19 @@ así el logout invalida el token aunque su firma siga vigente. Contraseñas con 
 
 | Método | Ruta | Auth | Cuerpo | Respuesta |
 |---|---|---|---|---|
+| POST | `/api/auth/invitado` | — | — | `201 { user, token, expires_at, session_id }` — sesión anónima (20/h/IP) |
 | POST | `/api/auth/register` | — | `{ nombre?(1–80), email, password(8–72 bytes) }` | `201 { user, token, expires_at, session_id }` · `409 EMAIL_EN_USO` |
 | POST | `/api/auth/login` | — | `{ email, password }` | `200 { user, token, expires_at, session_id }` · `401 CREDENCIALES_INVALIDAS` |
 | POST | `/api/auth/logout` | ✅ | — | `200 { revoked: true }` — revoca la sesión y limpia la caché del usuario |
 | GET | `/api/auth/me` | ✅ | — | `200 { user, profile }` |
 | GET | `/api/profile` | ✅ | — | `200 { altura, pecho, cintura, cadera, avatar_config, updated_at }` |
 | PUT | `/api/profile` | ✅ | campos parciales (cm, `null` borra) + `avatar_config` objeto | `200` perfil |
-| GET | `/api/closet?category=top\|bottom\|shoes` | ✅ | — | `200 { items, count }` |
-| POST | `/api/closet/add-from-link` | ✅ | `{ url, category? }` (si falta se deduce del link) | `201` prenda `pending` · `409 PRENDA_DUPLICADA` · `422 CATEGORIA_REQUERIDA` |
-| GET | `/api/closet/:id` | ✅ | — | `200` prenda · `404` si no existe o es de otro usuario |
-| PATCH | `/api/closet/:id` | ✅ | `{ category }` | `200` prenda |
-| DELETE | `/api/closet/:id` | ✅ | — | `200 { id, deleted: true }` |
+| GET | `/api/closet?genero=&category=` | ✅ | — | `200 { items, count }` (armario de un género) |
+| POST | `/api/closet/importar` (alias `/add-from-link`) | ✅ | `{ url, genero?, category? }` | `202` prenda `processing` + `Location` · `409 PRENDA_DUPLICADA` |
+| GET | `/api/closet/:id` | ✅ | — | `200` prenda (consultar hasta `ready` / `review` / `failed`) · `404` si es de otro usuario |
+| PATCH | `/api/closet/:id` | ✅ | `{ category, tipo? }` | `200` prenda (una prenda en `review` pasa a `ready`) |
+| DELETE | `/api/closet/:id` | ✅ | — | `200 { id, deleted: true }` (borra también su recorte) |
+| GET | `/media/closet/<user>/<id>.png` | — | — | recorte PNG con transparencia (rutas con UUID; `Cross-Origin-Resource-Policy: cross-origin` para WebGL) |
 | POST | `/api/ropa/escanear-link` | — | `{ url }` | `200 { prenda }` (ver abajo) · `400` URL inválida o interna |
 
 `prenda` = `{ id, nombre, categoria: 'Torso'|'Piernas'|'Calzado'|'Vestido'|null, tipo, confianza:
@@ -241,6 +243,27 @@ fuente: 'pagina'|'url', motivo|null }`. El escáner lee la página del producto 
 `Product`, migas de pan, `og:*`) con protección SSRF (solo IPs públicas, 3 redirecciones, 6 s,
 1.5 MB) y clasifica con un diccionario ES/EN ponderado. Si no hay evidencia devuelve
 `categoria: null` y un `motivo` en lugar de adivinar; los accesorios se reconocen y no se visten.
+
+Prenda del armario = `{ id, genero, source_url, imagen_url, category: top|bottom|dress|shoes|null, tipo,
+nombre, color, tienda, precio, status: processing|ready|review|failed, error, analisis: { confianza,
+evidencias[], avisos[], metodoLectura, metodoRecorte, fotosEvaluadas[], silueta }, created_at, updated_at }`.
+
+### Importación de prendas (asíncrona)
+
+1. `POST /api/closet/importar` valida la URL, inserta la prenda `processing` y responde **202** al instante.
+2. Una cola en memoria (2 en paralelo) ejecuta `importacion.service`:
+   - `scraper.service`: descarga el HTML (SSRF-safe); si la tienda bloquea (403/429, captcha, Cloudflare) y
+     Puppeteer está instalado, la renderiza con un navegador sin interfaz. Adaptadores para Amazon,
+     Mercado Libre, Nike, Zara, H&M y genérico (JSON-LD, og:image, galerías); descarta logos, banners,
+     reseñas, iconos y GIF.
+   - `imagen.service` (Sharp): descarga hasta 6 fotos y elige la más limpia (fondo liso, sin piel visible,
+     buena resolución, no apaisada); quita el fondo (remove.bg si hay `REMOVE_BG_API_KEY`, si no recorte
+     local con descontaminación del borde); analiza la silueta (dos piernas, calzado apaisado, mangas,
+     vestido o falda) y el color dominante.
+   - `decidir`: el texto (categoría de la tienda > título > URL) manda si es claro; si no, decide la silueta;
+     si ninguno es concluyente queda en `review`. Los accesorios terminan en `failed`.
+3. El cliente consulta `GET /api/closet/:id` cada segundo. Al reiniciar el servidor, las importaciones a
+   medias pasan a `failed`.
 
 `user` = `{ id, nombre, email, created_at }`. El frontend guarda estatura en `altura` y
 peso/complexión/género en `avatar_config`.
@@ -294,8 +317,11 @@ sigue aceptando `avatar_data` para integraciones externas.
 | `UPLOADS_DIR` | `./uploads` | Imágenes procesadas del armario |
 | `AUTH_RATE_LIMIT` | `30` | Peticiones de login/registro por 15 min |
 | `SCAN_FETCH_PAGES` | `true` | El escáner lee la página del producto; `false` = solo analiza la URL |
+| `SCRAPER_BROWSER` | `true` | Reintentar con Puppeteer si la tienda bloquea (requiere `npm install puppeteer`) |
+| `REMOVE_BG_API_KEY` | — | Recorte con remove.bg; sin clave se usa el recorte local |
+| `GUEST_RATE_LIMIT` / `IMPORT_RATE_LIMIT` | `20` / `40` | Sesiones de invitado por hora / importaciones por 15 min (por IP) |
 
-Pruebas: `tests/auth.test.js`, `tests/closet.test.js`, `tests/ropa.test.js`, `tests/servicios.test.js`, `tests/webhooks.test.js`
+Pruebas: `tests/auth.test.js`, `tests/closet.test.js`, `tests/ropa.test.js`, `tests/scraper.test.js`, `tests/imagen.test.js`, `tests/importacion.test.js`, `tests/servicios.test.js`, `tests/webhooks.test.js`
 (cada archivo con su propia base en memoria).
 ---
 

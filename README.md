@@ -27,6 +27,10 @@ npm test                    # pruebas del backend
 
 La base `dev.db` se crea y migra sola al arrancar (o con `npm run db:migrate`).
 
+Opcional, para tiendas que bloquean la lectura automática (Amazon, captchas):
+`npm install puppeteer` (descarga un Chromium de ~170 MB). Para recortes de mayor calidad,
+`REMOVE_BG_API_KEY` en `.env` (remove.bg).
+
 ## 2. Frontend (carpeta `frontend/`)
 
 En otra terminal, con el backend corriendo:
