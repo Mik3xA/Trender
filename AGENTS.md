@@ -137,7 +137,7 @@ npm test
 - `tests/webhooks.test.js`: éxito 200, `avatar_data`, validación 400 y rutas inexistentes.
 - `tests/auth.test.js`: registro con nombre, login, logout, `/me` y `/api/profile`.
 - `tests/closet.test.js`: armario y aislamiento entre usuarios.
-- `tests/ropa.test.js`: escáner de links.
+- `tests/ropa.test.js`: escáner (clasificador, extracción de metadatos, SSRF y endpoint). Las pruebas no salen a internet (`SCAN_FETCH_PAGES=false`).
 - `tests/servicios.test.js`: servicios (`db`, migraciones, `auth`, `perfil`, `closet`, `ropa`, `email`, caché, URLs).
 
 ### Frontend

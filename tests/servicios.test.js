@@ -69,7 +69,7 @@ describe('ropa.service', () => {
     expect(ropaService.normalizarTexto('Pantalón ÚNICO')).toBe('pantalon unico');
     expect(ropaService.categoriaArmario('https://x.example/botas-cuero')).toBe('shoes');
     expect(ropaService.categoriaArmario('https://x.example/falda-plisada')).toBe('bottom');
-    expect(ropaService.categoriaArmario('https://x.example/algo')).toBe('top');
+    expect(ropaService.categoriaArmario('https://x.example/algo')).toBeNull();
   });
 });
 

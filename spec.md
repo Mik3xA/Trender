@@ -229,11 +229,18 @@ así el logout invalida el token aunque su firma siga vigente. Contraseñas con 
 | GET | `/api/profile` | ✅ | — | `200 { altura, pecho, cintura, cadera, avatar_config, updated_at }` |
 | PUT | `/api/profile` | ✅ | campos parciales (cm, `null` borra) + `avatar_config` objeto | `200` perfil |
 | GET | `/api/closet?category=top\|bottom\|shoes` | ✅ | — | `200 { items, count }` |
-| POST | `/api/closet/add-from-link` | ✅ | `{ url, category? }` (si falta se deduce del link) | `201` prenda `pending` · `409 PRENDA_DUPLICADA` |
+| POST | `/api/closet/add-from-link` | ✅ | `{ url, category? }` (si falta se deduce del link) | `201` prenda `pending` · `409 PRENDA_DUPLICADA` · `422 CATEGORIA_REQUERIDA` |
 | GET | `/api/closet/:id` | ✅ | — | `200` prenda · `404` si no existe o es de otro usuario |
 | PATCH | `/api/closet/:id` | ✅ | `{ category }` | `200` prenda |
 | DELETE | `/api/closet/:id` | ✅ | — | `200 { id, deleted: true }` |
-| POST | `/api/ropa/escanear-link` | — | `{ url }` | `200 { prenda: { id, categoria, nombre, precio, imagenUrl } }` |
+| POST | `/api/ropa/escanear-link` | — | `{ url }` | `200 { prenda }` (ver abajo) · `400` URL inválida o interna |
+
+`prenda` = `{ id, nombre, categoria: 'Torso'|'Piernas'|'Calzado'|'Vestido'|null, tipo, confianza:
+'alta'|'media'|'baja'|'ninguna', color: { nombre, hex }|null, precio|null, marca|null, imagen|null, tienda,
+fuente: 'pagina'|'url', motivo|null }`. El escáner lee la página del producto (título, JSON-LD
+`Product`, migas de pan, `og:*`) con protección SSRF (solo IPs públicas, 3 redirecciones, 6 s,
+1.5 MB) y clasifica con un diccionario ES/EN ponderado. Si no hay evidencia devuelve
+`categoria: null` y un `motivo` en lugar de adivinar; los accesorios se reconocen y no se visten.
 
 `user` = `{ id, nombre, email, created_at }`. El frontend guarda estatura en `altura` y
 peso/complexión/género en `avatar_config`.
@@ -284,7 +291,7 @@ La aplicación Angular vive en `frontend/` (rama de frontend) y consume esta API
 | `DATABASE_URL` | `./dev.db` | Ruta SQLite (`:memory:` en pruebas) |
 | `UPLOADS_DIR` | `./uploads` | Imágenes procesadas del armario |
 | `AUTH_RATE_LIMIT` | `30` | Peticiones de login/registro por 15 min |
-| `SCAN_DELAY_MS` | `1200` | Retardo simulado del escáner de links |
+| `SCAN_FETCH_PAGES` | `true` | El escáner lee la página del producto; `false` = solo analiza la URL |
 
 Pruebas: `tests/auth.test.js`, `tests/closet.test.js`, `tests/ropa.test.js`, `tests/servicios.test.js`, `tests/webhooks.test.js`
 (cada archivo con su propia base en memoria).

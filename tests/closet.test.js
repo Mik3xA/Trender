@@ -46,6 +46,15 @@ describe('Armario /api/closet', () => {
     await request(app).delete(`/api/closet/${res.body.data.id}`).set(beto.auth);
   });
 
+  it('pide la categoría si no se puede deducir del link', async () => {
+    const res = await request(app)
+      .post('/api/closet/add-from-link')
+      .set(beto.auth)
+      .send({ url: 'https://shop.example.com/producto/88231' });
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe('CATEGORIA_REQUERIDA');
+  });
+
   it('valida url y categoría', async () => {
     const res = await request(app).post('/api/closet/add-from-link').set(ana.auth).send({ url: 'nada', category: 'hat' });
     expect(res.status).toBe(400);
