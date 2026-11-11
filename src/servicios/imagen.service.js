@@ -235,11 +235,34 @@ async function quitarFondo(buffer) {
     .extractChannel(0) // Sharp devuelve 3 canales tras el desenfoque: se queda en uno.
     .raw()
     .toBuffer();
+  // Quita el "halo": los píxeles del borde mezclados con el fondo blanco se vuelven
+  // transparentes y el resto del borde se endurece (sin línea clara alrededor de la prenda).
+  for (let i = 0; i < alfa.length; i += 1) {
+    alfa[i] = Math.max(0, Math.min(255, Math.round((alfa[i] - 170) * (255 / 70))));
+  }
 
-  const png = await sharp(rgb, { raw: { width: info.width, height: info.height, channels: 3 } })
-    .joinChannel(alfa, { raw: { width: info.width, height: info.height, channels: 1 } })
-    .png()
-    .toBuffer();
+  // Descontaminación del borde: los píxeles semitransparentes conservan el blanco del
+  // fondo original y dibujan una línea clara; se les da el color medio de la prenda.
+  const rgba = Buffer.alloc(info.width * info.height * 4);
+  const suma = [0, 0, 0];
+  let opacos = 0;
+  for (let k = 0; k < alfa.length; k += 1) {
+    if (alfa[k] === 255) {
+      suma[0] += rgb[k * 3];
+      suma[1] += rgb[k * 3 + 1];
+      suma[2] += rgb[k * 3 + 2];
+      opacos += 1;
+    }
+  }
+  const medio = suma.map((v) => Math.round(v / Math.max(1, opacos)));
+  for (let k = 0; k < alfa.length; k += 1) {
+    const borde = alfa[k] < 255;
+    rgba[k * 4] = borde ? medio[0] : rgb[k * 3];
+    rgba[k * 4 + 1] = borde ? medio[1] : rgb[k * 3 + 1];
+    rgba[k * 4 + 2] = borde ? medio[2] : rgb[k * 3 + 2];
+    rgba[k * 4 + 3] = alfa[k];
+  }
+  const png = await sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
   const recortado = await recortarAlContorno(png);
   const meta = await sharp(recortado).metadata();
   return { png: recortado, metodo: 'recorte-local', ancho: meta.width, alto: meta.height };
