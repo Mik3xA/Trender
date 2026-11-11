@@ -1,406 +1,325 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 
-import {
-  Genero,
-  LIMITES,
-  MEDIDAS_INICIALES,
-  Medidas,
-  TIPOS_CUERPO,
-  TipoCuerpo,
-  estimarContornos,
-  imc,
-  sanearMedidas,
-} from '../probador/cuerpo';
-import {
-  CategoriaPrenda,
-  MUESTRAS,
-  NOMBRE_CATEGORIA,
-  PrendaEscaneada,
-  PrendaVirtual,
-  prendaDesdeEscaneo,
-  vestirConjunto,
-} from '../probador/prendas';
+import { TONOS } from '../motor-3d/piel';
+import { Genero, LIMITES, MEDIDAS_INICIALES, Medidas, TIPOS_CUERPO, TipoCuerpo, estimarContornos, sanearMedidas } from '../probador/cuerpo';
+import { MUESTRAS, NOMBRE_CATEGORIA, PrendaVirtual, vestirConjunto } from '../probador/prendas';
 import { recomendarTalla } from '../probador/tallas';
-import { AuthService, StoredSession } from '../servicios/auth.service';
-import { PerfilService } from '../servicios/perfil.service';
-import { RopaService } from '../servicios/ropa.service';
+import { ArmarioService, CATEGORIA_PROBADOR, CategoriaArmario, PrendaArmario, aPrendaVirtual } from '../servicios/armario.service';
+import { PerfilGenero, PerfilService, Perfiles } from '../servicios/perfil.service';
 import { Visor3dComponent } from '../visor-3d/visor-3d';
+import { environment } from '../../environments/environment';
 
-type AuthMode = 'login' | 'registro';
-type Paso = 'cuerpo' | 'prenda' | 'talla';
-type TipoNotificacion = 'exito' | 'error';
+type Filtro = 'todo' | CategoriaArmario | 'basicos';
 type Contorno = 'pecho' | 'cintura' | 'cadera';
 
-const MEDIDAS_KEY = 'trender.measurements';
-const CONJUNTO_KEY = 'trender.outfit';
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const GUARDADO_PERFIL_MS = 600;
+const CLAVE_PERFILES = 'trender.perfiles';
+const CLAVE_GENERO = 'trender.genero';
+const GUARDADO_MS = 700;
 const MAX_PRENDAS = 6;
 
-/** Página del probador: cuenta, medidas, escáner de prendas, tallas y visor 3D. */
+const perfilInicial = (genero: Genero): PerfilGenero => ({ medidas: { ...MEDIDAS_INICIALES[genero] }, conjunto: [], tono: 'maniqui' });
+
+/**
+ * Probador de pantalla completa. Mujer y Hombre son apartados independientes:
+ * cada uno tiene su cuerpo, su tono, su conjunto y su armario en el servidor.
+ * No hay login: SesionService crea una sesión de invitado de forma transparente.
+ */
 @Component({
   selector: 'app-avatar-setup',
-  imports: [FormsModule, Visor3dComponent],
+  imports: [Visor3dComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './avatar-setup.html',
-  styleUrl: './avatar-setup.scss',
 })
 export class AvatarSetupComponent implements OnInit {
-  private readonly auth = inject(AuthService);
-  private readonly perfil = inject(PerfilService);
-  private readonly ropa = inject(RopaService);
+  private readonly armarioApi = inject(ArmarioService);
+  private readonly perfilApi = inject(PerfilService);
   private readonly destroyRef = inject(DestroyRef);
 
+  protected readonly apiUrl = environment.apiUrl;
   protected readonly LIMITES = LIMITES;
   protected readonly TIPOS_CUERPO = TIPOS_CUERPO;
-  protected readonly MUESTRAS = MUESTRAS;
+  protected readonly TONOS = TONOS;
   protected readonly NOMBRE_CATEGORIA = NOMBRE_CATEGORIA;
-  protected readonly CATEGORIAS: CategoriaPrenda[] = ['Torso', 'Piernas', 'Vestido', 'Calzado'];
+  protected readonly CATEGORIA_PROBADOR = CATEGORIA_PROBADOR;
+  protected readonly CATEGORIAS: CategoriaArmario[] = ['top', 'bottom', 'dress', 'shoes'];
+  protected readonly FILTROS: Array<{ id: Filtro; nombre: string }> = [
+    { id: 'todo', nombre: 'Todo' },
+    { id: 'top', nombre: 'Superior' },
+    { id: 'bottom', nombre: 'Inferior' },
+    { id: 'dress', nombre: 'Vestidos' },
+    { id: 'shoes', nombre: 'Calzado' },
+    { id: 'basicos', nombre: 'Básicos' },
+  ];
 
-  // ---- probador
-  readonly medidas = signal<Medidas>(sanearMedidas(this.leer<Partial<Medidas>>(MEDIDAS_KEY)));
-  readonly conjunto = signal<PrendaVirtual[]>(this.leerConjunto());
-  readonly paso = signal<Paso>('cuerpo');
+  // ---- apartados
+  readonly genero = signal<Genero>(this.leer<Genero>(CLAVE_GENERO) === 'Masculino' ? 'Masculino' : 'Femenino');
+  readonly perfiles = signal<Perfiles>(this.leerPerfiles());
+  readonly perfil = computed(() => this.perfiles()[this.genero()]);
+  readonly medidas = computed(() => this.perfil().medidas);
+  readonly conjunto = computed(() => this.perfil().conjunto);
+  readonly tono = computed(() => this.perfil().tono);
   readonly contornos = computed(() => estimarContornos(this.medidas()));
-  readonly indiceMasa = computed(() => Math.round(imc(this.medidas()) * 10) / 10);
-  readonly recomendaciones = computed(() =>
-    this.conjunto().map((prenda) => ({ prenda, talla: recomendarTalla(this.medidas(), prenda.categoria) }))
+  readonly recomendaciones = computed(() => this.conjunto().map((prenda) => ({ prenda, talla: recomendarTalla(this.medidas(), prenda.categoria) })));
+
+  // ---- armario
+  readonly armario = signal<PrendaArmario[]>([]);
+  readonly filtro = signal<Filtro>('todo');
+  readonly cargandoArmario = signal(false);
+  readonly basicos = computed(() =>
+    MUESTRAS.filter((m) => this.genero() === 'Femenino' || (m.categoria !== 'Vestido' && m.tipo !== 'falda'))
   );
-  readonly pantallaCompleta = signal(false);
+  readonly visibles = computed(() => {
+    const f = this.filtro();
+    return f === 'todo' ? this.armario() : this.armario().filter((p) => p.category === f);
+  });
 
-  // ---- escáner
-  readonly urlEscaneo = signal('');
-  readonly escaneando = signal(false);
-  readonly errorEscaneo = signal<string | null>(null);
-  readonly prendaEscaneada = signal<PrendaEscaneada | null>(null);
+  // ---- importación
+  readonly enlace = signal('');
+  readonly importando = signal(0);
+  readonly errorImportacion = signal<string | null>(null);
 
-  // ---- cuenta
-  readonly sesionIniciada = signal(false);
-  readonly nombreAutenticado = signal('');
-  readonly emailAutenticado = signal('');
-  mostrarModalAuth = false;
-  modoAuth: AuthMode = 'login';
-  nombreIngresado = '';
-  emailIngresado = '';
-  passwordIngresado = '';
-  readonly cargandoAuth = signal(false);
-  readonly errorAuth = signal<string | null>(null);
-  readonly registroExitoso = signal(false);
-  readonly nombreRegistrado = signal('');
+  // ---- interfaz
+  readonly panelAbierto = signal(true);
+  readonly notificacion = signal<string | null>(null);
 
-  readonly notificacion = signal<{ mensaje: string; tipo: TipoNotificacion } | null>(null);
-
+  private readonly seguimientos = new Set<Subscription>();
   private guardadoTimer?: ReturnType<typeof setTimeout>;
   private notificacionTimer?: ReturnType<typeof setTimeout>;
-  private registroTimer?: ReturnType<typeof setTimeout>;
-  /**
-   * Evita reenviar al backend lo que acabamos de recibir de él. Empieza en true
-   * para que la primera ejecución del effect (al cargar) no pise el perfil guardado.
-   */
-  private sincronizandoDesdeServidor = true;
-  /** Durante la confirmación de registro la sesión aún no se muestra en la interfaz. */
-  private registrando = false;
-  /** Tras cerrar sesión no se vuelve a escribir nada en localStorage. */
-  private omitirPersistencia = false;
+  private omitirGuardado = true; // la primera ejecución del effect solo refleja lo cargado
 
   constructor() {
     effect(() => {
-      const medidas = this.medidas();
-      const conjunto = this.conjunto();
-      if (this.omitirPersistencia) {
-        this.omitirPersistencia = false;
+      const perfiles = this.perfiles();
+      const genero = this.genero();
+      this.escribir(CLAVE_PERFILES, perfiles);
+      this.escribir(CLAVE_GENERO, genero);
+      if (this.omitirGuardado) {
+        this.omitirGuardado = false;
         return;
       }
-      this.escribir(MEDIDAS_KEY, medidas);
-      this.escribir(CONJUNTO_KEY, conjunto);
-      if (this.sincronizandoDesdeServidor) {
-        this.sincronizandoDesdeServidor = false;
-        return;
-      }
-      this.programarGuardado();
+      clearTimeout(this.guardadoTimer);
+      this.guardadoTimer = setTimeout(() => this.perfilApi.guardar(genero, perfiles).subscribe({ error: () => undefined }), GUARDADO_MS);
     });
     this.destroyRef.onDestroy(() => {
       clearTimeout(this.guardadoTimer);
       clearTimeout(this.notificacionTimer);
-      clearTimeout(this.registroTimer);
+      this.seguimientos.forEach((s) => s.unsubscribe());
     });
   }
 
   ngOnInit(): void {
-    const suscripcion = this.auth.sesion$.subscribe((sesion) => this.aplicarSesion(sesion));
-    this.destroyRef.onDestroy(() => suscripcion.unsubscribe());
-    this.auth.refrescarSesion();
-    if (this.auth.sesionActual?.token) this.cargarPerfil();
+    this.perfilApi.obtener().subscribe({
+      next: ({ perfiles }) => {
+        if (!perfiles.Femenino && !perfiles.Masculino) return;
+        this.omitirGuardado = true;
+        this.perfiles.update((actual) => ({ ...actual, ...perfiles }));
+      },
+      error: () => undefined, // sin backend: el probador funciona con lo guardado en el navegador
+    });
+    this.cargarArmario();
   }
 
-  // ------------------------------------------------------------------ medidas
-
-  get tituloAuth(): string {
-    return this.modoAuth === 'registro' ? 'Crea tu cuenta' : 'Inicia sesión';
-  }
-
-  get descripcionAuth(): string {
-    return this.modoAuth === 'registro'
-      ? 'Guarda tus medidas y tu conjunto para usarlos en cualquier dispositivo.'
-      : 'Recupera tus medidas y tu conjunto guardados.';
-  }
+  // ------------------------------------------------------------------ apartados y cuerpo
 
   cambiarGenero(genero: Genero): void {
-    if (genero === this.medidas().genero) return;
-    // Al cambiar de género se parte de proporciones típicas, conservando altura y peso.
-    this.medidas.update((m) => ({ ...MEDIDAS_INICIALES[genero], altura: m.altura, peso: m.peso }));
+    if (genero === this.genero()) return;
+    this.genero.set(genero);
+    this.filtro.set('todo');
+    this.enlace.set('');
+    this.errorImportacion.set(null);
+    this.cargarArmario();
+  }
+
+  private actualizarPerfil(cambio: (p: PerfilGenero) => PerfilGenero): void {
+    const genero = this.genero();
+    this.perfiles.update((todos) => ({ ...todos, [genero]: cambio(todos[genero]) }));
   }
 
   cambiarNumero(campo: 'altura' | 'peso', valor: number | string): void {
     const numero = Number(valor);
     if (!Number.isFinite(numero)) return;
     const { min, max } = LIMITES[campo];
-    this.medidas.update((m) => ({ ...m, [campo]: Math.min(max, Math.max(min, numero)) }));
+    this.actualizarPerfil((p) => ({ ...p, medidas: { ...p.medidas, [campo]: Math.min(max, Math.max(min, numero)) } }));
   }
 
   cambiarTipoCuerpo(tipo: TipoCuerpo): void {
-    this.medidas.update((m) => ({ ...m, tipoCuerpo: tipo }));
+    this.actualizarPerfil((p) => ({ ...p, medidas: { ...p.medidas, tipoCuerpo: tipo } }));
   }
 
-  /** Medida exacta opcional; vacío o fuera de rango vuelve a la estimación. */
+  cambiarTono(tono: string): void {
+    this.actualizarPerfil((p) => ({ ...p, tono }));
+  }
+
+  /** Medida exacta opcional; vacía o fuera de rango vuelve a la estimación. */
   cambiarContorno(campo: Contorno, valor: string | number | null): void {
     const numero = valor === '' || valor === null ? null : Number(valor);
-    const valido =
-      numero !== null && Number.isFinite(numero) && numero >= LIMITES.contorno.min && numero <= LIMITES.contorno.max;
-    this.medidas.update((m) => ({ ...m, [campo]: valido ? numero : null }));
+    const valido = numero !== null && Number.isFinite(numero) && numero >= LIMITES.contorno.min && numero <= LIMITES.contorno.max;
+    this.actualizarPerfil((p) => ({ ...p, medidas: { ...p.medidas, [campo]: valido ? numero : null } }));
   }
 
-  restablecerMedidas(): void {
-    this.medidas.set({ ...MEDIDAS_INICIALES[this.medidas().genero] });
-  }
-
-  // ------------------------------------------------------------------ prendas
-
-  vestir(prenda: PrendaVirtual): void {
-    this.conjunto.update((c) => vestirConjunto(c, prenda).slice(-MAX_PRENDAS));
-  }
-
-  quitar(id: string): void {
-    this.conjunto.update((c) => c.filter((p) => p.id !== id));
-  }
-
-  quitarTodo(): void {
-    this.conjunto.set([]);
-  }
+  // ------------------------------------------------------------------ conjunto
 
   estaPuesta(id: string): boolean {
     return this.conjunto().some((p) => p.id === id);
   }
 
-  escanearProducto(): void {
-    const url = this.urlEscaneo().trim();
-    this.errorEscaneo.set(null);
+  vestir(prenda: PrendaVirtual): void {
+    this.actualizarPerfil((p) => ({ ...p, conjunto: vestirConjunto(p.conjunto, prenda).slice(-MAX_PRENDAS) }));
+  }
+
+  quitar(id: string): void {
+    this.actualizarPerfil((p) => ({ ...p, conjunto: p.conjunto.filter((x) => x.id !== id) }));
+  }
+
+  quitarTodo(): void {
+    this.actualizarPerfil((p) => ({ ...p, conjunto: [] }));
+  }
+
+  /** Clic en una tarjeta del armario: se aplica al avatar (o se quita si ya está puesta). */
+  alternar(item: PrendaArmario): void {
+    if (this.estaPuesta(item.id)) return this.quitar(item.id);
+    const prenda = aPrendaVirtual(item);
+    if (prenda) this.vestir(prenda);
+  }
+
+  alternarBasico(prenda: PrendaVirtual): void {
+    if (this.estaPuesta(prenda.id)) this.quitar(prenda.id);
+    else this.vestir(prenda);
+  }
+
+  // ------------------------------------------------------------------ armario e importación
+
+  cargarArmario(): void {
+    const genero = this.genero();
+    this.cargandoArmario.set(true);
+    this.armarioApi.listar(genero).subscribe({
+      next: (items) => {
+        if (genero !== this.genero()) return;
+        this.armario.set(items);
+        this.cargandoArmario.set(false);
+        for (const item of items) if (item.status === 'processing') this.seguir(item.id);
+      },
+      error: () => this.cargandoArmario.set(false),
+    });
+  }
+
+  importar(): void {
+    const url = this.enlace().trim();
+    this.errorImportacion.set(null);
     if (!/^https?:\/\/\S+\.\S+/i.test(url)) {
-      this.errorEscaneo.set('Pega el enlace completo del producto (empieza con https://).');
+      this.errorImportacion.set('Pega el enlace completo del producto (empieza con https://).');
       return;
     }
-    this.escaneando.set(true);
-    this.prendaEscaneada.set(null);
-    this.ropa.escanear(url).subscribe({
-      next: (prenda) => {
-        this.escaneando.set(false);
-        this.prendaEscaneada.set(prenda);
-        const vestible = prendaDesdeEscaneo(prenda);
-        if (vestible) {
-          this.vestir(vestible);
-          this.mostrarNotificacion(`Probando: ${vestible.nombre}`, 'exito');
-        }
-      },
+    const genero = this.genero();
+    this.importando.update((n) => n + 1);
+    this.enlace.set('');
+    this.filtro.set('todo');
+    const sub = this.armarioApi.importar(url, genero).subscribe({
+      next: (item) => this.recibir(item, genero),
       error: (error: HttpErrorResponse) => {
-        this.escaneando.set(false);
-        this.errorEscaneo.set(
-          error.status === 400
-            ? this.mensajeError(error, 'Ese enlace no es válido.')
-            : 'No pudimos analizar este enlace. Revisa la URL o elige una prenda de muestra.'
-        );
+        this.importando.update((n) => n - 1);
+        this.errorImportacion.set(this.mensajeError(error));
       },
+      complete: () => this.importando.update((n) => n - 1),
+    });
+    this.seguimientos.add(sub);
+  }
+
+  /** Corrige o elige la categoría de una prenda y la viste. */
+  clasificar(item: PrendaArmario, categoria: CategoriaArmario): void {
+    this.armarioApi.clasificar(item.id, categoria, categoria === item.category ? undefined : this.tipoPor(categoria)).subscribe({
+      next: (actualizada) => {
+        this.reemplazar(actualizada);
+        this.quitar(item.id);
+        const prenda = aPrendaVirtual(actualizada);
+        if (prenda) this.vestir(prenda);
+      },
+      error: (error: HttpErrorResponse) => this.avisar(this.mensajeError(error)),
     });
   }
 
-  /** El escáner no reconoció la prenda (o se equivocó): el usuario elige la categoría. */
-  elegirCategoria(categoria: CategoriaPrenda): void {
-    const escaneada = this.prendaEscaneada();
-    if (!escaneada) return;
-    const prenda = prendaDesdeEscaneo(escaneada, categoria)!;
-    this.prendaEscaneada.set({ ...escaneada, categoria, tipo: prenda.tipo, motivo: null });
-    this.vestir(prenda);
-    this.mostrarNotificacion(`Probando: ${prenda.nombre}`, 'exito');
-  }
-
-  limpiarEscaneo(): void {
-    this.urlEscaneo.set('');
-    this.prendaEscaneada.set(null);
-    this.errorEscaneo.set(null);
-  }
-
-  // ------------------------------------------------------------------ cuenta
-
-  abrirAuthModal(modo: AuthMode): void {
-    this.modoAuth = modo;
-    this.mostrarModalAuth = true;
-    this.errorAuth.set(null);
-    this.passwordIngresado = '';
-  }
-
-  cerrarModalAuth(): void {
-    if (this.cargandoAuth() || this.registroExitoso()) return;
-    this.mostrarModalAuth = false;
-    this.errorAuth.set(null);
-    this.passwordIngresado = '';
-  }
-
-  cambiarModoAuth(modo: AuthMode): void {
-    this.modoAuth = modo;
-    this.errorAuth.set(null);
-  }
-
-  registrarConPassword(): void {
-    if (this.cargandoAuth()) return;
-    const nombre = this.nombreIngresado.trim();
-    const email = this.emailIngresado.trim();
-    if (!nombre) return this.errorAuth.set('Ingresa tu nombre.');
-    if (!EMAIL_REGEX.test(email)) return this.errorAuth.set('Ingresa un correo electrónico válido.');
-    if (this.passwordIngresado.length < 8) return this.errorAuth.set('La contraseña debe tener al menos 8 caracteres.');
-
-    this.errorAuth.set(null);
-    this.cargandoAuth.set(true);
-    this.registrando = true;
-    this.auth.registrar({ nombre, email, password: this.passwordIngresado }).subscribe({
+  eliminar(item: PrendaArmario, evento?: Event): void {
+    evento?.stopPropagation();
+    this.armarioApi.eliminar(item.id).subscribe({
       next: () => {
-        this.cargandoAuth.set(false);
-        this.nombreRegistrado.set(this.auth.sesionActual?.user?.nombre?.trim() || nombre);
-        this.registroExitoso.set(true);
-        this.registroTimer = setTimeout(() => {
-          this.registroExitoso.set(false);
-          this.registrando = false;
-          this.finalizarAcceso();
-          // Cuenta nueva: se guardan en ella las medidas que ya tenía en pantalla.
-          this.guardarPerfilAhora();
-        }, 2000);
+        this.armario.update((lista) => lista.filter((p) => p.id !== item.id));
+        this.quitar(item.id);
       },
-      error: (error: HttpErrorResponse) => {
-        this.cargandoAuth.set(false);
-        this.registrando = false;
-        this.errorAuth.set(this.mensajeError(error, 'No se pudo crear la cuenta.'));
-      },
+      error: (error: HttpErrorResponse) => this.avisar(this.mensajeError(error)),
     });
   }
 
-  iniciarSesionConPassword(): void {
-    if (this.cargandoAuth()) return;
-    const email = this.emailIngresado.trim();
-    if (!EMAIL_REGEX.test(email) || !this.passwordIngresado) return this.errorAuth.set('Ingresa tu correo y contraseña.');
-
-    this.errorAuth.set(null);
-    this.cargandoAuth.set(true);
-    this.auth.iniciarSesion({ email, password: this.passwordIngresado }).subscribe({
-      next: () => {
-        this.cargandoAuth.set(false);
-        this.finalizarAcceso();
-        this.cargarPerfil();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.cargandoAuth.set(false);
-        this.errorAuth.set(
-          error.status === 401
-            ? 'Credenciales inválidas. Revisa tu correo y contraseña.'
-            : this.mensajeError(error, 'No se pudo iniciar sesión.')
-        );
-      },
-    });
-  }
-
-  cerrarSesion(): void {
-    this.auth.cerrarSesion();
-    clearTimeout(this.guardadoTimer);
-    this.omitirPersistencia = true;
-    this.medidas.set({ ...MEDIDAS_INICIALES[this.medidas().genero] });
-    this.conjunto.set([]);
-    this.limpiarEscaneo();
-    this.paso.set('cuerpo');
-    this.mostrarNotificacion('Sesión cerrada. Tus datos se borraron de este dispositivo.', 'exito');
+  confianza(item: PrendaArmario): string {
+    const c = item.analisis?.confianza;
+    return c === 'alta' ? 'Seguro' : c === 'media' ? 'Probable' : c === 'baja' ? 'Dudoso' : '';
   }
 
   // ------------------------------------------------------------------ interfaz
 
-  alternarPantallaCompleta(): void {
-    this.pantallaCompleta.update((v) => !v);
+  alternarPanel(): void {
+    this.panelAbierto.update((v) => !v);
   }
 
-  mostrarNotificacion(mensaje: string, tipo: TipoNotificacion): void {
+  avisar(mensaje: string): void {
     clearTimeout(this.notificacionTimer);
-    this.notificacion.set({ mensaje, tipo });
-    this.notificacionTimer = setTimeout(() => this.notificacion.set(null), 3500);
-  }
-
-  cerrarNotificacion(): void {
-    clearTimeout(this.notificacionTimer);
-    this.notificacion.set(null);
+    this.notificacion.set(mensaje);
+    this.notificacionTimer = setTimeout(() => this.notificacion.set(null), 3800);
   }
 
   // ------------------------------------------------------------------ privados
 
-  private finalizarAcceso(): void {
-    this.mostrarModalAuth = false;
-    this.passwordIngresado = '';
-    this.nombreIngresado = '';
-    this.aplicarSesion(this.auth.sesionActual);
+  private seguir(id: string): void {
+    const genero = this.genero();
+    const sub = this.armarioApi.seguir(id).subscribe({ next: (item) => this.recibir(item, genero), error: () => undefined });
+    this.seguimientos.add(sub);
   }
 
-  private aplicarSesion(sesion: StoredSession | null): void {
-    const activa = !!sesion?.sesionIniciada && !this.registrando;
-    this.sesionIniciada.set(activa);
-    this.emailAutenticado.set(activa ? sesion!.email : '');
-    this.nombreAutenticado.set(activa ? sesion!.user?.nombre?.trim() || sesion!.email.split('@')[0] : '');
+  /** Cada respuesta del sondeo actualiza la tarjeta; al terminar se viste o se pide la categoría. */
+  private recibir(item: PrendaArmario, genero: Genero): void {
+    if (genero !== this.genero()) return; // el usuario cambió de apartado mientras tanto
+    this.reemplazar(item);
+    if (item.status === 'ready') {
+      const prenda = aPrendaVirtual(item);
+      if (prenda) {
+        this.vestir(prenda);
+        this.avisar(`${NOMBRE_CATEGORIA[prenda.categoria]} · ${prenda.tipo}: ${prenda.nombre}`);
+      }
+    } else if (item.status === 'review') {
+      this.avisar('No pudimos identificar la prenda: elige qué es en tu armario.');
+    } else if (item.status === 'failed') {
+      this.avisar(item.error ?? 'No se pudo importar la prenda.');
+    }
   }
 
-  private cargarPerfil(): void {
-    this.perfil.obtener().subscribe({
-      next: (guardado) => {
-        if (!guardado) {
-          this.guardarPerfilAhora(); // cuenta sin medidas: se guardan las actuales
-          return;
-        }
-        this.sincronizandoDesdeServidor = true;
-        this.medidas.set(guardado.medidas);
-        this.conjunto.set(guardado.conjunto);
-      },
-      error: () => undefined,
-    });
+  private reemplazar(item: PrendaArmario): void {
+    this.armario.update((lista) => (lista.some((p) => p.id === item.id) ? lista.map((p) => (p.id === item.id ? item : p)) : [item, ...lista]));
   }
 
-  private programarGuardado(): void {
-    clearTimeout(this.guardadoTimer);
-    if (!this.auth.obtenerToken()) return;
-    this.guardadoTimer = setTimeout(() => this.guardarPerfilAhora(), GUARDADO_PERFIL_MS);
+  private tipoPor(categoria: CategoriaArmario): string {
+    return { top: 'camiseta', bottom: 'pantalon', dress: 'vestido', shoes: 'tenis' }[categoria];
   }
 
-  private guardarPerfilAhora(): void {
-    if (!this.auth.obtenerToken()) return;
-    this.perfil.guardar({ medidas: this.medidas(), conjunto: this.conjunto() }).subscribe({ error: () => undefined });
-  }
-
-  private mensajeError(error: HttpErrorResponse, fallback: string): string {
+  private mensajeError(error: HttpErrorResponse): string {
     if (error.status === 0) return 'No se pudo conectar con el servidor. Verifica que el backend esté activo.';
     const detalles = error.error?.errors;
-    if (Array.isArray(detalles) && detalles.length) {
-      return detalles.map((d: { message?: string }) => d.message).filter(Boolean).join(' · ');
-    }
-    return error.error?.message ?? error.error?.error ?? fallback;
+    if (Array.isArray(detalles) && detalles.length) return detalles.map((d: { message?: string }) => d.message).join(' · ');
+    return error.error?.error ?? error.error?.message ?? 'Algo salió mal. Intenta de nuevo.';
   }
 
-  private leerConjunto(): PrendaVirtual[] {
-    const guardado = this.leer<PrendaVirtual[]>(CONJUNTO_KEY);
-    return Array.isArray(guardado)
-      ? guardado.filter((p) => p && typeof p.id === 'string' && typeof p.color === 'string').slice(0, MAX_PRENDAS)
-      : [];
+  private leerPerfiles(): Perfiles {
+    const guardados = this.leer<Partial<Record<Genero, Partial<PerfilGenero>>>>(CLAVE_PERFILES) ?? {};
+    const perfil = (genero: Genero): PerfilGenero => {
+      const p = guardados[genero];
+      if (!p?.medidas) return perfilInicial(genero);
+      return {
+        medidas: sanearMedidas({ ...(p.medidas as Medidas), genero }),
+        conjunto: Array.isArray(p.conjunto) ? p.conjunto.filter((x) => x && typeof x.id === 'string').slice(0, MAX_PRENDAS) : [],
+        tono: typeof p.tono === 'string' ? p.tono : 'maniqui',
+      };
+    };
+    return { Femenino: perfil('Femenino'), Masculino: perfil('Masculino') };
   }
 
   private leer<T>(clave: string): T | null {
@@ -408,7 +327,7 @@ export class AvatarSetupComponent implements OnInit {
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(clave) : null;
       return raw ? (JSON.parse(raw) as T) : null;
     } catch {
-      return null; // JSON corrupto o almacenamiento bloqueado
+      return null;
     }
   }
 
@@ -416,7 +335,7 @@ export class AvatarSetupComponent implements OnInit {
     try {
       window.localStorage.setItem(clave, JSON.stringify(valor));
     } catch {
-      // Sin almacenamiento: el probador sigue funcionando en memoria.
+      /* sin almacenamiento: todo sigue en memoria */
     }
   }
 }

@@ -1,0 +1,202 @@
+// Estilos globales del estudio (layout de pantalla completa y componentes del probador).
+// Layout de pantalla completa: barra, panel lateral colapsable, visor y armario.
+// Negro mate, acento oliva, texto y bordes de 1 px en blanco hueso. Sin sombras.
+
+app-avatar-setup {
+  display: block;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.estudio {
+  @apply grid h-full overflow-hidden bg-negro text-hueso;
+  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr) 212px;
+  grid-template-areas:
+    'barra barra'
+    'panel visor'
+    'panel armario';
+}
+
+.estudio--sin-panel {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'barra' 'visor' 'armario';
+}
+
+.barra {
+  grid-area: barra;
+  @apply flex items-center justify-between border-b border-linea px-4;
+}
+
+.apartados {
+  @apply flex border border-linea;
+}
+
+.apartado {
+  @apply px-6 py-1.5 text-xs uppercase tracking-[0.18em] text-hueso-2 transition-colors hover:text-hueso;
+  & + & {
+    @apply border-l border-linea;
+  }
+}
+
+.apartado--activo {
+  @apply bg-oliva text-hueso;
+}
+
+.icono {
+  @apply flex h-8 w-8 items-center justify-center border border-linea text-hueso-2 hover:text-hueso;
+}
+
+.panel {
+  grid-area: panel;
+  @apply overflow-y-auto border-r border-linea bg-negro-2;
+}
+
+.bloque {
+  @apply border-b border-linea p-5;
+}
+
+.titulo {
+  @apply text-[11px] font-medium uppercase tracking-[0.2em] text-hueso;
+}
+
+.etiqueta {
+  @apply text-[11px] uppercase tracking-[0.16em] text-hueso-3;
+}
+
+.fila {
+  @apply mb-2 flex items-baseline justify-between text-[11px] uppercase tracking-[0.16em] text-hueso-3;
+  span {
+    @apply normal-case tracking-normal text-hueso-2;
+  }
+}
+
+.campo {
+  @apply w-full border border-linea bg-negro px-3 py-2.5 text-sm text-hueso outline-none placeholder:text-hueso-3 focus:border-oliva-claro;
+}
+
+.numero {
+  @apply w-14 border border-transparent bg-transparent text-right text-sm text-hueso outline-none hover:border-linea focus:border-oliva-claro;
+}
+
+.deslizador {
+  @apply h-px w-full cursor-pointer appearance-none bg-linea accent-oliva;
+}
+
+.boton {
+  @apply border border-oliva bg-oliva px-4 py-2.5 text-xs font-medium uppercase tracking-[0.16em] text-hueso transition-colors hover:bg-oliva-claro disabled:cursor-not-allowed disabled:border-linea disabled:bg-transparent disabled:text-hueso-3;
+}
+
+.chip {
+  @apply border border-linea py-2 text-[11px] text-hueso-2 transition-colors hover:text-hueso;
+}
+
+.chip--activo {
+  @apply border-oliva bg-oliva-tenue text-hueso;
+}
+
+.tono {
+  @apply h-7 w-7 border border-linea;
+}
+
+.tono--activo {
+  @apply outline outline-1 outline-offset-2 outline-hueso;
+}
+
+.detalles summary {
+  @apply flex cursor-pointer list-none justify-between text-xs text-hueso-2;
+}
+
+.talla {
+  @apply flex h-7 min-w-[2.25rem] items-center justify-center border border-oliva px-1 text-xs font-medium text-hueso;
+}
+
+.visor {
+  grid-area: visor;
+  @apply relative bg-[#121211];
+}
+
+.marca {
+  @apply border border-linea bg-negro px-2.5 py-1 text-[11px] text-hueso-2;
+}
+
+.armario {
+  grid-area: armario;
+  @apply flex flex-col border-t border-linea bg-negro-2 px-4 pt-3;
+}
+
+.filtro {
+  @apply shrink-0 border border-transparent px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-hueso-3 hover:text-hueso;
+}
+
+.filtro--activo {
+  @apply border-linea text-hueso;
+}
+
+.rejilla {
+  @apply flex min-h-0 flex-1 gap-2 overflow-x-auto pb-3;
+}
+
+.tarjeta {
+  @apply relative flex w-36 shrink-0 flex-col border border-linea bg-negro text-left transition-colors hover:border-hueso-3;
+
+  .foto {
+    @apply flex h-[104px] w-full items-center justify-center bg-negro-3;
+  }
+
+  .pie {
+    @apply flex flex-col gap-0.5 border-t border-linea px-2 py-1.5 text-[11px] leading-tight;
+  }
+
+  .borrar {
+    @apply absolute right-1 top-1 hidden h-5 w-5 items-center justify-center border border-linea bg-negro text-xs text-hueso-2 hover:text-hueso;
+  }
+
+  .categorias {
+    @apply absolute inset-x-0 top-0 hidden grid-cols-2 gap-px bg-linea;
+    button {
+      @apply bg-negro py-1 text-[10px] text-hueso-2 hover:text-hueso;
+      &.activa {
+        @apply bg-oliva-tenue text-hueso;
+      }
+    }
+  }
+
+  &:hover .borrar {
+    @apply flex;
+  }
+
+  &:hover .categorias,
+  .categorias--fijas {
+    @apply grid;
+  }
+}
+
+.tarjeta--puesta {
+  @apply border-oliva;
+}
+
+.vacio {
+  @apply flex items-center text-xs text-hueso-3;
+}
+
+.aviso {
+  @apply fixed bottom-6 left-1/2 z-50 -translate-x-1/2 border border-linea bg-negro px-4 py-2.5 text-xs text-hueso;
+}
+
+// Móvil: columna única con scroll.
+@media (max-width: 860px) {
+  app-avatar-setup {
+    height: auto;
+  }
+  .estudio,
+  .estudio--sin-panel {
+    @apply h-auto overflow-visible;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 52px 62vh auto 212px;
+    grid-template-areas: 'barra' 'visor' 'panel' 'armario';
+  }
+  .panel {
+    @apply border-r-0 border-t;
+  }
+}
