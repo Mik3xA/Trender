@@ -278,8 +278,10 @@ deberá volver a validar la resolución DNS al descargar.
 ### Frontend
 
 La aplicación Angular vive en `frontend/` (rama de frontend) y consume esta API desde
-`environment.apiUrl` (`http://localhost:3000`). El escáner de links y la generación del modelo
-(`POST /webhooks/recibir` con `avatar_data`) no requieren sesión.
+`environment.apiUrl` (`http://localhost:3000`): `/api/auth/*`, `/api/profile` (estatura en `altura`,
+contornos exactos en `pecho/cintura/cadera`, y peso, género, tipo de cuerpo y conjunto en
+`avatar_config`) y `/api/ropa/escanear-link`, que no requiere sesión. `POST /webhooks/recibir`
+sigue aceptando `avatar_data` para integraciones externas.
 
 ### Variables de entorno adicionales
 

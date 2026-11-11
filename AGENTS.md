@@ -27,12 +27,16 @@
 - Prohibido hardcodear `http://localhost:3000` fuera de los archivos de entorno.
 - **Diseño centrado en el contenido:** Top-Nav superior. Prohibido implementar sidebar.
 - **Autenticación** centralizada en `frontend/src/app/servicios/auth.service.ts`; el componente no escribe la sesión directamente.
-- **Three.js** debe liberar geometrías, materiales, renderer y observadores en `ngOnDestroy`.
-- El visor 3D debe mantener un `ResizeObserver` sobre su contenedor.
-- Estado de demo persistido en `localStorage` con acceso protegido y `JSON.parse` en `try/catch`.
-- El flujo del webhook nunca debe romper el render 3D ante respuestas 200 o 400.
+- Estructura del probador:
+  - `app/probador/`: lógica pura y probada sin WebGL: `cuerpo.ts` (contornos y proporciones a partir de género, altura, peso, tipo de cuerpo y medidas opcionales), `tallas.ts` (talla recomendada) y `prendas.ts` (tipos de prenda, estilos 3D, conjunto y muestras).
+  - `app/motor-3d/`: Three.js sin Angular. `geometria.ts` (loft de anillos y tubos con normales hacia fuera), `cuerpo-3d.ts` (maniquí y prendas como capas sobre el cuerpo), `telas.ts` (texturas procedimentales) y `motor-avatar.ts` (escena, luces, cámara y transiciones).
+  - `app/visor-3d/`: componente que crea y destruye `MotorAvatar`.
+- **Three.js** debe liberar geometrías, materiales, texturas, renderer y observadores al destruir el visor.
+- El visor 3D debe mantener un `ResizeObserver` sobre su contenedor y mostrar un aviso si no hay WebGL.
+- El avatar se actualiza en vivo al cambiar medidas o prendas (sin botón de "generar").
+- Medidas y conjunto se persisten en `localStorage` (acceso protegido, `JSON.parse` en `try/catch`) y, con sesión, en `/api/profile` con un retardo de 600 ms.
+- Si el escáner no reconoce la prenda, el usuario elige la categoría; nunca se viste una prenda adivinada.
 - Prohibido implementar carga de modelos `.GLB` por parte del usuario.
-- Tras generar el modelo, la vista se desplaza suavemente hasta el visor 3D.
 - El Navbar muestra `Hola, {nombre}` (nunca el correo) y "Mi Espacio de Medición" repite el nombre.
 - El escáner de links (`/api/ropa/escanear-link`) no requiere sesión de Trender.
 - El cierre de sesión llama a `POST /api/auth/logout` (revoca el token en el servidor) y limpia el estado local.
