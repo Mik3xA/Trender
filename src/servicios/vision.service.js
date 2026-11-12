@@ -305,6 +305,8 @@ function puntuar(r) {
   if (r.escote) puntos.Calzado -= 2;
   if (conPiernas) puntos.Vestido -= 2;
   if (bota) puntos.Vestido -= 2;
+  // Una prenda con capucha es una sudadera o una chamarra, no un vestido (aunque sea larga).
+  if (r.capucha) puntos.Vestido -= 2;
   return { puntos, motivos, conPiernas, conMangas, bota, falda };
 }
 
