@@ -26,7 +26,7 @@
       <path d="M194 278v40" stroke="#2c4262" stroke-width="2" />
       <path d="M126 432h50v16h-56zM224 432h50l6 16h-56z" fill="#f6f6f4" stroke="#222" stroke-width="2.5" />
     </svg>
-    <span class="comparador-etiqueta right-4">Con la ropa elegida</span>
+    <span class="comparador-etiqueta right-4">Con tu ropa</span>
   </div>
 
   <!-- Antes: tu foto tal como la subes -->
@@ -43,11 +43,11 @@
       <path d="M156 262h88l8 170h-38l-14-130-14 130h-38z" fill="#2b2b2d" />
       <path d="M130 432h46v16h-50zM224 432h46l4 16h-50z" fill="#3a2a20" />
     </svg>
-    <span class="comparador-etiqueta left-4">Tu foto</span>
+    <span class="comparador-etiqueta left-4">Tu modelo</span>
   </div>
 
   <div class="comparador-divisor" [style.left.%]="posicion()">
-    <button type="button" class="comparador-asa" role="slider" aria-label="Comparar tu foto con el resultado" aria-valuemin="5" aria-valuemax="95"
+    <button type="button" class="comparador-asa" role="slider" aria-label="Comparar el modelo sin y con tu ropa" aria-valuemin="5" aria-valuemax="95"
             [attr.aria-valuenow]="posicion()" (keydown)="teclado($event)">
       <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L4.5 12l3.75-3M15.75 9l3.75 3-3.75 3" />

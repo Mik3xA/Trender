@@ -4,9 +4,8 @@
     <nav class="hidden items-center gap-8 lg:flex" aria-label="Secciones">
       <a href="#probador" class="enlace-nav">Probador</a>
       <a href="#como-funciona" class="enlace-nav">Cómo funciona</a>
-      <a href="#outfits" class="enlace-nav">Outfits</a>
+      <a href="#caracteristicas" class="enlace-nav">Características</a>
       <a href="#consejos" class="enlace-nav">Consejos</a>
-      <a href="#privacidad" class="enlace-nav">Privacidad</a>
       <a href="#preguntas" class="enlace-nav">Preguntas</a>
     </nav>
     <a href="#probador" class="boton-negro !py-2">Probar ahora</a>
@@ -18,13 +17,13 @@
   <section id="inicio" class="portada">
     <div class="contenedor-ancho grid items-center gap-12 py-14 lg:grid-cols-[1.05fr_0.95fr] lg:py-20">
       <div>
-        <p class="insignia"><span class="insignia-punto"></span> Probador virtual con IA · sin registro</p>
+        <p class="insignia"><span class="insignia-punto"></span> Probador virtual 3D · sin registro</p>
         <h1 class="titulo-portada">
-          Tu foto. Tu ropa.<br><span class="text-oliva">Mírate con ella puesta.</span>
+          Tu ropa, puesta<br><span class="text-oliva">en un modelo 3D.</span>
         </h1>
         <p class="mt-6 max-w-xl text-lg leading-relaxed text-tinta-2">
-          Sube una foto tuya y fotos de tu ropa —prendas sueltas o un outfit completo—. Trender las reconoce, te pregunta
-          lo necesario y una IA genera una foto tuya con esa ropa puesta.
+          Sube fotos de tu ropa: Trender reconoce si es chamarra, camisa, pants o tenis, toma su color y sus detalles y
+          viste con ella un modelo 3D de mujer o de hombre ajustado a tu cuerpo.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
           <a href="#probador" class="boton-negro !px-6 !py-3">Empezar gratis</a>
@@ -41,7 +40,7 @@
       </div>
       <div class="relative">
         <tr-comparador />
-        <p class="mt-3 text-center text-xs text-tinta-3">Arrastra el divisor para comparar</p>
+        <p class="mt-3 text-center text-xs text-tinta-3">Arrastra el divisor: de la foto de la prenda al modelo</p>
       </div>
     </div>
   </section>
@@ -63,12 +62,12 @@
       <div class="mb-6 flex flex-wrap items-end justify-between gap-4 px-1">
         <div>
           <p class="antetitulo">Probador</p>
-          <h2 class="titulo-seccion">Pruébatelo en tu foto</h2>
+          <h2 class="titulo-seccion">Vístelo en el modelo</h2>
         </div>
         <ol class="pasos-linea" aria-label="Pasos">
-          <li><span>1</span> Tu foto</li>
+          <li><span>1</span> Tu modelo</li>
           <li><span>2</span> Tu ropa</li>
-          <li><span>3</span> Generar</li>
+          <li><span>3</span> Combinar</li>
         </ol>
       </div>
       <tr-estudio />
@@ -81,9 +80,9 @@
       <div class="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
         <div>
           <p class="antetitulo">Cómo funciona</p>
-          <h2 class="titulo-seccion">Tres pasos y listo: sin medidas ni maniquíes</h2>
+          <h2 class="titulo-seccion">Tres pasos y listo</h2>
         </div>
-        <p class="texto-seccion lg:justify-self-end">Tu foto es la referencia: la IA respeta tu cara, tu cuerpo, tu pose y el fondo, y solo cambia la ropa.</p>
+        <p class="texto-seccion lg:justify-self-end">Cada prenda se reconstruye en 3D con su forma: cierre, botones, capucha, bolsillos, suela y agujetas.</p>
       </div>
       <ol class="mt-12 grid gap-4 md:grid-cols-3">
         @for (p of PASOS; track p.titulo; let i = $index) {
@@ -104,44 +103,25 @@
     </div>
   </section>
 
-  <!-- Outfits -->
-  <section id="outfits" class="seccion">
-    <div class="contenedor grid items-center gap-14 lg:grid-cols-2">
-      <div class="outfit-demo" aria-hidden="true">
-        <div class="outfit-demo-foto">
-          <svg viewBox="0 0 200 260" class="h-full w-full">
-            <rect width="200" height="260" fill="#ece7dd" />
-            <path d="M70 30q30 16 60 0l34 20-10 22-12-6v64H58V66l-12 6-10-22z" fill="#5f6b38" />
-            <path d="M66 140h68l6 82h-30l-10-60-10 60H60z" fill="#2f4f86" />
-            <ellipse cx="78" cy="240" rx="20" ry="8" fill="#222" /><ellipse cx="122" cy="240" rx="20" ry="8" fill="#222" />
-          </svg>
-          <span class="outfit-demo-etiqueta">Outfit completo</span>
-        </div>
-        <div class="outfit-demo-partes">
-          @for (p of PARTES_DEMO; track p.nombre) {
-            <div class="outfit-parte" [class.outfit-parte--activa]="p.activa">
-              <span class="outfit-parte-check">{{ p.activa ? '✓' : '' }}</span>
-              <span><strong class="block text-sm">{{ p.nombre }}</strong><span class="text-xs opacity-60">{{ p.detalle }}</span></span>
-            </div>
-          }
-        </div>
-      </div>
+  <!-- Lo que detectamos -->
+  <section id="analisis" class="seccion">
+    <div class="contenedor grid items-center gap-12 lg:grid-cols-2">
       <div>
-        <p class="antetitulo">Outfits completos</p>
-        <h2 class="titulo-seccion">¿Todo el outfit o solo una parte? Tú eliges</h2>
+        <p class="antetitulo">Análisis de la foto</p>
+        <h2 class="titulo-seccion">De la foto a una prenda 3D</h2>
         <p class="texto-seccion">
-          Si subes una foto con varias prendas, te preguntamos si es un outfit completo. Luego decides qué usar: todo, solo
-          la parte de arriba, el pantalón o los zapatos, y lo combinas con otras prendas de tu armario.
+          Recortamos el fondo, estudiamos la silueta y los colores y elegimos la plantilla 3D de esa prenda. Si algo no
+          queda claro, el cuestionario te lo pregunta.
         </p>
-        <ul class="mt-8 space-y-3">
-          @for (d of DETECCIONES; track d.titulo) {
-            <li class="deteccion">
-              <span class="deteccion-icono" aria-hidden="true">{{ d.icono }}</span>
-              <span><strong class="block text-sm font-semibold text-tinta">{{ d.titulo }}</strong><span class="text-xs text-tinta-2">{{ d.texto }}</span></span>
-            </li>
-          }
-        </ul>
       </div>
+      <ul class="grid gap-3 sm:grid-cols-1">
+        @for (d of DETECCIONES; track d.titulo) {
+          <li class="deteccion">
+            <span class="deteccion-icono" aria-hidden="true">{{ d.icono }}</span>
+            <span><strong class="block text-sm font-semibold text-tinta">{{ d.titulo }}</strong><span class="text-xs text-tinta-2">{{ d.texto }}</span></span>
+          </li>
+        }
+      </ul>
     </div>
   </section>
 
@@ -171,11 +151,11 @@
     <div class="contenedor">
       <p class="antetitulo">Consejos</p>
       <h2 class="titulo-seccion">Así salen mejor tus fotos</h2>
-      <div class="mt-12 grid gap-10 lg:grid-cols-2">
+      <div class="mt-12">
         @for (grupo of CONSEJOS; track grupo.titulo) {
           <div>
-            <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-tinta-3">{{ grupo.titulo }}</h3>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               @for (c of grupo.items; track c.titulo) {
                 <article class="consejo">
                   <p class="flex items-center gap-2 text-sm font-semibold text-tinta">
@@ -186,29 +166,6 @@
               }
             </div>
           </div>
-        }
-      </div>
-    </div>
-  </section>
-
-  <!-- Privacidad -->
-  <section id="privacidad" class="seccion seccion--tinta">
-    <div class="contenedor grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-      <div>
-        <p class="antetitulo !text-oliva-claro">Privacidad</p>
-        <h2 class="titulo-seccion !text-papel">Tus fotos son tuyas</h2>
-        <p class="mt-4 max-w-lg text-base leading-relaxed text-white/70">
-          Tus fotos y tus pruebas se guardan en una carpeta privada del servidor y solo se muestran con tu sesión. Las
-          puedes borrar cuando quieras.
-        </p>
-      </div>
-      <div class="grid gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-2">
-        @for (u of PRIVACIDAD; track u.titulo) {
-          <article class="bg-tinta p-6">
-            <p class="text-2xl font-semibold text-oliva-claro">{{ u.numero }}</p>
-            <h3 class="mt-3 text-base font-semibold text-papel">{{ u.titulo }}</h3>
-            <p class="mt-2 text-sm leading-relaxed text-white/65">{{ u.texto }}</p>
-          </article>
         }
       </div>
     </div>
@@ -230,8 +187,8 @@
   <!-- Llamada final -->
   <section class="contenedor-ancho py-16">
     <div class="banda-oliva">
-      <h2 class="text-3xl font-medium tracking-tight md:text-5xl">Tu armario, en tu foto, en minutos</h2>
-      <p class="mx-auto mt-4 max-w-xl text-base text-papel/80">Sube una foto tuya y una prenda. Sin cuenta, sin descargar nada.</p>
+      <h2 class="text-3xl font-medium tracking-tight md:text-5xl">Tu armario, en 3D, en minutos</h2>
+      <p class="mx-auto mt-4 max-w-xl text-base text-papel/80">Sube la foto de una prenda y mírala puesta. Sin cuenta, sin descargar nada.</p>
       <a href="#probador" class="mt-8 inline-flex rounded-full bg-papel px-7 py-3 text-sm font-semibold text-tinta transition-colors hover:bg-hueso">Empezar ahora</a>
     </div>
   </section>
@@ -241,7 +198,7 @@
   <div class="contenedor-ancho grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
     <div>
       <span class="marca-logo">TRENDER</span>
-      <p class="mt-3 max-w-xs text-sm leading-relaxed text-tinta-3">Probador virtual con IA: sube tu foto y tu ropa, y mírate con ella puesta.</p>
+      <p class="mt-3 max-w-xs text-sm leading-relaxed text-tinta-3">Probador virtual 3D: sube fotos de tu ropa y mírala puesta en un modelo con tu cuerpo.</p>
     </div>
     @for (col of PIE; track col.titulo) {
       <nav [attr.aria-label]="col.titulo">

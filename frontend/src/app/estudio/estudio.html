@@ -11,11 +11,6 @@
       </nav>
     </div>
     <div class="flex items-center gap-3">
-      @if (estadoIa(); as e) {
-        <span class="estado-ia" [class.estado-ia--local]="!e.ia" [title]="e.ia ? 'Las pruebas se generan con IA' : 'Configura una clave de IA en el backend para fotos realistas'">
-          <span class="estado-ia-punto"></span>{{ e.ia ? 'IA: ' + nombreProveedor(e.proveedor) : 'Vista previa sin IA' }}
-        </span>
-      }
       <button type="button" class="icono" (click)="tutorial.iniciar()" aria-label="Ver tutorial" title="Ver tutorial">?</button>
     </div>
   </header>
@@ -27,146 +22,77 @@
   }
 
   <div class="estudio-cuerpo">
-    <!-- ============ Tú ============ -->
-    <aside class="columna" aria-label="Tu foto" data-tutorial="persona">
+    <!-- ============ Tu modelo ============ -->
+    <aside class="columna" aria-label="Tu modelo" data-tutorial="persona">
       <div class="columna-cabeza">
         <span class="paso-chip">1</span>
         <div>
-          <h2 class="columna-titulo">Tu foto</h2>
-          <p class="columna-texto">De cuerpo entero, de frente y con buena luz.</p>
+          <h2 class="columna-titulo">Tu modelo</h2>
+          <p class="columna-texto">{{ genero() === 'Femenino' ? 'Mujer' : 'Hombre' }} · ajústalo a tu cuerpo.</p>
         </div>
       </div>
 
-      <label class="zona-subida zona-subida--persona" [class.zona-subida--activa]="arrastrandoPersona()"
-             (dragover)="$event.preventDefault(); arrastrandoPersona.set(true)" (dragleave)="arrastrandoPersona.set(false)"
-             (drop)="$event.preventDefault(); arrastrandoPersona.set(false); subirPersona($any($event).dataTransfer?.files)">
-        <input type="file" accept="image/*,.heic,.heif" class="sr-only" data-subir-persona
-               (change)="subirPersona($any($event.target).files); $any($event.target).value = ''">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-        </svg>
-        <span class="text-sm font-medium">{{ subiendoPersona() ? 'Subiendo…' : 'Subir una foto tuya' }}</span>
-        <span class="text-[11px] opacity-70">Solo tú puedes verla</span>
-      </label>
-      @if (errorPersona()) { <p class="error-texto" role="alert">{{ errorPersona() }}</p> }
-
-      @if (personas().length) {
-        <div class="personas" role="listbox" aria-label="Tus fotos">
-          @for (f of personas(); track f.id) {
-            <div class="persona" [class.persona--activa]="persona()?.id === f.id" role="option" [attr.aria-selected]="persona()?.id === f.id">
-              <button type="button" class="persona-foto" (click)="elegirPersona(f)" [attr.aria-label]="'Usar esta foto'">
-                @if (imagenes.url(f.imagen_url); as src) { <img [src]="src" alt=""> } @else { <span class="cargando-bloque"></span> }
-              </button>
-              <button type="button" class="persona-borrar" (click)="eliminarPersona(f, $event)" aria-label="Borrar esta foto">×</button>
-            </div>
+      <div>
+        <p class="etiqueta">Tipo de cuerpo</p>
+        <div class="mt-2 grid grid-cols-2 gap-1.5">
+          @for (t of TIPOS_CUERPO; track t.id) {
+            <button type="button" class="chip" [class.chip--activo]="medidas().tipoCuerpo === t.id" [attr.aria-pressed]="medidas().tipoCuerpo === t.id"
+                    [title]="t.descripcion" (click)="cambiarTipoCuerpo(t.id)">{{ t.nombre }}</button>
           }
         </div>
-      }
-
-      <ul class="consejos-mini">
-        <li><span>✓</span> Cuerpo entero, brazos ligeramente separados</li>
-        <li><span>✓</span> Ropa ajustada o sencilla, fondo despejado</li>
-        <li><span>✓</span> Luz de frente, sin filtros</li>
-      </ul>
-    </aside>
-
-    <!-- ============ Resultado ============ -->
-    <section class="columna columna--escena" aria-label="Resultado">
-      <div class="escena" data-tutorial="resultado">
-        @if (prueba(); as p) {
-          @if (p.status === 'ready' && !verOriginal()) {
-            @if (imagenes.url(p.imagen_url); as src) { <img [src]="src" alt="Tu prueba con la ropa elegida" class="escena-img" data-resultado> }
-            @else { <span class="cargando-bloque escena-img"></span> }
-          } @else if (p.status === 'failed' && !verOriginal()) {
-            <div class="escena-vacia">
-              <p class="text-sm font-semibold">No se pudo generar la prueba</p>
-              <p class="mt-1 max-w-sm text-xs opacity-70">{{ p.error }}</p>
-            </div>
-          } @else if (persona(); as f) {
-            @if (imagenes.url(f.imagen_url); as src) { <img [src]="src" alt="Tu foto" class="escena-img"> }
+      </div>
+      <div>
+        <div class="fila"><label for="altura">Altura</label><span>{{ medidas().altura }} cm</span></div>
+        <input id="altura" type="range" class="deslizador" [min]="LIMITES.altura.min" [max]="LIMITES.altura.max" step="1"
+               [value]="medidas().altura" (input)="cambiarNumero('altura', $any($event.target).value)">
+      </div>
+      <div>
+        <div class="fila"><label for="peso">Peso</label><span>{{ medidas().peso }} kg</span></div>
+        <input id="peso" type="range" class="deslizador" [min]="LIMITES.peso.min" [max]="LIMITES.peso.max" step="0.5"
+               [value]="medidas().peso" (input)="cambiarNumero('peso', $any($event.target).value)">
+      </div>
+      <div>
+        <p class="etiqueta">Tono</p>
+        <div class="mt-2 flex gap-2">
+          @for (t of TONOS; track t.id) {
+            <button type="button" class="tono" [class.tono--activo]="tono() === t.id" [style.background]="t.color"
+                    [attr.aria-pressed]="tono() === t.id" [attr.aria-label]="t.nombre" [title]="t.nombre" (click)="cambiarTono(t.id)"></button>
           }
-        } @else if (persona(); as f) {
-          @if (imagenes.url(f.imagen_url); as src) { <img [src]="src" alt="Tu foto" class="escena-img"> }
-          @else { <span class="cargando-bloque escena-img"></span> }
-        } @else {
-          <div class="escena-vacia">
-            <div class="escena-silueta" aria-hidden="true"></div>
-            <p class="text-base font-semibold">Sube tu foto para empezar</p>
-            <p class="mt-1 max-w-xs text-sm opacity-70">Luego elige prendas de tu armario y genera la prueba: verás una foto tuya con esa ropa puesta.</p>
-          </div>
-        }
-
-        @if (generando() || prueba()?.status === 'processing') {
-          <div class="escena-generando" role="status" aria-live="polite">
-            <span class="generando-barra"></span>
-            <p class="text-sm font-semibold">Generando tu prueba…</p>
-            <p class="text-xs opacity-80">La IA está vistiendo tu foto. Tarda de 10 a 60 segundos.</p>
-          </div>
-        }
-
-        @if (prueba()?.status === 'ready') {
-          <div class="escena-herramientas">
-            <button type="button" class="pildora" [class.pildora--activa]="!verOriginal()" (click)="verOriginal.set(false)">Resultado</button>
-            <button type="button" class="pildora" [class.pildora--activa]="verOriginal()" (click)="verOriginal.set(true)">Original</button>
-            <button type="button" class="pildora" (click)="descargar(prueba()!)" aria-label="Descargar imagen">↓ Descargar</button>
-          </div>
-          <span class="escena-marca">{{ nombreProveedor(prueba()?.proveedor) }}</span>
-        }
+        </div>
       </div>
 
-      @for (a of prueba()?.avisos ?? []; track a) { <p class="aviso-escena">{{ a }}</p> }
-      @if (errorPrueba()) { <p class="error-texto" role="alert">{{ errorPrueba() }}</p> }
-
-      <!-- Bandeja: prendas elegidas + generar -->
-      <div class="bandeja" data-tutorial="generar">
-        <div class="bandeja-prendas">
+      <div class="mt-auto" data-tutorial="generar">
+        <div class="flex items-center justify-between">
+          <p class="etiqueta">Lleva puesto</p>
+          @if (seleccionadas().length) { <button type="button" class="text-[11px] text-tinta-3 underline hover:text-tinta" (click)="quitarTodo()">Quitar todo</button> }
+        </div>
+        <div class="mt-2 space-y-1.5">
           @for (s of seleccionadas(); track s.id) {
-            <div class="bandeja-item">
+            <div class="bandeja-item !w-full">
               @if (urlPrenda(s.prenda); as src) { <img [src]="src" alt=""> }
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <p class="truncate text-xs font-semibold">{{ s.prenda.nombre }}</p>
-                @if (s.prenda.category === 'outfit') {
-                  <div class="mt-1 flex flex-wrap gap-1">
-                    @for (parte of PARTES_ELEGIBLES; track parte) {
-                      <button type="button" class="mini-chip" [class.mini-chip--activo]="usaParte(s, parte)" (click)="alternarParte(s.id, parte)">{{ NOMBRE_PARTE[parte] }}</button>
-                    }
-                  </div>
-                } @else {
-                  <p class="text-[11px] opacity-60">{{ NOMBRE_TIPO[s.prenda.tipo ?? ''] ?? NOMBRE_CATEGORIA[s.prenda.category!] }}</p>
-                }
+                <p class="text-[11px] opacity-60">{{ NOMBRE_TIPO[s.prenda.tipo ?? ''] ?? '' }} · talla {{ talla(s.prenda) }}</p>
               </div>
               <button type="button" class="bandeja-quitar" (click)="quitarDeSeleccion(s.id)" [attr.aria-label]="'Quitar ' + s.prenda.nombre">×</button>
             </div>
           } @empty {
-            <p class="bandeja-vacia">Elige hasta {{ estadoIa()?.maxPrendas ?? 4 }} prendas de tu armario (una por parte del cuerpo).</p>
+            <p class="bandeja-vacia">Toca prendas de tu armario para ponérselas al modelo.</p>
           }
         </div>
-        <button type="button" class="boton-generar" [disabled]="!puedeGenerar()" (click)="generar()" data-generar>
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-          </svg>
-          {{ generando() ? 'Generando…' : !persona() ? 'Sube tu foto' : seleccionadas().length ? 'Generar prueba' : 'Elige prendas' }}
-        </button>
       </div>
+    </aside>
 
-      <!-- Historial -->
-      @if (pruebas().length) {
-        <div class="historial" aria-label="Tus pruebas">
-          @for (p of pruebas(); track p.id) {
-            <div class="historial-item" [class.historial-item--activo]="prueba()?.id === p.id">
-              <button type="button" class="historial-foto" (click)="verPrueba(p)" [attr.aria-label]="'Ver prueba del ' + p.created_at">
-                @if (p.status === 'ready') {
-                  @if (imagenes.url(p.imagen_url); as src) { <img [src]="src" alt=""> } @else { <span class="cargando-bloque"></span> }
-                } @else if (p.status === 'processing') { <span class="cargando-bloque"></span> } @else { <span class="historial-error">!</span> }
-              </button>
-              <div class="historial-acciones">
-                <button type="button" (click)="repetir(p)" title="Elegir estas prendas otra vez">↺</button>
-                <button type="button" (click)="eliminarPrueba(p, $event)" title="Borrar prueba">×</button>
-              </div>
-            </div>
-          }
+    <!-- ============ Visor 3D ============ -->
+    <section class="columna columna--escena !p-0" aria-label="Modelo 3D">
+      <div class="escena !rounded-none" data-tutorial="resultado">
+        <tr-visor-3d [medidas]="medidas()" [conjunto]="conjunto()" [tono]="tono()" class="absolute inset-0 block" />
+        <div class="pointer-events-none absolute left-4 top-4 flex gap-2">
+          <span class="escena-marca !static">{{ genero() === 'Femenino' ? 'Mujer' : 'Hombre' }}</span>
+          <span class="escena-marca !static">{{ medidas().altura }} cm · {{ medidas().peso }} kg</span>
         </div>
-      }
+        <p class="pointer-events-none absolute bottom-4 left-4 text-[11px] text-tinta-3">Arrastra para girar · rueda para acercar</p>
+      </div>
     </section>
 
     <!-- ============ Armario ============ -->
@@ -175,7 +101,7 @@
         <span class="paso-chip">2</span>
         <div>
           <h2 class="columna-titulo">Tu armario <span class="contador">{{ armario().length }}</span></h2>
-          <p class="columna-texto">Sube fotos de ropa y toca las que quieras probarte.</p>
+          <p class="columna-texto">Sube fotos de ropa y toca las que quieras ponerle al modelo.</p>
         </div>
       </div>
 
@@ -196,7 +122,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
           </svg>
           <span class="text-sm font-medium">{{ subiendo() ? 'Analizando ' + subiendo() + (subiendo() === 1 ? ' foto…' : ' fotos…') : 'Elige o arrastra fotos de ropa' }}</span>
-          <span class="text-[11px] opacity-70">Varias a la vez · prendas sueltas u outfits completos</span>
+          <span class="text-[11px] opacity-70">Varias a la vez · una prenda por foto</span>
         </label>
         @if (errorSubida()) { <p class="error-texto" role="alert">{{ errorSubida() }}</p> }
       </div>
@@ -211,7 +137,7 @@
         @for (item of visibles(); track item.id) {
           <article class="tarjeta" [class.tarjeta--elegida]="estaSeleccionada(item.id)" data-prenda>
             <button type="button" class="tarjeta-foto" (click)="alternarSeleccion(item)" [disabled]="item.status === 'processing'"
-                    [attr.aria-pressed]="estaSeleccionada(item.id)" [attr.aria-label]="(estaSeleccionada(item.id) ? 'Quitar de la prueba: ' : 'Elegir para la prueba: ') + (item.nombre ?? 'prenda')">
+                    [attr.aria-pressed]="estaSeleccionada(item.id)" [attr.aria-label]="(estaSeleccionada(item.id) ? 'Quitar: ' : 'Probar: ') + (item.nombre ?? 'prenda')">
               @switch (item.status) {
                 @case ('processing') { <span class="cargando-bloque"></span><span class="tarjeta-estado">Analizando…</span> }
                 @case ('failed') { <span class="tarjeta-estado text-[#b4532a]">{{ item.error }}</span> }
@@ -247,7 +173,7 @@
           </article>
         } @empty {
           <p class="armario-vacio">
-            @if (cargandoArmario()) { Cargando armario… } @else { Tu armario de {{ genero() === 'Femenino' ? 'mujer' : 'hombre' }} está vacío. Sube fotos de tu ropa: prendas sueltas o un outfit completo. }
+            @if (cargandoArmario()) { Cargando armario… } @else { Tu armario de {{ genero() === 'Femenino' ? 'mujer' : 'hombre' }} está vacío. Sube fotos de tu ropa, una prenda por foto. }
           </p>
         }
       </div>
@@ -264,30 +190,17 @@
           <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-oliva">Tu prenda</p>
             <h3 class="mt-0.5 truncate text-base font-semibold">{{ f.nombre ?? 'Prenda' }}</h3>
-            <p class="text-xs text-tinta-3">Tus respuestas le dicen a la IA cómo se ve puesta</p>
+            <p class="text-xs text-tinta-3">Tus respuestas cambian cómo se ve en el modelo</p>
           </div>
         </div>
         <button type="button" class="icono shrink-0" (click)="cerrarFicha()" aria-label="Cerrar cuestionario">×</button>
       </header>
 
-      @if (f.analisis?.posibleOutfit && f.category !== 'outfit') {
-        <div class="pregunta-outfit">
-          <p class="text-sm font-semibold">¿Es un outfit completo?</p>
-          <p class="mt-1 text-xs opacity-80">En la foto parece haber varias prendas. Si es un outfit podrás usarlo entero o solo una parte.</p>
-          <button type="button" class="boton-negro mt-3 !px-4 !py-2 !text-xs" (click)="responder(f, { tipo: 'outfit' })">Sí, es un outfit completo</button>
-        </div>
-      }
-
-      @if (f.category === 'outfit') {
-        <div class="pregunta-ficha">
-          <p>¿Qué quieres usar de este outfit?</p>
-          <div class="grid grid-cols-2 gap-2">
-            @for (parte of PARTES_ELEGIBLES; track parte) {
-              <label class="interruptor"><input type="checkbox" [checked]="usaDelOutfit(f, parte)" (change)="alternarParteOutfit(f, parte)"> {{ NOMBRE_PARTE[parte] }}</label>
-            }
-          </div>
-          <p class="mt-2 text-[11px] text-tinta-3">También puedes cambiarlo al elegirlo para una prueba.</p>
-        </div>
+      @if (f.category === 'outfit' || f.analisis?.posibleOutfit) {
+        <p class="mt-5 rounded-2xl bg-oliva-tenue p-3 text-xs text-oliva-oscuro">
+          En esta foto parece haber varias prendas. El modelo 3D viste una prenda por foto: elige abajo qué prenda es
+          la principal, o sube cada prenda por separado.
+        </p>
       }
 
       <div class="pregunta-ficha">
@@ -331,8 +244,19 @@
           </div>
         </div>
       }
+      @if (f.category && f.category !== 'outfit' && f.imagen_url) {
+        <div class="pregunta-ficha">
+          <p>Aspecto en el modelo</p>
+          <div class="segmentos">
+            @for (o of OPCIONES.aspecto; track o.id) {
+              <button type="button" [class.activo]="respuesta(f, 'aspecto') === o.id" (click)="responder(f, { ajustes: { aspecto: o.id } })">{{ o.nombre }}</button>
+            }
+          </div>
+          <p class="mt-2 text-[11px] text-tinta-3">"Color y tejido" se ve más limpio; "Foto" conserva rayas, logos y estampados.</p>
+        </div>
+      }
       @if (f.category === 'top') {
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-2 gap-2 mt-5">
           <label class="interruptor"><input type="checkbox" [checked]="respuesta(f, 'capucha') === true" (change)="responder(f, { ajustes: { capucha: $any($event.target).checked } })"> Capucha</label>
           <label class="interruptor"><input type="checkbox" [checked]="respuesta(f, 'cuello') === true" (change)="responder(f, { ajustes: { cuello: $any($event.target).checked } })"> Cuello</label>
         </div>

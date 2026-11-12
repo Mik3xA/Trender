@@ -315,7 +315,7 @@ tr-estudio {
 }
 
 .rejilla {
-  @apply grid grid-cols-2 gap-3 sm:grid-cols-3;
+  @apply grid grid-cols-2 items-start gap-3 sm:grid-cols-3;
 }
 
 @media (min-width: 1100px) {
@@ -339,9 +339,9 @@ tr-estudio {
 }
 
 .tarjeta-foto {
-  @apply relative flex aspect-square w-full items-center justify-center bg-hueso p-2;
+  @apply relative block aspect-square w-full overflow-hidden bg-hueso;
   img {
-    @apply h-full w-full object-contain;
+    @apply absolute inset-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)] object-contain;
   }
 }
 
@@ -465,4 +465,32 @@ tr-estudio {
 
 .tutorial-tarjeta {
   @apply fixed z-[61] w-[320px] rounded-2xl border border-linea bg-papel p-5 text-tinta;
+}
+
+// Controles del modelo.
+.chip {
+  @apply rounded-xl border border-linea py-2 text-xs text-tinta-2 transition-colors hover:border-tinta/30 hover:text-tinta;
+}
+
+.chip--activo {
+  @apply border-oliva bg-oliva-tenue font-medium text-oliva-oscuro;
+}
+
+.fila {
+  @apply mb-2 flex items-baseline justify-between text-xs font-medium text-tinta-2;
+  span {
+    @apply font-semibold text-tinta;
+  }
+}
+
+.deslizador {
+  @apply h-1 w-full cursor-pointer appearance-none rounded-full bg-hueso-2 accent-oliva;
+}
+
+.tono {
+  @apply h-7 w-7 rounded-full border border-black/10;
+}
+
+.tono--activo {
+  @apply outline outline-2 outline-offset-2 outline-oliva;
 }
