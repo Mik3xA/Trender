@@ -83,6 +83,14 @@ async function peticion(url, opciones, nombre) {
   const cuerpo = await respuesta.json().catch(() => ({}));
   if (!respuesta.ok) {
     const detalle = cuerpo?.error?.message ?? cuerpo?.message ?? cuerpo?.error ?? `HTTP ${respuesta.status}`;
+    // La clave es válida pero el proyecto no tiene facturación (la generación de imágenes no entra en el nivel gratuito).
+    if (/billing|free tier|quota.*(limit: 0|exceeded)/i.test(String(detalle))) {
+      throw errorOperacional(
+        502,
+        `${nombre} requiere activar la facturación en tu cuenta: la generación de imágenes no está en el nivel gratuito. Actívala en https://aistudio.google.com/billing y vuelve a intentarlo.`,
+        'IA_FACTURACION'
+      );
+    }
     const codigo = respuesta.status === 401 || respuesta.status === 403 ? 'IA_CLAVE_INVALIDA' : respuesta.status === 429 ? 'IA_LIMITE' : 'IA_ERROR';
     throw errorOperacional(502, `${nombre} respondió un error: ${String(detalle).slice(0, 200)}`, codigo);
   }
