@@ -4,7 +4,7 @@ import { Observable, map, switchMap, take, takeWhile, timer } from 'rxjs';
 
 import { environment } from '../../environments/environment';
 import { Genero } from '../probador/cuerpo';
-import { CategoriaPrenda, COLOR_POR_DEFECTO, ESTILOS, PrendaVirtual, TIPO_POR_CATEGORIA, Tela } from '../probador/prendas';
+import { AjustesPrenda, CategoriaPrenda, COLOR_POR_DEFECTO, ESTILOS, PrendaVirtual, TIPO_POR_CATEGORIA, Tela } from '../probador/prendas';
 
 export type CategoriaArmario = 'top' | 'bottom' | 'dress' | 'shoes';
 
@@ -21,6 +21,7 @@ export interface PrendaArmario {
   tienda: string | null;
   precio: string | null;
   status: 'pending' | 'processing' | 'ready' | 'review' | 'failed';
+  ajustes?: AjustesPrenda | null;
   error: string | null;
   analisis: {
     origen?: 'tienda' | 'foto subida' | 'foto añadida' | 'link de imagen';
@@ -57,13 +58,16 @@ export interface AnalisisVisual {
   puntos: Record<CategoriaPrenda, number>;
   nombreSugerido: string | null;
   detalle: {
-    manga: 'sin' | 'corta' | 'larga' | null;
+    manga: 'sin' | 'corta' | 'tres-cuartos' | 'larga' | null;
+    capucha?: boolean | null;
+    abertura?: boolean | null;
     largo: string | null;
     tela: Tela | null;
     estampado: string | null;
     colores: Array<{ hex: string; nombre: string; proporcion: number }>;
   };
   zonas: ZonasFoto;
+  sugerencias?: string[];
   rasgos?: { desplazamientoArriba?: number };
 }
 
@@ -92,17 +96,12 @@ export class ArmarioService {
       .pipe(map((r) => r.data.items));
   }
 
-  /** Emite la prenda en cada consulta y completa cuando deja de estar "processing". */
-  importar(url: string, genero: Genero): Observable<PrendaArmario> {
-    return this.http
-      .post<{ data: PrendaArmario }>(`${this.url}/importar`, { url, genero })
-      .pipe(switchMap(({ data }) => this.seguir(data.id)));
-  }
-
   /** Sube la FOTO de una prenda; se analiza en el servidor igual que un link. */
-  subirFoto(archivo: Blob, genero: Genero, nombre?: string): Observable<PrendaArmario> {
+  /** Emite la prenda en cada consulta y completa cuando deja de estar "processing". */
+  subirFoto(archivo: Blob, genero: Genero, opciones: { nombre?: string; tipo?: string } = {}): Observable<PrendaArmario> {
     const params: Record<string, string> = { genero };
-    if (nombre?.trim()) params['nombre'] = nombre.trim().slice(0, 120);
+    if (opciones.nombre?.trim()) params['nombre'] = opciones.nombre.trim().slice(0, 120);
+    if (opciones.tipo) params['tipo'] = opciones.tipo;
     return this.http
       .post<{ data: PrendaArmario }>(`${this.url}/subir`, archivo, { params, headers: { 'Content-Type': tipoImagen(archivo) } })
       .pipe(switchMap(({ data }) => this.seguir(data.id)));
@@ -124,9 +123,10 @@ export class ArmarioService {
     );
   }
 
-  clasificar(id: string, category: CategoriaArmario, tipo?: string): Observable<PrendaArmario> {
+  /** Categoría, tipo y respuestas del cuestionario (ajuste, largo, manga, capucha, cuello). */
+  clasificar(id: string, category: CategoriaArmario, tipo?: string, ajustes?: AjustesPrenda): Observable<PrendaArmario> {
     return this.http
-      .patch<{ data: PrendaArmario }>(`${this.url}/${id}`, tipo ? { category, tipo } : { category })
+      .patch<{ data: PrendaArmario }>(`${this.url}/${id}`, { category, ...(tipo ? { tipo } : {}), ...(ajustes ? { ajustes } : {}) })
       .pipe(map((r) => r.data));
   }
 
@@ -188,6 +188,12 @@ export function aPrendaVirtual(p: PrendaArmario): PrendaVirtual | null {
     zonas: p.analisis?.visual?.zonas,
     tela: p.analisis?.visual?.detalle.tela ?? undefined,
     estampado: p.analisis?.visual?.detalle.estampado ?? null,
+    // Lo que el usuario respondió manda; si no respondió, lo que se vio en la foto.
+    ajustes: {
+      ...(p.analisis?.visual?.detalle.manga ? { manga: p.analisis.visual.detalle.manga } : {}),
+      ...(p.analisis?.visual?.detalle.capucha ? { capucha: true } : {}),
+      ...(p.ajustes ?? {}),
+    },
     // La caña/talón (parte alta) a la izquierda de la foto => la punta mira a la derecha.
     puntaDerecha: (p.analisis?.visual?.rasgos?.desplazamientoArriba ?? 0) < 0,
   };

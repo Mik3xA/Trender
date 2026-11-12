@@ -97,32 +97,11 @@ describe('AvatarSetupComponent', () => {
     expect(c.tono()).toBe('moreno');
   });
 
-  it('importa un link: la tarjeta aparece "processing" y al quedar lista se viste', () => {
-    const progreso = new Subject<PrendaArmario>();
-    armario['importar'].mockReturnValue(progreso);
-    c.cambiarGenero('Masculino');
-    c.enlace.set('https://tienda.example/sweatpants');
-    c.importar();
-    expect(armario['importar']).toHaveBeenCalledWith('https://tienda.example/sweatpants', 'Masculino');
-
-    progreso.next(prenda({ status: 'processing', category: null, tipo: null }));
-    fixture.detectChanges();
-    expect(texto()).toContain('Analizando');
-    expect(c.conjunto()).toEqual([]);
-
-    progreso.next(prenda());
-    progreso.complete();
-    fixture.detectChanges();
-    expect(c.conjunto()).toEqual([expect.objectContaining({ id: 'p1', categoria: 'Piernas', tipo: 'jogger' })]);
-    expect(c.notificacion()).toContain('Inferior · jogger');
-    expect(c.importando()).toBe(0);
-  });
-
-  it('si la prenda queda en revisión, el usuario elige la categoría y se viste', () => {
-    armario['importar'].mockReturnValue(of(prenda({ status: 'review', category: null, tipo: null })));
+  it('si la foto queda en revisión, el usuario elige la categoría y se viste', async () => {
+    armario['subirFoto'].mockReturnValue(of(prenda({ status: 'review', category: null, tipo: null })));
     armario['clasificar'].mockReturnValue(of(prenda({ category: 'shoes', tipo: 'tenis' })));
-    c.enlace.set('https://tienda.example/p/1');
-    c.importar();
+    c.subirArchivos([new File([new Uint8Array([1])], 'x.jpg', { type: 'image/jpeg' })]);
+    await vi.advanceTimersByTimeAsync(0);
     expect(c.conjunto()).toEqual([]);
     expect(c.notificacion()).toContain('elige qué es');
 
@@ -131,16 +110,12 @@ describe('AvatarSetupComponent', () => {
     expect(c.conjunto()).toEqual([expect.objectContaining({ categoria: 'Calzado' })]);
   });
 
-  it('valida el link y muestra errores del backend', () => {
-    c.enlace.set('pantalon zara');
-    c.importar();
-    expect(armario['importar']).not.toHaveBeenCalled();
-    expect(c.errorImportacion()).toContain('https://');
-
-    armario['importar'].mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409, error: { error: 'Esta prenda ya está en tu armario' } })));
-    c.enlace.set('https://tienda.example/x');
-    c.importar();
-    expect(c.errorImportacion()).toBe('Esta prenda ya está en tu armario');
+  it('muestra errores del backend al subir', async () => {
+    armario['subirFoto'].mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409, error: { error: 'Esta foto ya está en tu armario' } })));
+    c.subirArchivos([new File([new Uint8Array([1])], 'x.jpg', { type: 'image/jpeg' })]);
+    await vi.runAllTimersAsync();
+    expect(c.errorImportacion()).toBe('Esta foto ya está en tu armario');
+    expect(c.subiendo()).toBe(0);
   });
 
   it('un clic en el armario aplica la prenda y otro la quita; borrar la quita del avatar', () => {
@@ -156,7 +131,7 @@ describe('AvatarSetupComponent', () => {
     expect(c.estaPuesta('p1')).toBe(false);
   });
 
-  it('retoma las importaciones que seguían en curso al recargar', () => {
+  it('retoma los análisis que seguían en curso al recargar', () => {
     armario['listar'].mockReturnValue(of([prenda({ status: 'processing' })]));
     c.cargarArmario();
     expect(armario['seguir']).toHaveBeenCalledWith('p1');
@@ -208,7 +183,7 @@ describe('AvatarSetupComponent', () => {
     await vi.runAllTimersAsync();
     fixture.detectChanges();
     expect(armario['subirFoto']).toHaveBeenCalledTimes(1);
-    expect(armario['subirFoto']).toHaveBeenCalledWith(foto, 'Femenino', 'Mi camiseta');
+    expect(armario['subirFoto']).toHaveBeenCalledWith(foto, 'Femenino', { nombre: 'Mi camiseta', tipo: undefined });
     expect(c.armario()[0].id).toBe('f1');
     expect(c.estaPuesta('f1')).toBe(true);
     expect(c.subiendo()).toBe(0);
@@ -245,14 +220,46 @@ describe('AvatarSetupComponent', () => {
     expect(c.armario()[0].imagen_url).toBe('/media/closet/u/l1.png');
   });
 
-  it('desde la ficha se corrige el tipo de la prenda', () => {
-    const item = prenda();
+  it('cuestionario: elegir "sudadera" y "holgada" actualiza el avatar al instante y lo guarda', () => {
+    const item = prenda({ id: 't1', category: 'top', tipo: 'sueter', genero: 'Femenino' });
     armario['listar'].mockReturnValue(of([item]));
-    armario['clasificar'].mockReturnValue(of({ ...item, tipo: 'jeans' }));
-    c.cambiarGenero('Masculino');
-    c.cambiarTipo(item, 'jeans');
-    expect(armario['clasificar']).toHaveBeenCalledWith('p1', 'bottom', 'jeans');
-    expect(c.armario()[0].tipo).toBe('jeans');
-    expect(c.tiposDe('bottom')).toContain('short');
+    let servidor: PrendaArmario = item;
+    armario['clasificar'].mockImplementation((id: string, category: string, tipo?: string, ajustes?: object) => {
+      servidor = { ...servidor, category: category as PrendaArmario['category'], tipo: tipo ?? servidor.tipo, ajustes: { ...(servidor.ajustes ?? {}), ...(ajustes ?? {}) } };
+      return of(servidor);
+    });
+    c.cargarArmario();
+    c.verFicha(item);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-ficha]')?.textContent).toContain('¿Qué prenda es?');
+
+    c.responder(c.armario()[0], { tipo: 'sudadera' });
+    expect(armario['clasificar']).toHaveBeenLastCalledWith('t1', 'top', 'sudadera', undefined);
+    expect(c.conjunto()).toEqual([expect.objectContaining({ id: 't1', tipo: 'sudadera' })]);
+
+    c.responder(c.armario()[0], { ajustes: { ajuste: 'holgado' } });
+    expect(armario['clasificar']).toHaveBeenLastCalledWith('t1', 'top', undefined, { ajuste: 'holgado' });
+    expect(c.conjunto()[0].ajustes).toMatchObject({ ajuste: 'holgado' });
+    expect(c.respuesta(c.armario()[0], 'ajuste')).toBe('holgado');
+    expect(c.respuesta(c.armario()[0], 'capucha')).toBe(true); // una sudadera trae capucha por defecto
+  });
+
+  it('elegir un tipo de otra categoría mueve la prenda (pants -> inferior)', () => {
+    const item = prenda({ id: 't2', category: 'top', tipo: 'sueter', genero: 'Femenino' });
+    armario['listar'].mockReturnValue(of([item]));
+    armario['clasificar'].mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500, error: {} })));
+    c.cargarArmario();
+    c.responder(item, { tipo: 'jogger' });
+    expect(armario['clasificar']).toHaveBeenCalledWith('t2', 'bottom', 'jogger', undefined);
+    // El servidor falló: se vuelve a como estaba.
+    expect(c.armario()[0]).toMatchObject({ category: 'top', tipo: 'sueter' });
+  });
+
+  it('se puede decir qué es antes de subir la foto', async () => {
+    armario['subirFoto'].mockReturnValue(of(prenda({ status: 'processing' })));
+    c.tipoSubida.set('chamarra');
+    c.subirArchivos([new File([new Uint8Array([1])], 'x.jpg', { type: 'image/jpeg' })]);
+    await vi.runAllTimersAsync();
+    expect(armario['subirFoto']).toHaveBeenCalledWith(expect.anything(), 'Femenino', { nombre: undefined, tipo: 'chamarra' });
   });
 });

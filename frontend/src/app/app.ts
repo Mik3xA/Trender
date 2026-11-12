@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { AvatarSetupComponent } from './avatar-setup/avatar-setup';
+import { ComparadorComponent } from './comparador/comparador';
 import { PreguntasComponent } from './preguntas/preguntas';
 import { TutorialComponent } from './tutorial/tutorial';
 import { TutorialService } from './tutorial/tutorial.service';
@@ -14,7 +15,7 @@ interface Bloque {
 /** Página: portada, probador embebido, cómo funciona, características, preguntas y pie. */
 @Component({
   selector: 'app-root',
-  imports: [AvatarSetupComponent, PreguntasComponent, TutorialComponent],
+  imports: [AvatarSetupComponent, ComparadorComponent, PreguntasComponent, TutorialComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -23,13 +24,56 @@ export class AppComponent {
   private readonly tutorial = inject(TutorialService);
   protected readonly anio = new Date().getFullYear();
 
-  protected readonly TIENDAS = ['Amazon', 'Mercado Libre', 'Nike', 'Zara', 'H&M'];
+  protected readonly CIFRAS = [
+    { valor: '20', etiqueta: 'tipos de prenda' },
+    { valor: '6', etiqueta: 'fotos a la vez' },
+    { valor: '0', etiqueta: 'registros' },
+  ];
+
+  protected readonly PRENDAS_CINTA = [
+    'Playera', 'Camisa', 'Blusa', 'Top', 'Suéter', 'Sudadera', 'Chamarra', 'Saco', 'Abrigo',
+    'Pantalón', 'Jeans', 'Pants', 'Leggings', 'Short', 'Falda', 'Vestido', 'Tenis', 'Zapatos', 'Botas', 'Sandalias',
+  ];
+
+  protected readonly DETECCIONES = [
+    { icono: '◐', titulo: 'Tipo de prenda', texto: 'Superior, inferior, vestido o calzado y el tipo concreto.' },
+    { icono: '⌒', titulo: 'Mangas y largo', texto: 'Sin manga, corta, 3/4 o larga; corta, a la cadera o larga.' },
+    { icono: '◍', titulo: 'Colores y estampado', texto: 'Color principal y secundario con nombre; liso, rayas o estampado.' },
+    { icono: '⌃', titulo: 'Detalles', texto: 'Capucha, cierre o botones al frente, puños de pants, caña de bota.' },
+  ];
+
+  protected readonly FICHA_DEMO: Array<[string, string]> = [
+    ['Tipo', 'Sudadera'],
+    ['Manga', 'Larga'],
+    ['Colores', 'Gris · blanco'],
+    ['Estampado', 'Liso'],
+  ];
+
+  protected readonly CONSEJOS = [
+    { bien: true, titulo: 'Fondo liso', texto: 'Una pared, el piso o una sábana de un solo color que contraste con la prenda.', fondo: '#ffffff', prenda: '#5f6b38', giro: 0, persona: false },
+    { bien: true, titulo: 'Extendida y de frente', texto: 'Estírala sobre la cama o cuélgala de un gancho, con las mangas a la vista.', fondo: '#ece7dd', prenda: '#1f2a44', giro: 0, persona: false },
+    { bien: false, titulo: 'Puesta en una persona', texto: 'Con brazos y cuello a la vista el recorte se confunde: mejor la prenda sola.', fondo: '#d8d2c8', prenda: '#b3282d', giro: 0, persona: true },
+    { bien: false, titulo: 'Doblada o de lado', texto: 'Si está doblada no vemos las mangas ni el largo y la clasificación falla.', fondo: '#a77b52', prenda: '#7d7d7a', giro: 28, persona: false },
+  ];
+
+  protected readonly USOS = [
+    { numero: '01', titulo: 'Antes de comprar', texto: 'Toma la foto de la prenda en la tienda y mírala con lo que ya tienes.' },
+    { numero: '02', titulo: 'Arma outfits', texto: 'Combina superior, inferior y calzado de tu propio armario.' },
+    { numero: '03', titulo: 'Compara tallas', texto: 'Mira cómo cambia una prenda ajustada, regular u holgada.' },
+    { numero: '04', titulo: 'Para otra persona', texto: 'Los apartados Mujer y Hombre guardan cuerpo y armario por separado.' },
+  ];
+
+  protected readonly PIE: Array<{ titulo: string; enlaces: Array<[string, string]> }> = [
+    { titulo: 'Probador', enlaces: [['Subir prenda', '#probador'], ['Tutorial', '#como-funciona'], ['Consejos de foto', '#consejos']] },
+    { titulo: 'Producto', enlaces: [['Análisis', '#analisis'], ['Características', '#caracteristicas'], ['Para qué sirve', '#usos']] },
+    { titulo: 'Ayuda', enlaces: [['Preguntas frecuentes', '#preguntas'], ['Cómo funciona', '#como-funciona']] },
+  ];
 
   protected readonly PASOS: Array<{ titulo: string; texto: string }> = [
     { titulo: 'Elige Mujer u Hombre', texto: 'Cada apartado tiene su propio avatar y su propio armario.' },
     { titulo: 'Ajusta tu cuerpo', texto: 'Altura, peso y tipo de cuerpo. Las medidas exactas son opcionales.' },
-    { titulo: 'Sube la foto de la prenda', texto: 'O pega el link de la tienda. Detectamos el tipo, el color y el estampado.' },
-    { titulo: 'Pruébatela y elige talla', texto: 'Gira el avatar, combina prendas y mira la talla recomendada.' },
+    { titulo: 'Sube la foto de la prenda', texto: 'Quitamos el fondo y detectamos el tipo, las mangas, el color y el estampado.' },
+    { titulo: 'Responde y pruébatela', texto: 'Confirma qué es y cómo te queda; gira el avatar y mira tu talla.' },
   ];
 
   protected readonly CARACTERISTICAS: Bloque[] = [

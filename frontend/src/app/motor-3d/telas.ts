@@ -222,8 +222,7 @@ export function materialConFoto(url: string, colorBase: string, tela: Tela, esti
   cargarFoto(url).then((foto) => {
     const ctx = lienzo(LADO_TEXTURA);
     if (!foto || !ctx) return;
-    ctx.fillStyle = colorBase;
-    ctx.fillRect(0, 0, LADO_TEXTURA, LADO_TEXTURA);
+    ctx.clearRect(0, 0, LADO_TEXTURA, LADO_TEXTURA);
     if (estirar) {
       ctx.drawImage(foto, 0, 0, LADO_TEXTURA, LADO_TEXTURA);
     } else {
@@ -231,25 +230,60 @@ export function materialConFoto(url: string, colorBase: string, tela: Tela, esti
       const [w, h] = [foto.width * escala, foto.height * escala];
       ctx.drawImage(foto, (LADO_TEXTURA - w) / 2, (LADO_TEXTURA - h) / 2, w, h);
     }
-    // Rellena lo transparente (fuera de la prenda) con el color medio de la tela,
-    // para que un pliegue que se sale de la silueta no muestre un hueco blanco.
+    // Lo transparente (fuera de la prenda) y el borde del recorte (2-3 px que
+    // pueden conservar restos del fondo) se rellenan con el color MEDIO real de
+    // la prenda en la foto: un pliegue que se sale de la silueta no deja huecos
+    // ni manchas claras en los costados.
     const datos = ctx.getImageData(0, 0, LADO_TEXTURA, LADO_TEXTURA);
-    const base = new THREE.Color(colorBase);
-    for (let i = 0; i < datos.data.length; i += 4) {
-      const a = datos.data[i + 3] / 255;
-      if (a < 1) {
-        datos.data[i] = datos.data[i] * a + base.r * 255 * (1 - a);
-        datos.data[i + 1] = datos.data[i + 1] * a + base.g * 255 * (1 - a);
-        datos.data[i + 2] = datos.data[i + 2] * a + base.b * 255 * (1 - a);
-        datos.data[i + 3] = 255;
+    const n = LADO_TEXTURA * LADO_TEXTURA;
+    const opaco = new Uint8Array(n);
+    const suma = [0, 0, 0];
+    let cuenta = 0;
+    for (let k = 0; k < n; k += 1) {
+      if (datos.data[k * 4 + 3] >= 250) {
+        opaco[k] = 1;
+        suma[0] += datos.data[k * 4];
+        suma[1] += datos.data[k * 4 + 1];
+        suma[2] += datos.data[k * 4 + 2];
+        cuenta += 1;
       }
     }
+    const base = new THREE.Color(colorBase);
+    const medio = cuenta ? suma.map((v) => v / cuenta) : [base.r * 255, base.g * 255, base.b * 255];
+    // Erosión del área opaca (radio 3, separable): el borde pasa al color medio.
+    const radio = 3;
+    const horizontal = new Uint8Array(n);
+    for (let y = 0; y < LADO_TEXTURA; y += 1) {
+      for (let x = 0; x < LADO_TEXTURA; x += 1) {
+        let v = 1;
+        for (let d = -radio; d <= radio && v; d += 1) v = opaco[y * LADO_TEXTURA + Math.min(LADO_TEXTURA - 1, Math.max(0, x + d))];
+        horizontal[y * LADO_TEXTURA + x] = v;
+      }
+    }
+    for (let y = 0; y < LADO_TEXTURA; y += 1) {
+      for (let x = 0; x < LADO_TEXTURA; x += 1) {
+        let v = 1;
+        for (let d = -radio; d <= radio && v; d += 1) v = horizontal[Math.min(LADO_TEXTURA - 1, Math.max(0, y + d)) * LADO_TEXTURA + x];
+        if (!v) {
+          const i = (y * LADO_TEXTURA + x) * 4;
+          datos.data[i] = medio[0];
+          datos.data[i + 1] = medio[1];
+          datos.data[i + 2] = medio[2];
+          datos.data[i + 3] = 255;
+        }
+      }
+    }
+    // El costado de la prenda (aLado) se funde con este mismo color medio.
+    colorTela.value.setRGB(medio[0] / 255, medio[1] / 255, medio[2] / 255, THREE.SRGBColorSpace);
     ctx.putImageData(datos, 0, 0);
     const textura = new THREE.CanvasTexture(ctx.canvas);
     textura.colorSpace = THREE.SRGBColorSpace;
     textura.anisotropy = 8;
     material.map = textura;
     material.color.set('#ffffff'); // el color ya viene en la foto
+    // Con la foto, el brillo de la tela toma su color: un brillo blanco la deslavaría.
+    material.sheen *= 0.45;
+    material.sheenColor.set(colorBase).lerp(new THREE.Color('#ffffff'), 0.35);
     material.needsUpdate = true;
   });
   return material;

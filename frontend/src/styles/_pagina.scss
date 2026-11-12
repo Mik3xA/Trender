@@ -79,3 +79,111 @@
 .pie {
   @apply border-t border-linea py-10 text-sm text-tinta-3;
 }
+
+// ---------------------------------------------------------------- secciones nuevas
+
+.seccion--tinta {
+  @apply bg-tinta;
+}
+
+.insignia {
+  @apply inline-flex items-center gap-2 rounded-full border border-linea bg-hueso px-3 py-1 text-xs font-medium text-tinta-2;
+}
+
+.insignia-punto {
+  @apply h-1.5 w-1.5 rounded-full bg-oliva;
+  box-shadow: 0 0 0 4px theme('colors.oliva.tenue');
+}
+
+// Antes / después.
+.comparador {
+  @apply relative aspect-[4/5] w-full cursor-ew-resize touch-none select-none overflow-hidden rounded-3xl border border-linea;
+}
+
+.comparador-capa {
+  @apply absolute inset-0;
+}
+
+.comparador-despues {
+  @apply bg-hueso;
+}
+
+.comparador-etiqueta {
+  @apply absolute top-4 rounded-full bg-papel/90 px-3 py-1 text-xs font-medium text-tinta;
+}
+
+.comparador-divisor {
+  @apply pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-papel;
+  box-shadow: 0 0 0 1px rgba(20, 20, 20, 0.08);
+}
+
+.comparador-asa {
+  @apply pointer-events-auto absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-tinta text-papel;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
+// Cinta de prendas que se desplaza.
+.cinta {
+  @apply overflow-hidden border-y border-linea bg-hueso py-4;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.cinta-pista {
+  @apply flex w-max gap-3;
+  animation: cinta 45s linear infinite;
+}
+
+.cinta-item {
+  @apply whitespace-nowrap rounded-full border border-linea bg-papel px-4 py-1.5 text-sm text-tinta-2;
+}
+
+@keyframes cinta {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinta-pista {
+    animation: none;
+  }
+}
+
+// Análisis.
+.deteccion {
+  @apply flex gap-3 rounded-xl border border-linea p-4;
+}
+
+.deteccion-icono {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-oliva-tenue text-sm text-oliva-oscuro;
+}
+
+.ficha-demo {
+  @apply rounded-3xl border border-linea bg-papel p-6;
+  box-shadow: 0 30px 60px -40px rgba(20, 20, 20, 0.35);
+}
+
+.ficha-demo-foto {
+  @apply h-20 w-20 shrink-0 rounded-2xl bg-hueso p-2;
+}
+
+// Consejos de foto.
+.consejo {
+  @apply rounded-2xl border border-linea bg-papel p-4;
+}
+
+.consejo-foto {
+  @apply flex h-36 items-center justify-center overflow-hidden rounded-xl border border-linea;
+}
+
+.consejo--no .consejo-foto {
+  @apply opacity-80;
+}
+
+.consejo-marca {
+  @apply flex h-5 w-5 items-center justify-center rounded-full bg-oliva text-[11px] text-papel;
+}
+
+.consejo-marca--no {
+  @apply bg-[#b4532a];
+}

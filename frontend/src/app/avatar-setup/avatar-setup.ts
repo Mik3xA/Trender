@@ -4,7 +4,7 @@ import { Subscription, from, switchMap } from 'rxjs';
 
 import { TONOS } from '../motor-3d/piel';
 import { Genero, LIMITES, MEDIDAS_INICIALES, Medidas, TIPOS_CUERPO, TipoCuerpo, estimarContornos, sanearMedidas } from '../probador/cuerpo';
-import { MUESTRAS, NOMBRE_CATEGORIA, PrendaVirtual, vestirConjunto } from '../probador/prendas';
+import { AjustesPrenda, MUESTRAS, NOMBRE_CATEGORIA, NOMBRE_TIPO, PrendaVirtual, vestirConjunto } from '../probador/prendas';
 import { recomendarTalla } from '../probador/tallas';
 import { ArmarioService, CATEGORIA_PROBADOR, CategoriaArmario, PrendaArmario, aPrendaVirtual, prepararFoto } from '../servicios/armario.service';
 import { PerfilGenero, PerfilService, Perfiles } from '../servicios/perfil.service';
@@ -28,6 +28,8 @@ const TIPOS_POR_CATEGORIA: Record<CategoriaArmario, string[]> = {
   dress: ['vestido'],
   shoes: ['tenis', 'zapatos', 'botas', 'sandalias'],
 };
+const categoriaDeTipo = (tipo: string): CategoriaArmario | null =>
+  (Object.keys(TIPOS_POR_CATEGORIA) as CategoriaArmario[]).find((c) => TIPOS_POR_CATEGORIA[c].includes(tipo)) ?? null;
 
 const perfilInicial = (genero: Genero): PerfilGenero => ({ medidas: { ...MEDIDAS_INICIALES[genero] }, conjunto: [], tono: 'maniqui' });
 
@@ -57,6 +59,33 @@ export class AvatarSetupComponent implements OnInit {
   protected readonly NOMBRE_CATEGORIA = NOMBRE_CATEGORIA;
   protected readonly CATEGORIA_PROBADOR = CATEGORIA_PROBADOR;
   protected readonly CATEGORIAS: CategoriaArmario[] = ['top', 'bottom', 'dress', 'shoes'];
+  protected readonly NOMBRE_TIPO = NOMBRE_TIPO;
+  /** Atajos antes de subir ("¿Qué vas a subir?"). */
+  protected readonly TIPOS_RAPIDOS = ['camiseta', 'camisa', 'sudadera', 'chamarra', 'pantalon', 'jeans', 'jogger', 'short', 'falda', 'vestido', 'tenis'];
+  protected readonly GRUPOS_TIPO: Array<{ categoria: CategoriaArmario; nombre: string; tipos: string[] }> = [
+    { categoria: 'top', nombre: 'Superior', tipos: TIPOS_POR_CATEGORIA.top },
+    { categoria: 'bottom', nombre: 'Inferior', tipos: TIPOS_POR_CATEGORIA.bottom },
+    { categoria: 'dress', nombre: 'Vestido', tipos: TIPOS_POR_CATEGORIA.dress },
+    { categoria: 'shoes', nombre: 'Calzado', tipos: TIPOS_POR_CATEGORIA.shoes },
+  ];
+  protected readonly OPCIONES = {
+    ajuste: [
+      { id: 'ajustado', nombre: 'Ajustada' },
+      { id: 'regular', nombre: 'Regular' },
+      { id: 'holgado', nombre: 'Holgada' },
+    ],
+    largo: [
+      { id: 'corto', nombre: 'Corto' },
+      { id: 'normal', nombre: 'Normal' },
+      { id: 'largo', nombre: 'Largo' },
+    ],
+    manga: [
+      { id: 'sin', nombre: 'Sin' },
+      { id: 'corta', nombre: 'Corta' },
+      { id: 'tres-cuartos', nombre: '3/4' },
+      { id: 'larga', nombre: 'Larga' },
+    ],
+  } as const;
   protected readonly FILTROS: Array<{ id: Filtro; nombre: string }> = [
     { id: 'todo', nombre: 'Todo' },
     { id: 'top', nombre: 'Superior' },
@@ -89,15 +118,14 @@ export class AvatarSetupComponent implements OnInit {
   });
 
   // ---- importación (link o foto)
-  readonly modoAgregar = signal<'foto' | 'link'>('foto');
   readonly subiendo = signal(0);
   readonly arrastrando = signal(false);
   readonly nombreFoto = signal('');
   private readonly fichaId = signal<string | null>(null);
   /** Prenda cuyo análisis se muestra (se mantiene al día con el armario). */
   readonly ficha = computed(() => this.armario().find((p) => p.id === this.fichaId()) ?? null);
-  readonly enlace = signal('');
-  readonly importando = signal(0);
+  /** Respuesta previa opcional: "voy a subir una sudadera". */
+  readonly tipoSubida = signal<string | null>(null);
   readonly errorImportacion = signal<string | null>(null);
 
   // ---- interfaz
@@ -166,7 +194,6 @@ export class AvatarSetupComponent implements OnInit {
     if (genero === this.genero()) return;
     this.genero.set(genero);
     this.filtro.set('todo');
-    this.enlace.set('');
     this.errorImportacion.set(null);
     this.cargarArmario();
   }
@@ -244,28 +271,6 @@ export class AvatarSetupComponent implements OnInit {
     });
   }
 
-  importar(): void {
-    const url = this.enlace().trim();
-    this.errorImportacion.set(null);
-    if (!/^https?:\/\/\S+\.\S+/i.test(url)) {
-      this.errorImportacion.set('Pega el enlace completo del producto (empieza con https://).');
-      return;
-    }
-    const genero = this.genero();
-    this.importando.update((n) => n + 1);
-    this.enlace.set('');
-    this.filtro.set('todo');
-    const sub = this.armarioApi.importar(url, genero).subscribe({
-      next: (item) => this.recibir(item, genero),
-      error: (error: HttpErrorResponse) => {
-        this.importando.update((n) => n - 1);
-        this.errorImportacion.set(this.mensajeError(error));
-      },
-      complete: () => this.importando.update((n) => n - 1),
-    });
-    this.seguimientos.add(sub);
-  }
-
   /** Sube una o varias fotos de prendas (se analizan en el servidor). */
   subirArchivos(archivos: FileList | File[] | null | undefined): void {
     this.errorImportacion.set(null);
@@ -286,10 +291,16 @@ export class AvatarSetupComponent implements OnInit {
         continue;
       }
       this.subiendo.update((n) => n + 1);
+      const tipo = this.tipoSubida() ?? undefined;
+      const unaSola = fotos.length === 1;
       from(prepararFoto(archivo))
-        .pipe(switchMap((blob) => this.armarioApi.subirFoto(blob, genero, nombre || undefined)))
+        .pipe(switchMap((blob) => this.armarioApi.subirFoto(blob, genero, { nombre: nombre || undefined, tipo })))
         .subscribe({
-          next: (item) => this.recibir(item, genero),
+          next: (item) => {
+            this.recibir(item, genero);
+            // Al terminar el análisis se abre el cuestionario para afinar cómo se ve en el avatar.
+            if (unaSola && (item.status === 'ready' || item.status === 'review') && genero === this.genero()) this.fichaId.set(item.id);
+          },
           error: (error: HttpErrorResponse) => {
             this.subiendo.update((n) => n - 1);
             this.errorImportacion.set(this.mensajeError(error));
@@ -330,20 +341,66 @@ export class AvatarSetupComponent implements OnInit {
     return TIPOS_POR_CATEGORIA[categoria];
   }
 
-  /** Corrige el tipo concreto (p. ej. "sueter" -> "sudadera") y vuelve a vestirla. */
-  cambiarTipo(item: PrendaArmario, tipo: string): void {
-    if (!item.category || tipo === item.tipo) return;
-    this.armarioApi.clasificar(item.id, item.category, tipo).subscribe({
+  /** ¿El análisis propuso este tipo? (se resalta en el cuestionario). */
+  sugerido(item: PrendaArmario, tipo: string): boolean {
+    return item.analisis?.visual?.sugerencias?.slice(0, 3).includes(tipo) ?? false;
+  }
+
+  /** Respuesta actual de una pregunta: la del usuario o, si no hay, lo que se vio en la foto. */
+  respuesta(item: PrendaArmario, clave: keyof AjustesPrenda): string | boolean | undefined {
+    const guardada = item.ajustes?.[clave];
+    if (guardada !== undefined) return guardada;
+    const visto = item.analisis?.visual?.detalle;
+    if (clave === 'manga') return visto?.manga ?? undefined;
+    if (clave === 'capucha') return visto?.capucha ?? (item.tipo === 'sudadera' ? true : undefined);
+    if (clave === 'cuello') return ['camisa', 'chamarra', 'blazer', 'abrigo'].includes(item.tipo ?? '');
+    if (clave === 'ajuste') return 'regular';
+    if (clave === 'largo') return 'normal';
+    return undefined;
+  }
+
+  /**
+   * Guarda una respuesta del cuestionario (tipo de prenda o cómo queda) y
+   * vuelve a vestir la prenda para que el avatar la muestre al instante.
+   */
+  responder(item: PrendaArmario, cambios: { tipo?: string; ajustes?: AjustesPrenda }): void {
+    const categoria = cambios.tipo ? categoriaDeTipo(cambios.tipo) : item.category;
+    if (!categoria) return;
+    // Optimista: el avatar cambia ya; si el servidor falla se vuelve atrás.
+    const previa = item;
+    const local: PrendaArmario = {
+      ...item,
+      category: categoria,
+      tipo: cambios.tipo ?? item.tipo,
+      status: 'ready',
+      ajustes: cambios.ajustes ? { ...(item.ajustes ?? {}), ...cambios.ajustes } : item.ajustes,
+    };
+    this.reemplazar(local);
+    this.revestir(local);
+    this.armarioApi.clasificar(item.id, categoria, cambios.tipo, cambios.ajustes).subscribe({
       next: (actualizada) => {
         this.reemplazar(actualizada);
-        if (this.estaPuesta(item.id)) {
-          this.quitar(item.id);
-          const prenda = aPrendaVirtual(actualizada);
-          if (prenda) this.vestir(prenda);
-        }
+        this.revestir(actualizada);
       },
-      error: (error: HttpErrorResponse) => this.avisar(this.mensajeError(error)),
+      error: (error: HttpErrorResponse) => {
+        this.reemplazar(previa);
+        this.revestir(previa);
+        this.avisar(this.mensajeError(error));
+      },
     });
+  }
+
+  /** Corrige el tipo concreto (p. ej. "sueter" -> "sudadera"). */
+  cambiarTipo(item: PrendaArmario, tipo: string): void {
+    if (tipo !== item.tipo) this.responder(item, { tipo });
+  }
+
+  /** Si la prenda está puesta (o se está ajustando), se vuelve a vestir con sus datos nuevos. */
+  private revestir(item: PrendaArmario): void {
+    const prenda = aPrendaVirtual(item);
+    if (!prenda) return;
+    if (this.estaPuesta(item.id)) this.quitar(item.id);
+    this.vestir(prenda);
   }
 
   /** Corrige o elige la categoría de una prenda y la viste. */
@@ -409,7 +466,7 @@ export class AvatarSetupComponent implements OnInit {
     } else if (item.status === 'review') {
       this.avisar('No estamos seguros del tipo de prenda: elige qué es en tu armario.');
     } else if (item.status === 'failed') {
-      this.avisar(item.error ?? 'No se pudo importar la prenda.');
+      this.avisar(item.error ?? 'No se pudo analizar la foto.');
     }
   }
 
