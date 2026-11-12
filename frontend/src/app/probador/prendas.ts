@@ -11,6 +11,8 @@ export interface AjustesPrenda {
   manga?: 'sin' | 'corta' | 'tres-cuartos' | 'larga';
   capucha?: boolean;
   cuello?: boolean;
+  /** Aspecto en el modelo 3D: color y tejido limpios, o la foto proyectada. */
+  aspecto?: 'tela' | 'foto';
   /** Outfit completo: qué partes usar. */
   usar?: Parte[];
 }

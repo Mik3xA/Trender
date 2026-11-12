@@ -9,29 +9,29 @@ export interface PasoTutorial {
 
 export const PASOS_TUTORIAL: PasoTutorial[] = [
   {
+    objetivo: 'apartados',
+    titulo: 'Elige el apartado',
+    texto: 'Mujer y Hombre son probadores independientes: cada uno tiene su modelo, su conjunto y su armario.',
+  },
+  {
     objetivo: 'persona',
-    titulo: 'Sube una foto tuya',
-    texto: 'De cuerpo entero, de frente y con buena luz. Es privada: solo tú puedes verla. Puedes guardar varias y elegir cuál usar.',
+    titulo: 'Ajusta tu modelo',
+    texto: 'Tipo de cuerpo, altura, peso y tono. Debajo ves lo que lleva puesto y la talla recomendada.',
   },
   {
     objetivo: 'importar',
     titulo: 'Sube fotos de tu ropa',
-    texto: 'Varias a la vez: prendas sueltas o un outfit completo. Si quieres, dinos antes qué es. Quitamos el fondo y detectamos el tipo, el color y los detalles.',
+    texto: 'Varias a la vez, una prenda por foto. Si quieres, dinos antes qué es. Quitamos el fondo y detectamos el tipo, el color y los detalles.',
   },
   {
     objetivo: 'armario',
     titulo: 'Tu armario',
-    texto: 'Toca las prendas que quieras probarte (una por parte del cuerpo). Con el botón de ajustes respondes el cuestionario y con la papelera las quitas.',
-  },
-  {
-    objetivo: 'generar',
-    titulo: 'Genera la prueba',
-    texto: 'Las prendas elegidas aparecen aquí. De un outfit puedes usar todo o solo una parte. Pulsa "Generar prueba".',
+    texto: 'Toca una prenda para ponérsela al modelo (una por parte del cuerpo). Con el botón de ajustes respondes su cuestionario y con la papelera la quitas.',
   },
   {
     objetivo: 'resultado',
-    titulo: 'Tu foto con la ropa puesta',
-    texto: 'Compara con la original, descárgala o repite las prendas de una prueba anterior. Repite este tutorial con el botón "?".',
+    titulo: 'Mira cómo queda',
+    texto: 'Arrastra para girar el modelo y usa la rueda para acercarte. Repite este tutorial con el botón "?".',
   },
 ];
 

@@ -6,78 +6,105 @@ import {
   AjustesPrenda,
   CategoriaArmario,
   NOMBRE_CATEGORIA,
-  NOMBRE_PARTE,
   NOMBRE_TIPO,
-  PARTES_OUTFIT,
-  Parte,
   TIPOS_POR_CATEGORIA,
   categoriaDeTipo,
   partesDe,
 } from '../probador/prendas';
+import { TONOS } from '../motor-3d/piel';
+import { LIMITES, MEDIDAS_INICIALES, Medidas, TIPOS_CUERPO, TipoCuerpo, sanearMedidas } from '../probador/cuerpo';
+import { CategoriaPrenda, ESTILOS, COLOR_POR_DEFECTO, PrendaVirtual, TIPO_POR_CATEGORIA } from '../probador/estilos';
+import { recomendarTalla } from '../probador/tallas';
 import { ArmarioService, Genero, PrendaArmario, prepararFoto, urlPrenda } from '../servicios/armario.service';
-import { ImagenesService } from '../servicios/imagenes.service';
-import { FotoPersona, PersonaService } from '../servicios/persona.service';
-import { EstadoIa, Prueba, PruebasService } from '../servicios/pruebas.service';
 import { SesionService } from '../servicios/sesion.service';
 import { TutorialService } from '../tutorial/tutorial.service';
+import { Visor3dComponent } from '../visor-3d/visor-3d';
 
 type Filtro = 'todo' | CategoriaArmario;
 
 interface Seleccion {
   id: string;
-  /** Solo para outfits: qué partes usar. */
-  usar?: Parte[];
 }
 
 const CLAVE_GENERO = 'trender.genero';
-const CLAVE_PERSONA = 'trender.persona';
+const CLAVE_CUERPOS = 'trender.cuerpos';
+const CLAVE_PUESTO = 'trender.puesto';
+
+interface Cuerpo {
+  medidas: Medidas;
+  tono: string;
+}
+
+const CATEGORIA_3D: Record<Exclude<CategoriaArmario, 'outfit'>, CategoriaPrenda> = { top: 'Torso', bottom: 'Piernas', dress: 'Vestido', shoes: 'Calzado' };
+
+/** Prenda del armario lista para vestir en el modelo 3D (null si aún no se puede). */
+export function aPrenda3d(p: PrendaArmario): PrendaVirtual | null {
+  if (p.status !== 'ready' || !p.category || p.category === 'outfit') return null;
+  const categoria = CATEGORIA_3D[p.category];
+  const visto = p.analisis?.visual;
+  const liso = !visto?.detalle.estampado || visto.detalle.estampado === 'liso';
+  return {
+    id: p.id,
+    nombre: p.nombre ?? 'Prenda',
+    categoria,
+    tipo: p.tipo && ESTILOS[p.tipo] ? p.tipo : TIPO_POR_CATEGORIA[categoria],
+    color: p.color ?? COLOR_POR_DEFECTO[categoria],
+    imagen: urlPrenda(p),
+    zonas: (visto as { zonas?: PrendaVirtual['zonas'] } | null | undefined)?.zonas,
+    estampado: visto?.detalle.estampado ?? null,
+    // Lisa: color y tejido limpios. Con rayas o estampado: se proyecta la foto.
+    aspecto: p.ajustes?.aspecto ?? (liso ? 'tela' : 'foto'),
+    ajustes: {
+      ...(visto?.detalle.manga ? { manga: visto.detalle.manga } : {}),
+      ...(visto?.detalle.capucha ? { capucha: true } : {}),
+      ...(p.ajustes ?? {}),
+    },
+  };
+}
 const MAX_FOTOS_A_LA_VEZ = 8;
 const MAX_BYTES_FOTO = 25 * 1024 * 1024;
 
 const esImagen = (f: File) => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name);
 
 /**
- * Probador con IA: tu foto (izquierda) + prendas de tu armario (derecha) ->
- * foto generada contigo puesta la ropa (centro). Mujer y Hombre tienen armarios
- * separados. No hay login: SesionService crea una sesión de invitado.
+ * Probador 3D: tu modelo (izquierda), el visor con la ropa puesta (centro) y tu
+ * armario (derecha). Mujer y Hombre tienen modelo, conjunto y armario propios.
+ * No hay login: SesionService crea una sesión de invitado.
  */
 @Component({
   selector: 'tr-estudio',
+  imports: [Visor3dComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './estudio.html',
 })
 export class EstudioComponent implements OnInit {
   private readonly armarioApi = inject(ArmarioService);
-  private readonly personaApi = inject(PersonaService);
-  private readonly pruebasApi = inject(PruebasService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  protected readonly imagenes = inject(ImagenesService);
   protected readonly sesion = inject(SesionService);
   protected readonly tutorial = inject(TutorialService);
 
   protected readonly NOMBRE_TIPO = NOMBRE_TIPO;
   protected readonly NOMBRE_CATEGORIA = NOMBRE_CATEGORIA;
-  protected readonly NOMBRE_PARTE = NOMBRE_PARTE;
   protected readonly urlPrenda = urlPrenda;
+  protected readonly LIMITES = LIMITES;
+  protected readonly TIPOS_CUERPO = TIPOS_CUERPO;
+  protected readonly TONOS = TONOS;
   protected readonly FILTROS: Array<{ id: Filtro; nombre: string }> = [
     { id: 'todo', nombre: 'Todo' },
     { id: 'top', nombre: 'Superior' },
     { id: 'bottom', nombre: 'Inferior' },
     { id: 'dress', nombre: 'Vestidos' },
     { id: 'shoes', nombre: 'Calzado' },
-    { id: 'outfit', nombre: 'Outfits' },
   ];
   /** Atajos antes de subir ("¿Qué vas a subir?"). */
-  protected readonly TIPOS_RAPIDOS = ['outfit', 'camiseta', 'camisa', 'sudadera', 'chamarra', 'pantalon', 'jeans', 'jogger', 'falda', 'vestido', 'tenis'];
+  protected readonly TIPOS_RAPIDOS = ['camiseta', 'camisa', 'sudadera', 'chamarra', 'pantalon', 'jeans', 'jogger', 'falda', 'vestido', 'tenis', 'botas'];
   protected readonly GRUPOS_TIPO: Array<{ categoria: CategoriaArmario; nombre: string; tipos: string[] }> = [
-    { categoria: 'outfit', nombre: 'Varias prendas', tipos: TIPOS_POR_CATEGORIA.outfit },
     { categoria: 'top', nombre: 'Superior', tipos: TIPOS_POR_CATEGORIA.top },
     { categoria: 'bottom', nombre: 'Inferior', tipos: TIPOS_POR_CATEGORIA.bottom },
     { categoria: 'dress', nombre: 'Vestido', tipos: TIPOS_POR_CATEGORIA.dress },
     { categoria: 'shoes', nombre: 'Calzado', tipos: TIPOS_POR_CATEGORIA.shoes },
   ];
-  protected readonly PARTES_ELEGIBLES: Parte[] = ['top', 'bottom', 'dress', 'shoes'];
   protected readonly OPCIONES = {
     ajuste: [
       { id: 'ajustado', nombre: 'Ajustada' },
@@ -94,6 +121,10 @@ export class EstudioComponent implements OnInit {
       { id: 'corta', nombre: 'Corta' },
       { id: 'tres-cuartos', nombre: '3/4' },
       { id: 'larga', nombre: 'Larga' },
+    ],
+    aspecto: [
+      { id: 'tela', nombre: 'Color y tejido' },
+      { id: 'foto', nombre: 'Foto de la prenda' },
     ],
   } as const;
 
@@ -116,30 +147,21 @@ export class EstudioComponent implements OnInit {
   private readonly fichaId = signal<string | null>(null);
   readonly ficha = computed(() => this.armario().find((p) => p.id === this.fichaId()) ?? null);
 
-  // ---- tu foto
-  readonly personas = signal<FotoPersona[]>([]);
-  readonly personaId = signal<string | null>(this.leer(CLAVE_PERSONA));
-  readonly persona = computed(() => this.personas().find((p) => p.id === this.personaId()) ?? this.personas()[0] ?? null);
-  readonly subiendoPersona = signal(false);
-  readonly arrastrandoPersona = signal(false);
-  readonly errorPersona = signal<string | null>(null);
+  // ---- tu modelo (uno por apartado)
+  readonly cuerpos = signal<Record<Genero, Cuerpo>>(this.leerCuerpos());
+  readonly medidas = computed(() => this.cuerpos()[this.genero()].medidas);
+  readonly tono = computed(() => this.cuerpos()[this.genero()].tono);
 
-  // ---- selección y pruebas
-  readonly seleccion = signal<Seleccion[]>([]);
+  // ---- lo que lleva puesto (por apartado)
+  private readonly puesto = signal<Record<Genero, string[]>>(this.leerJson(CLAVE_PUESTO) ?? { Femenino: [], Masculino: [] });
+  readonly seleccion = computed<Seleccion[]>(() => this.puesto()[this.genero()].map((id) => ({ id })));
   readonly seleccionadas = computed(() =>
     this.seleccion()
       .map((s) => ({ ...s, prenda: this.armario().find((p) => p.id === s.id) }))
       .filter((s): s is Seleccion & { prenda: PrendaArmario } => !!s.prenda)
   );
-  readonly pruebas = signal<Prueba[]>([]);
-  readonly pruebaId = signal<string | null>(null);
-  readonly prueba = computed(() => this.pruebas().find((p) => p.id === this.pruebaId()) ?? null);
-  readonly generando = signal(false);
-  readonly errorPrueba = signal<string | null>(null);
-  readonly estadoIa = signal<EstadoIa | null>(null);
-  /** Comparar: ver la foto original en lugar del resultado. */
-  readonly verOriginal = signal(false);
-  readonly puedeGenerar = computed(() => !!this.persona() && this.seleccionadas().length > 0 && !this.generando());
+  /** Prendas 3D que viste el modelo. */
+  readonly conjunto = computed(() => this.seleccionadas().map((s) => aPrenda3d(s.prenda)).filter((p): p is PrendaVirtual => !!p));
 
   // ---- interfaz
   readonly notificacion = signal<string | null>(null);
@@ -148,10 +170,8 @@ export class EstudioComponent implements OnInit {
 
   constructor() {
     effect(() => this.escribir(CLAVE_GENERO, this.genero()));
-    effect(() => {
-      const id = this.persona()?.id;
-      if (id) this.escribir(CLAVE_PERSONA, id);
-    });
+    effect(() => this.escribir(CLAVE_CUERPOS, this.cuerpos()));
+    effect(() => this.escribir(CLAVE_PUESTO, this.puesto()));
     // Primera visita: el tutorial arranca cuando el probador entra en pantalla.
     afterNextRender(() => {
       if (this.tutorial.visto() || typeof IntersectionObserver === 'undefined') return;
@@ -175,15 +195,33 @@ export class EstudioComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarArmario();
-    this.personaApi.listar().subscribe({ next: (fotos) => this.personas.set(fotos), error: () => undefined });
-    this.pruebasApi.listar().subscribe({
-      next: (lista) => {
-        this.pruebas.set(lista);
-        for (const p of lista) if (p.status === 'processing') this.seguirPrueba(p.id);
-      },
-      error: () => undefined,
-    });
-    this.pruebasApi.estado().subscribe({ next: (e) => this.estadoIa.set(e), error: () => undefined });
+  }
+
+  // ------------------------------------------------------------------ tu modelo
+
+  private actualizarCuerpo(cambio: (c: Cuerpo) => Cuerpo): void {
+    const genero = this.genero();
+    this.cuerpos.update((todos) => ({ ...todos, [genero]: cambio(todos[genero]) }));
+  }
+
+  cambiarNumero(campo: 'altura' | 'peso', valor: number | string): void {
+    const numero = Number(valor);
+    if (!Number.isFinite(numero)) return;
+    const { min, max } = LIMITES[campo];
+    this.actualizarCuerpo((c) => ({ ...c, medidas: { ...c.medidas, [campo]: Math.min(max, Math.max(min, numero)) } }));
+  }
+
+  cambiarTipoCuerpo(tipo: TipoCuerpo): void {
+    this.actualizarCuerpo((c) => ({ ...c, medidas: { ...c.medidas, tipoCuerpo: tipo } }));
+  }
+
+  cambiarTono(tono: string): void {
+    this.actualizarCuerpo((c) => ({ ...c, tono }));
+  }
+
+  talla(item: PrendaArmario): string {
+    const prenda = aPrenda3d(item);
+    return prenda ? recomendarTalla(this.medidas(), prenda.categoria).talla : '';
   }
 
   // ------------------------------------------------------------------ apartados y armario
@@ -192,7 +230,6 @@ export class EstudioComponent implements OnInit {
     if (genero === this.genero()) return;
     this.genero.set(genero);
     this.filtro.set('todo');
-    this.seleccion.set([]);
     this.errorSubida.set(null);
     this.cargarArmario();
   }
@@ -252,8 +289,11 @@ export class EstudioComponent implements OnInit {
             if (item.status === 'processing') return;
             if (item.status === 'ready' || item.status === 'review') listas += 1;
             if (item.status === 'failed') this.avisar(item.error ?? 'No se pudo analizar una de las fotos.');
-            // Con una sola foto se abre el cuestionario para confirmar cómo es la prenda.
-            else if (lote.length === 1) this.fichaId.set(item.id);
+            else {
+              // Lista: se la pone el modelo. Con una sola foto se abre además su cuestionario.
+              if (item.status === 'ready' && !this.estaSeleccionada(item.id)) this.alternarSeleccion(item);
+              if (lote.length === 1) this.fichaId.set(item.id);
+            }
           },
           error: (error: HttpErrorResponse) => {
             this.subiendo.update((n) => n - 1);
@@ -297,7 +337,7 @@ export class EstudioComponent implements OnInit {
     this.armarioApi.eliminar(item.id).subscribe({
       next: () => {
         this.armario.update((lista) => lista.filter((p) => p.id !== item.id));
-        this.seleccion.update((s) => s.filter((x) => x.id !== item.id));
+        this.quitarDeSeleccion(item.id);
         if (this.fichaId() === item.id) this.fichaId.set(null);
         this.avisar(`"${item.nombre ?? 'Prenda'}" se quitó de tu armario.`);
       },
@@ -320,155 +360,30 @@ export class EstudioComponent implements OnInit {
    * cuerpo: si eliges otra playera, sustituye a la anterior.
    */
   alternarSeleccion(item: PrendaArmario): void {
-    if (this.estaSeleccionada(item.id)) {
-      this.seleccion.update((s) => s.filter((x) => x.id !== item.id));
-      return;
-    }
-    if (item.status !== 'ready' || !item.category) {
+    if (this.estaSeleccionada(item.id)) return this.quitarDeSeleccion(item.id);
+    if (item.status !== 'ready' || !item.category || item.category === 'outfit') {
       this.fichaId.set(item.id);
       return;
     }
-    const usar = item.category === 'outfit' ? (item.ajustes?.usar ?? PARTES_OUTFIT) : undefined;
-    const nuevas = new Set(partesDe(item.category, usar));
+    const nuevas = new Set(partesDe(item.category));
     const quedan = this.seleccion().filter((s) => {
       const otra = this.armario().find((p) => p.id === s.id);
-      return !partesDe(otra?.category ?? null, s.usar).some((parte) => nuevas.has(parte));
+      return !partesDe(otra?.category ?? null).some((parte) => nuevas.has(parte));
     });
-    const max = this.estadoIa()?.maxPrendas ?? 4;
-    if (quedan.length >= max) {
-      this.avisar(`Puedes probar hasta ${max} prendas a la vez.`);
-      return;
-    }
-    const sustituidas = this.seleccion().length - quedan.length;
-    this.seleccion.set([...quedan, { id: item.id, ...(usar ? { usar: [...usar] } : {}) }]);
-    if (sustituidas) this.avisar(`"${item.nombre}" reemplaza a la prenda que ocupaba esa parte.`);
+    this.fijarPuesto([...quedan.map((s) => s.id), item.id]);
   }
 
   quitarDeSeleccion(id: string): void {
-    this.seleccion.update((s) => s.filter((x) => x.id !== id));
+    this.fijarPuesto(this.seleccion().map((s) => s.id).filter((x) => x !== id));
   }
 
-  /** Partes de un outfit elegido que se usan en la prueba (Todo / Arriba / Abajo / Calzado). */
-  alternarParte(id: string, parte: Parte): void {
-    this.seleccion.update((lista) =>
-      lista.map((s) => {
-        if (s.id !== id) return s;
-        const actual = new Set(s.usar ?? PARTES_OUTFIT);
-        if (actual.has(parte)) actual.delete(parte);
-        else actual.add(parte);
-        if (parte === 'dress' && actual.has('dress')) {
-          actual.delete('top');
-          actual.delete('bottom');
-        }
-        if ((parte === 'top' || parte === 'bottom') && actual.has(parte)) actual.delete('dress');
-        return actual.size ? { ...s, usar: this.PARTES_ELEGIBLES.filter((p) => actual.has(p)) } : s;
-      })
-    );
+  quitarTodo(): void {
+    this.fijarPuesto([]);
   }
 
-  usaParte(s: Seleccion, parte: Parte): boolean {
-    return (s.usar ?? PARTES_OUTFIT).includes(parte);
-  }
-
-  // ------------------------------------------------------------------ tu foto
-
-  subirPersona(archivos: FileList | File[] | null | undefined): void {
-    this.errorPersona.set(null);
-    const archivo = Array.from(archivos ?? []).find(esImagen);
-    if (!archivo) {
-      if (archivos?.length) this.errorPersona.set('Elige una imagen (JPG, PNG, WEBP o HEIC).');
-      return;
-    }
-    this.subiendoPersona.set(true);
-    from(prepararFoto(archivo))
-      .pipe(switchMap((blob) => this.personaApi.subir(blob)))
-      .subscribe({
-        next: (foto) => {
-          this.personas.update((lista) => [foto, ...lista]);
-          this.personaId.set(foto.id);
-          this.pruebaId.set(null);
-          this.subiendoPersona.set(false);
-        },
-        error: (error: HttpErrorResponse) => {
-          this.subiendoPersona.set(false);
-          this.errorPersona.set(this.mensajeError(error));
-        },
-      });
-  }
-
-  elegirPersona(foto: FotoPersona): void {
-    this.personaId.set(foto.id);
-    // Si ya hay una prueba con esta foto, se muestra la más reciente.
-    this.pruebaId.set(this.pruebas().find((p) => p.persona_id === foto.id && p.status !== 'failed')?.id ?? null);
-  }
-
-  eliminarPersona(foto: FotoPersona, evento?: Event): void {
-    evento?.stopPropagation();
-    this.personaApi.eliminar(foto.id).subscribe({
-      next: () => {
-        this.personas.update((lista) => lista.filter((p) => p.id !== foto.id));
-        this.imagenes.olvidar(foto.imagen_url);
-        if (this.personaId() === foto.id) this.personaId.set(this.personas()[0]?.id ?? null);
-      },
-      error: (error: HttpErrorResponse) => this.avisar(this.mensajeError(error)),
-    });
-  }
-
-  // ------------------------------------------------------------------ generar
-
-  generar(): void {
-    const persona = this.persona();
-    if (!persona || !this.seleccion().length || this.generando()) return;
-    this.errorPrueba.set(null);
-    this.generando.set(true);
-    this.verOriginal.set(false);
-    const sub = this.pruebasApi.crear(persona.id, this.seleccion()).subscribe({
-      next: (prueba) => {
-        this.reemplazarPrueba(prueba);
-        this.pruebaId.set(prueba.id);
-        if (prueba.status === 'failed') this.errorPrueba.set(prueba.error ?? 'No se pudo generar la prueba.');
-      },
-      error: (error: HttpErrorResponse) => {
-        this.generando.set(false);
-        this.errorPrueba.set(this.mensajeError(error));
-      },
-      complete: () => this.generando.set(false),
-    });
-    this.seguimientos.add(sub);
-  }
-
-  verPrueba(prueba: Prueba): void {
-    this.pruebaId.set(prueba.id);
-    this.verOriginal.set(false);
-    if (prueba.persona_id && this.personas().some((p) => p.id === prueba.persona_id)) this.personaId.set(prueba.persona_id);
-  }
-
-  eliminarPrueba(prueba: Prueba, evento?: Event): void {
-    evento?.stopPropagation();
-    this.pruebasApi.eliminar(prueba.id).subscribe({
-      next: () => {
-        this.pruebas.update((lista) => lista.filter((p) => p.id !== prueba.id));
-        if (prueba.imagen_url) this.imagenes.olvidar(prueba.imagen_url);
-        if (this.pruebaId() === prueba.id) this.pruebaId.set(null);
-      },
-      error: (error: HttpErrorResponse) => this.avisar(this.mensajeError(error)),
-    });
-  }
-
-  /** Vuelve a elegir las prendas de una prueba anterior. */
-  repetir(prueba: Prueba): void {
-    const disponibles = prueba.prendas.filter((p) => this.armario().some((a) => a.id === p.id));
-    this.seleccion.set(disponibles.map((p) => ({ id: p.id, ...(p.usar ? { usar: p.usar } : {}) })));
-    if (disponibles.length < prueba.prendas.length) this.avisar('Algunas prendas de esa prueba ya no están en este armario.');
-  }
-
-  descargar(prueba: Prueba): void {
-    const url = this.imagenes.url(prueba.imagen_url);
-    if (!url || typeof document === 'undefined') return;
-    const enlace = document.createElement('a');
-    enlace.href = url;
-    enlace.download = `trender-${prueba.id.slice(0, 8)}.jpg`;
-    enlace.click();
+  private fijarPuesto(ids: string[]): void {
+    const genero = this.genero();
+    this.puesto.update((todo) => ({ ...todo, [genero]: ids }));
   }
 
   // ------------------------------------------------------------------ cuestionario
@@ -491,6 +406,7 @@ export class EstudioComponent implements OnInit {
   respuesta(item: PrendaArmario, clave: Exclude<keyof AjustesPrenda, 'usar'>): string | boolean | undefined {
     const guardada = item.ajustes?.[clave];
     if (guardada !== undefined) return guardada;
+    if (clave === 'aspecto') return aPrenda3d({ ...item, status: 'ready' })?.aspecto;
     const visto = item.analisis?.visual?.detalle;
     if (clave === 'manga') return visto?.manga ?? undefined;
     if (clave === 'capucha') return visto?.capucha ?? (item.tipo === 'sudadera' ? true : undefined);
@@ -500,25 +416,11 @@ export class EstudioComponent implements OnInit {
     return undefined;
   }
 
-  usaDelOutfit(item: PrendaArmario, parte: Parte): boolean {
-    return (item.ajustes?.usar ?? PARTES_OUTFIT).includes(parte);
-  }
-
-  /** Parte de un outfit en el cuestionario (qué se usará por defecto al probarlo). */
-  alternarParteOutfit(item: PrendaArmario, parte: Parte): void {
-    const actual = new Set(item.ajustes?.usar ?? PARTES_OUTFIT);
-    if (actual.has(parte)) actual.delete(parte);
-    else actual.add(parte);
-    if (!actual.size) return;
-    this.responder(item, { ajustes: { usar: this.PARTES_ELEGIBLES.filter((p) => actual.has(p)) } });
-  }
-
   /** Guarda una respuesta (tipo de prenda o cómo es) en el servidor. */
   responder(item: PrendaArmario, cambios: { tipo?: string; ajustes?: AjustesPrenda }): void {
     const categoria = cambios.tipo ? categoriaDeTipo(cambios.tipo) : item.category;
     if (!categoria) return;
-    const ajustes =
-      cambios.tipo === 'outfit' && !item.ajustes?.usar ? { ...(cambios.ajustes ?? {}), usar: PARTES_OUTFIT } : cambios.ajustes;
+    const ajustes = cambios.ajustes;
     const previa = item;
     this.reemplazar({
       ...item,
@@ -551,10 +453,6 @@ export class EstudioComponent implements OnInit {
     this.notificacionTimer = setTimeout(() => this.notificacion.set(null), 4200);
   }
 
-  nombreProveedor(p: Prueba['proveedor'] | undefined): string {
-    return p === 'gemini' ? 'Google Gemini' : p === 'fashn' ? 'FASHN' : 'Vista previa (sin IA)';
-  }
-
   // ------------------------------------------------------------------ privados
 
   private seguirPrenda(id: string): void {
@@ -563,17 +461,8 @@ export class EstudioComponent implements OnInit {
     this.seguimientos.add(sub);
   }
 
-  private seguirPrueba(id: string): void {
-    const sub = this.pruebasApi.seguir(id).subscribe({ next: (p) => this.reemplazarPrueba(p), error: () => undefined });
-    this.seguimientos.add(sub);
-  }
-
   private reemplazar(item: PrendaArmario): void {
     this.armario.update((lista) => (lista.some((p) => p.id === item.id) ? lista.map((p) => (p.id === item.id ? item : p)) : [item, ...lista]));
-  }
-
-  private reemplazarPrueba(prueba: Prueba): void {
-    this.pruebas.update((lista) => (lista.some((p) => p.id === prueba.id) ? lista.map((p) => (p.id === prueba.id ? prueba : p)) : [prueba, ...lista]));
   }
 
   private mensajeError(error: HttpErrorResponse): string {
@@ -584,12 +473,25 @@ export class EstudioComponent implements OnInit {
   }
 
   private leer(clave: string): string | null {
+    return this.leerJson<string>(clave);
+  }
+
+  private leerJson<T>(clave: string): T | null {
     try {
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(clave) : null;
-      return raw ? (JSON.parse(raw) as string) : null;
+      return raw ? (JSON.parse(raw) as T) : null;
     } catch {
       return null;
     }
+  }
+
+  private leerCuerpos(): Record<Genero, Cuerpo> {
+    const guardados = this.leerJson<Partial<Record<Genero, Partial<Cuerpo>>>>(CLAVE_CUERPOS) ?? {};
+    const cuerpo = (genero: Genero): Cuerpo => ({
+      medidas: guardados[genero]?.medidas ? sanearMedidas({ ...guardados[genero]!.medidas!, genero }) : { ...MEDIDAS_INICIALES[genero] },
+      tono: typeof guardados[genero]?.tono === 'string' ? guardados[genero]!.tono! : 'maniqui',
+    });
+    return { Femenino: cuerpo('Femenino'), Masculino: cuerpo('Masculino') };
   }
 
   private escribir(clave: string, valor: unknown): void {
