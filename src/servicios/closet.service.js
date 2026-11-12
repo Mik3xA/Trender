@@ -27,6 +27,8 @@ const OPCIONES_AJUSTES = {
   ajuste: ['ajustado', 'regular', 'holgado'],
   largo: ['corto', 'normal', 'largo'],
   manga: ['sin', 'corta', 'tres-cuartos', 'larga'],
+  // Modelo 3D: color y tejido limpios, o la foto proyectada.
+  aspecto: ['tela', 'foto'],
 };
 const GENEROS = ['Femenino', 'Masculino'];
 const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads'));
