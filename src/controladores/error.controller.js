@@ -4,7 +4,8 @@ function errorHandler(err, req, res, next) {
 
   console.error('[Error Handler]', statusCode >= 500 ? err : `${statusCode} ${err.message}`);
 
-  const message = statusCode >= 500 ? 'Internal Server Error' : err.message;
+  let message = statusCode >= 500 ? 'Internal Server Error' : err.message;
+  if (err.type === 'entity.too.large') message = 'El archivo o la petición es demasiado grande';
 
   const response = { status: 'error', error: message };
 

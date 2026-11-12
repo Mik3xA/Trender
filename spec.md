@@ -231,6 +231,8 @@ así el logout invalida el token aunque su firma siga vigente. Contraseñas con 
 | PUT | `/api/profile` | ✅ | campos parciales (cm, `null` borra) + `avatar_config` objeto | `200` perfil |
 | GET | `/api/closet?genero=&category=` | ✅ | — | `200 { items, count }` (armario de un género) |
 | POST | `/api/closet/importar` (alias `/add-from-link`) | ✅ | `{ url, genero?, category? }` | `202` prenda `processing` + `Location` · `409 PRENDA_DUPLICADA` |
+| POST | `/api/closet/subir?genero&nombre&category` | ✅ | imagen (cuerpo `image/*`, ≤ 12 MB) | `202` prenda `processing` · `400` · `409 PRENDA_DUPLICADA` · `413` · `415 IMAGEN_INVALIDA` · `422 IMAGEN_PEQUENA` |
+| POST | `/api/closet/:id/foto` | ✅ | imagen (cuerpo `image/*`) | `202` la prenda vuelve a `processing` con la nueva foto · `404` · `409 EN_PROCESO` |
 | GET | `/api/closet/:id` | ✅ | — | `200` prenda (consultar hasta `ready` / `review` / `failed`) · `404` si es de otro usuario |
 | PATCH | `/api/closet/:id` | ✅ | `{ category, tipo? }` | `200` prenda (una prenda en `review` pasa a `ready`) |
 | DELETE | `/api/closet/:id` | ✅ | — | `200 { id, deleted: true }` (borra también su recorte) |

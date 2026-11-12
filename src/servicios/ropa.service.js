@@ -312,4 +312,5 @@ module.exports = {
   normalizarTexto,
   palabrasDeUrl,
   CATEGORIAS,
+  COLORES,
 };

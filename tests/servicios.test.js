@@ -196,3 +196,55 @@ describe('scripts/verificar-dependencias', () => {
     expect(require('../scripts/verificar-dependencias').faltantes()).toEqual([]);
   });
 });
+
+describe('vision.service (análisis visual de prendas)', () => {
+  jest.setTimeout(30000); // procesamiento de imagen real (sharp) en paralelo con otras suites
+  const imagen = require('../src/servicios/imagen.service');
+  const vision = require('../src/servicios/vision.service');
+  const { fotoPrenda } = require('./siluetas-prueba');
+
+  const analizar = async (forma, fondo = 'liso') => vision.analizarPrenda((await imagen.quitarFondo(await fotoPrenda(forma, { fondo }), { tolerante: true })).png);
+
+  it.each([
+    ['camiseta', 'Torso', 'camiseta', 'corta'],
+    ['sudadera', 'Torso', 'sueter', 'larga'],
+    ['top', 'Torso', 'top', 'sin'],
+    ['vestido', 'Vestido', 'vestido', 'sin'],
+  ])('%s: categoría, tipo y manga', async (forma, categoria, tipo, manga) => {
+    const a = await analizar(forma);
+    expect(a).toMatchObject({ categoria, tipo });
+    expect(a.detalle.manga).toBe(manga);
+    expect(a.evidencias.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['pantalon', 'Piernas', 'pantalon', 'largo'],
+    ['short', 'Piernas', 'short', 'corto'],
+    ['tenis', 'Calzado', 'tenis', null],
+    ['par-tenis', 'Calzado', 'tenis', null],
+  ])('%s: prendas inferiores y calzado', async (forma, categoria, tipo, largo) => {
+    const a = await analizar(forma);
+    expect(a).toMatchObject({ categoria, tipo });
+    expect(a.detalle.largo).toBe(largo);
+  });
+
+  it.each(['degradado', 'casa'])('funciona con fondos caseros (%s)', async (fondo) => {
+    expect(await analizar('pantalon', fondo)).toMatchObject({ categoria: 'Piernas', tipo: 'pantalon' });
+    expect(await analizar('sudadera', fondo)).toMatchObject({ categoria: 'Torso' });
+  });
+
+  it('describe el color y el estampado', async () => {
+    const a = await analizar('camiseta');
+    expect(a.detalle.colores[0]).toMatchObject({ nombre: 'rojo' });
+    expect(a.detalle.estampado).toBe('liso');
+    expect(vision.nombreColor(110, 110, 110)).toBe('gris');
+    expect(vision.nombreColor(30, 42, 70)).toBe('azul marino');
+  });
+
+  it('el recorte estricto sigue rechazando fondos no lisos; el tolerante los acepta', async () => {
+    const foto = await fotoPrenda('camiseta', { fondo: 'casa' });
+    await expect(imagen.quitarFondo(foto)).resolves.toBeDefined(); // pared ~ lisa: el estricto la acepta
+    const tolerante = await imagen.quitarFondo(foto, { tolerante: true });
+    expect(tolerante.metodo).toBe('recorte-tolerante');
+  });
+});

@@ -1,5 +1,8 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+
+const sharp = require('sharp');
 
 const { db, generarId } = require('./db.service');
 const cache = require('./cache.service');
@@ -106,6 +109,88 @@ function importarDesdeLink(userId, { url, genero = 'Femenino', category = null }
   return { prenda: obtenerPrenda(userId, itemId), terminado };
 }
 
+const FORMATOS_FOTO = new Set(['jpeg', 'png', 'webp', 'avif', 'gif', 'tiff', 'heif']);
+const LADO_MINIMO_FOTO = 120;
+
+/** Comprueba que el archivo es una foto legible y de tamaño suficiente. */
+async function validarFoto(buffer) {
+  let meta;
+  try {
+    meta = await sharp(buffer, { failOn: 'none' }).metadata();
+  } catch {
+    throw errorOperacional(415, 'El archivo no es una imagen válida', 'IMAGEN_INVALIDA');
+  }
+  if (!FORMATOS_FOTO.has(meta.format)) {
+    throw errorOperacional(415, 'Formato no admitido: usa JPG, PNG, WEBP o AVIF', 'IMAGEN_INVALIDA');
+  }
+  if ((meta.width ?? 0) < LADO_MINIMO_FOTO || (meta.height ?? 0) < LADO_MINIMO_FOTO) {
+    throw errorOperacional(422, `La foto es demasiado pequeña (mínimo ${LADO_MINIMO_FOTO} px por lado)`, 'IMAGEN_PEQUENA');
+  }
+  if (meta.format === 'heif') {
+    try {
+      await sharp(buffer).resize(8).toBuffer();
+    } catch {
+      throw errorOperacional(415, 'No se pudo leer la foto HEIC: expórtala como JPG o PNG', 'IMAGEN_INVALIDA');
+    }
+  }
+
+}
+
+/**
+ * Registra una FOTO de prenda subida por el usuario y encola su análisis
+ * (recorte, tipo de prenda, color, estampado...). La misma foto dos veces en
+ * el mismo apartado es un duplicado (409).
+ * @param {string} userId
+ * @param {{ buffer: Buffer, genero?: string, nombre?: string|null, category?: string|null }} datos
+ */
+async function subirFoto(userId, { buffer, genero = 'Femenino', nombre = null, category = null }) {
+  await validarFoto(buffer);
+  // El origen de una foto es su huella: identifica duplicados sin guardar el original.
+  const huella = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 24);
+  const sourceUrl = `foto:${genero}:${huella}`;
+  const itemId = generarId();
+  try {
+    consultas.insertar.run(itemId, userId, genero, sourceUrl, category);
+  } catch (err) {
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      throw errorOperacional(409, 'Esta foto ya está en tu armario', 'PRENDA_DUPLICADA');
+    }
+    throw err;
+  }
+  if (nombre) actualizarInterno(itemId, { nombre });
+  cache.invalidar(userId, PREFIJO_CACHE);
+  const item = { id: itemId, user_id: userId, source_url: sourceUrl, category };
+  const terminado = importacion.encolar(() =>
+    importacion.procesarFoto(item, buffer, { nombre }, { actualizar: actualizarInterno, rutaAbsoluta, rutaImagen })
+  );
+  return { prenda: obtenerPrenda(userId, itemId), terminado };
+}
+
+/**
+ * Añade (o cambia) la foto de una prenda que ya existe; por ejemplo, una
+ * importada por link cuya tienda no dejó descargar la foto. Se conservan el
+ * nombre, la tienda y el precio; la categoría la decide de nuevo la foto
+ * junto con el nombre.
+ */
+async function agregarFoto(userId, itemId, buffer) {
+  const actual = obtenerPrenda(userId, itemId);
+  if (actual.status === 'processing') throw errorOperacional(409, 'La prenda aún se está analizando', 'EN_PROCESO');
+  await validarFoto(buffer);
+  const fila = consultas.obtener.get(itemId, userId);
+  if (fila.image_path) fs.rmSync(rutaAbsoluta(fila.image_path), { force: true });
+  actualizarInterno(itemId, { status: 'processing', error: null });
+  const item = { id: itemId, user_id: userId, source_url: fila.source_url, category: null };
+  const terminado = importacion.encolar(() =>
+    importacion.procesarFoto(
+      item,
+      buffer,
+      { nombre: actual.nombre, origen: 'foto añadida', conservar: { tienda: actual.tienda, precio: actual.precio } },
+      { actualizar: actualizarInterno, rutaAbsoluta, rutaImagen }
+    )
+  );
+  return { prenda: obtenerPrenda(userId, itemId), terminado };
+}
+
 /** El usuario corrige o elige la categoría (y opcionalmente el tipo). */
 function actualizarPrenda(userId, itemId, { category, tipo }) {
   const actual = obtenerPrenda(userId, itemId);
@@ -134,6 +219,8 @@ module.exports = {
   listarPrendas,
   obtenerPrenda,
   importarDesdeLink,
+  subirFoto,
+  agregarFoto,
   actualizarPrenda,
   eliminarPrenda,
 };
