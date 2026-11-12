@@ -5,6 +5,8 @@ const { requerirAuth } = require('../middlewares/auth.middleware');
 const authRoutes = require('./auth.routes');
 const perfilRoutes = require('./perfil.routes');
 const closetRoutes = require('./closet.routes');
+const personaRoutes = require('./persona.routes');
+const pruebasRoutes = require('./pruebas.routes');
 
 const router = express.Router();
 
@@ -15,5 +17,7 @@ router.use('/auth', authRoutes); // register/login públicos; logout/me protegid
 // Protegidas: requerirAuth fija req.auth.userId antes de cualquier controlador
 router.use('/profile', requerirAuth, perfilRoutes);
 router.use('/closet', requerirAuth, closetRoutes);
+router.use('/persona', requerirAuth, personaRoutes);
+router.use('/pruebas', requerirAuth, pruebasRoutes);
 
 module.exports = router;

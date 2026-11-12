@@ -9,13 +9,16 @@ const cache = require('./cache.service');
 const { errorOperacional } = require('./errores.service');
 const importacion = require('./importacion.service');
 
-const CATEGORIAS = ['top', 'bottom', 'dress', 'shoes'];
+const CATEGORIAS = ['top', 'bottom', 'dress', 'shoes', 'outfit'];
+/** Partes que se pueden usar de un outfit completo. */
+const PARTES_OUTFIT = ['top', 'bottom', 'dress', 'shoes'];
 /** Tipos concretos de cada categoría (los que el avatar 3D sabe vestir). */
 const TIPOS_POR_CATEGORIA = {
   top: ['camiseta', 'camisa', 'blusa', 'top', 'sueter', 'sudadera', 'chamarra', 'blazer', 'abrigo'],
   bottom: ['pantalon', 'jeans', 'jogger', 'leggings', 'short', 'falda'],
   dress: ['vestido'],
   shoes: ['tenis', 'zapatos', 'botas', 'sandalias'],
+  outfit: ['outfit'],
 };
 const TIPOS = Object.values(TIPOS_POR_CATEGORIA).flat();
 const categoriaDeTipo = (tipo) => Object.keys(TIPOS_POR_CATEGORIA).find((c) => TIPOS_POR_CATEGORIA[c].includes(tipo)) ?? null;
@@ -215,10 +218,13 @@ function eliminarPrenda(userId, itemId) {
 }
 
 module.exports = {
+  validarFoto,
+  rutaAbsoluta,
   CATEGORIAS,
   TIPOS,
   TIPOS_POR_CATEGORIA,
   OPCIONES_AJUSTES,
+  PARTES_OUTFIT,
   categoriaDeTipo,
   GENEROS,
   UPLOADS_DIR,

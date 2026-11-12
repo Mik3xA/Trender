@@ -97,6 +97,13 @@ function medirRasgos(mascara) {
   const validas = lista.filter((c) => c.area >= mayor * 0.08);
   const piezas = validas.filter((c) => c.area >= mayor * 0.25).length;
   const ids = new Set(validas.map((c) => c.id));
+  // Piezas una encima de otra (playera arriba, pantalón abajo, tenis al final): foto de un outfit.
+  const grandes = validas.filter((c) => c.area >= mayor * 0.15).sort((a, b) => a.y0 - b.y0);
+  let apiladas = 0;
+  for (let i = 1; i < grandes.length; i += 1) {
+    const solape = grandes[i - 1].y1 - grandes[i].y0;
+    if (solape < (grandes[i].y1 - grandes[i].y0) * 0.15) apiladas += 1;
+  }
   const caja = {
     x0: Math.min(...validas.map((c) => c.x0)),
     y0: Math.min(...validas.map((c) => c.y0)),
@@ -188,6 +195,7 @@ function medirRasgos(mascara) {
     caja,
     anchoTorsoPx: anchoTorso,
     rasgos: {
+      apiladas,
       capucha,
       estrechaAbajo: redondear(estrechaAbajo),
       proporcion: redondear(W / H),
@@ -498,6 +506,8 @@ async function analizarPrenda(png) {
     else if (conMangas) manga = 'corta';
     else manga = 'sin';
   }
+  // ¿Varias prendas en la misma foto? (piezas apiladas, o una silueta larga con mangas y piernas).
+  const posibleOutfit = r.apiladas >= 1 || (r.proporcion < 0.5 && r.huecoInicio < 0.85 && r.huecoTotal > 0.1 && (conMangas || r.tresTramos > 0.25));
   const abertura = (r.cierre >= 0.55 && color?.estampado !== 'rayas verticales') || (r.piezas === 2 && r.tresTramos > 0.25);
   const tipo = categoria ? elegirTipo(categoria, r, { manga, bota, falda, abertura }, color) : null;
   if (categoria === 'Torso' && abertura) evidencias0(motivos, 'Torso', 'abertura al frente (cierre o botones)');
@@ -539,6 +549,7 @@ async function analizarPrenda(png) {
       manga,
       largo,
       tela,
+      posibleOutfit,
       capucha: categoria === 'Torso' ? r.capucha : null,
       abertura: categoria === 'Torso' ? abertura : null,
       estampado: color?.estampado ?? null,

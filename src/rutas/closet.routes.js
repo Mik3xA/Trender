@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const { body, header, param, query } = require('express-validator');
 
 const closetController = require('../controladores/closet.controller');
-const { CATEGORIAS, GENEROS, TIPOS, OPCIONES_AJUSTES } = require('../servicios/closet.service');
+const { CATEGORIAS, GENEROS, TIPOS, OPCIONES_AJUSTES, PARTES_OUTFIT } = require('../servicios/closet.service');
 const { manejarValidacion } = require('../middlewares/validacion.middleware');
 
 const router = express.Router();
@@ -11,7 +11,7 @@ const router = express.Router();
 // Analizar fotos consume CPU: se limita por usuario/IP.
 const limitadorImportacion = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: Number(process.env.IMPORT_RATE_LIMIT) || 40,
+  limit: Number(process.env.IMPORT_RATE_LIMIT) || 120,
   message: { status: 'error', error: 'Demasiadas importaciones, intenta más tarde' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -61,13 +61,19 @@ router.patch(
   body('ajustes')
     .optional({ values: 'null' })
     .isObject().withMessage('ajustes debe ser un objeto')
-    .custom((a) => Object.keys(a).every((k) => ['ajuste', 'largo', 'manga', 'capucha', 'cuello'].includes(k)))
-    .withMessage('ajustes solo admite ajuste, largo, manga, capucha y cuello'),
+    .custom((a) => Object.keys(a).every((k) => ['ajuste', 'largo', 'manga', 'capucha', 'cuello', 'usar'].includes(k)))
+    .withMessage('ajustes solo admite ajuste, largo, manga, capucha, cuello y usar'),
   ...Object.entries(OPCIONES_AJUSTES).map(([clave, valores]) =>
     body(`ajustes.${clave}`).optional().isIn(valores).withMessage(`ajustes.${clave} debe ser uno de: ${valores.join(', ')}`)
   ),
   body('ajustes.capucha').optional().isBoolean({ strict: true }).withMessage('ajustes.capucha debe ser true o false'),
   body('ajustes.cuello').optional().isBoolean({ strict: true }).withMessage('ajustes.cuello debe ser true o false'),
+  // Outfit completo: qué partes usar (arriba, abajo, vestido, calzado).
+  body('ajustes.usar')
+    .optional()
+    .isArray({ min: 1, max: 4 }).withMessage('ajustes.usar debe ser una lista de 1 a 4 partes')
+    .custom((lista) => lista.every((p) => PARTES_OUTFIT.includes(p)) && new Set(lista).size === lista.length)
+    .withMessage(`ajustes.usar admite: ${PARTES_OUTFIT.join(', ')}`),
   manejarValidacion,
   closetController.actualizar
 );

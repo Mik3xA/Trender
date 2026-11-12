@@ -40,6 +40,25 @@ La base `dev.db` se crea y migra sola al arrancar (o con `npm run db:migrate`).
   También se puede decir el tipo al subir: `POST /api/closet/subir?tipo=sudadera`.
 - **Cambiar la foto** de una prenda: `POST /api/closet/:id/foto` (mismo formato que `subir`).
 
+### Prueba con IA (tu foto + tus prendas)
+
+1. `POST /api/persona` con una foto tuya de cuerpo entero (imagen en el cuerpo). Se guarda en una carpeta
+   **privada** (`PRIVATE_DIR`, por defecto `privado/`) y solo se sirve con tu sesión: `GET /api/persona/:id/imagen`.
+2. `POST /api/pruebas` con `{ personaId, prendas: [{ id, usar? }] }` (1 a 4 prendas; de un outfit completo
+   puedes usar solo algunas partes: `usar: ["top"]`). Responde 202; consulta `GET /api/pruebas/:id` hasta
+   `ready` y descarga `GET /api/pruebas/:id/imagen`.
+
+Proveedor de IA (en `.env`):
+
+| Variable | Qué hace |
+| --- | --- |
+| `GEMINI_API_KEY` | Google Gemini (edición de imagen). Viste todas las prendas en una sola petición, incluido calzado y partes de un outfit. Clave en https://aistudio.google.com/apikey |
+| `FASHN_API_KEY` | FASHN (modelo especializado en try-on). Una petición por prenda; no viste calzado. |
+| `TRYON_PROVIDER` | `gemini`, `fashn` o `local`. Vacío = el que tenga clave. |
+
+Sin claves se usa `local`: una **vista previa aproximada** que superpone los recortes sobre tu foto (no es una
+foto realista; sirve para probar el flujo). `GET /api/pruebas/estado` dice qué proveedor está activo.
+
 Opcional, para recortes de mayor calidad: `REMOVE_BG_API_KEY` en `.env` (remove.bg).
 
 ## 2. Frontend (carpeta `frontend/`)

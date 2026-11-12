@@ -51,7 +51,7 @@ describe('migraciones.service', () => {
       INSERT INTO user_measurements (user_id, estatura, peso, complexion, genero) VALUES ('u1', 165, 60, 'Media', 'Femenino');
     `);
 
-    expect(migrar(legado)).toEqual([1, 2, 3, 4]);
+    expect(migrar(legado)).toEqual([1, 2, 3, 4, 5]);
     const perfil = legado.prepare('SELECT altura, avatar_config_json FROM user_profiles WHERE user_id = ?').get('u1');
     expect(perfil.altura).toBe(165);
     expect(JSON.parse(perfil.avatar_config_json)).toEqual({ peso: 60, complexion: 'Media', genero: 'Femenino' });
