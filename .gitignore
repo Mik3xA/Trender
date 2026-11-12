@@ -6,3 +6,4 @@ dev.db
 dev.db-*
 *.db-wal
 *.db-shm
+privado/

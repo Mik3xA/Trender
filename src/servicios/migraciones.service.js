@@ -168,6 +168,72 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    version: 5,
+    nombre: 'outfits_fotos_persona_y_pruebas',
+    up(db) {
+      // Nueva categoría "outfit" (foto con varias prendas): se reconstruye la tabla por el CHECK.
+      db.exec(`
+        CREATE TABLE closet_items_nueva (
+          id            TEXT PRIMARY KEY,
+          user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          genero        TEXT NOT NULL DEFAULT 'Femenino' CHECK (genero IN ('Femenino', 'Masculino')),
+          source_url    TEXT,
+          image_path    TEXT,
+          category      TEXT CHECK (category IS NULL OR category IN ('top', 'bottom', 'dress', 'shoes', 'outfit')),
+          tipo          TEXT,
+          nombre        TEXT,
+          color         TEXT,
+          tienda        TEXT,
+          precio        TEXT,
+          imagen_origen TEXT,
+          analisis_json TEXT CHECK (analisis_json IS NULL OR json_valid(analisis_json)),
+          ajustes_json  TEXT CHECK (ajustes_json IS NULL OR json_valid(ajustes_json)),
+          error         TEXT,
+          status        TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('pending', 'processing', 'ready', 'review', 'failed')),
+          created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        INSERT INTO closet_items_nueva
+          SELECT id, user_id, genero, source_url, image_path, category, tipo, nombre, color, tienda, precio,
+                 imagen_origen, analisis_json, ajustes_json, error, status, created_at, updated_at
+          FROM closet_items;
+        DROP TABLE closet_items;
+        ALTER TABLE closet_items_nueva RENAME TO closet_items;
+        CREATE INDEX idx_closet_items_user_genero ON closet_items(user_id, genero, created_at DESC);
+        CREATE UNIQUE INDEX idx_closet_items_user_genero_url ON closet_items(user_id, genero, source_url) WHERE source_url IS NOT NULL;
+
+        -- Fotos de la persona (privadas): la base de cada prueba con IA.
+        CREATE TABLE fotos_persona (
+          id         TEXT PRIMARY KEY,
+          user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          image_path TEXT NOT NULL,
+          ancho      INTEGER NOT NULL,
+          alto       INTEGER NOT NULL,
+          huella     TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          UNIQUE (user_id, huella)
+        );
+        CREATE INDEX idx_fotos_persona_user ON fotos_persona(user_id, created_at DESC);
+
+        -- Pruebas: foto de la persona + prendas elegidas -> imagen generada.
+        CREATE TABLE pruebas (
+          id           TEXT PRIMARY KEY,
+          user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          persona_id   TEXT REFERENCES fotos_persona(id) ON DELETE SET NULL,
+          prendas_json TEXT NOT NULL CHECK (json_valid(prendas_json)),
+          status       TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('processing', 'ready', 'failed')),
+          proveedor    TEXT,
+          image_path   TEXT,
+          avisos_json  TEXT CHECK (avisos_json IS NULL OR json_valid(avisos_json)),
+          error        TEXT,
+          created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX idx_pruebas_user ON pruebas(user_id, created_at DESC);
+      `);
+    },
+  },
 ];
 
 /**

@@ -16,7 +16,7 @@ const ropa = require('./ropa.service');
  */
 
 const CONCURRENCIA = 2;
-const CATEGORIA_ARMARIO = { Torso: 'top', Piernas: 'bottom', Vestido: 'dress', Calzado: 'shoes' };
+const CATEGORIA_ARMARIO = { Torso: 'top', Piernas: 'bottom', Vestido: 'dress', Calzado: 'shoes', Outfit: 'outfit' };
 const TIPO_POR_DEFECTO = { Torso: 'camiseta', Piernas: 'pantalon', Vestido: 'vestido', Calzado: 'tenis' };
 const NOMBRE_FUENTE = { categoria: 'categoría de la tienda', titulo: 'título del producto', url: 'palabras del link', descripcion: 'descripción', nombre: 'nombre que escribiste' };
 
@@ -112,12 +112,23 @@ function guardarRecorte(item, png, deps) {
 async function procesarFoto(item, buffer, { nombre = null, origen = 'foto subida', conservar = null } = {}, deps) {
   try {
     const calidad = await imagen.evaluarImagen(buffer);
-    const recorte = await imagen.quitarFondo(buffer, { tolerante: true });
-    const visual = await vision.analizarPrenda(recorte.png);
+    let recorte;
+    try {
+      recorte = await imagen.quitarFondo(buffer, { tolerante: true });
+    } catch (err) {
+      if (err.code !== 'FONDO_NO_LISO' && err.code !== 'SIN_PRENDA') throw err;
+      // Sin recorte (fondo muy parecido a la prenda, outfit puesto en una persona...):
+      // se guarda la foto completa; la IA de la prueba sabe sacar la prenda de ella.
+      recorte = { png: await imagen.fotoCompleta(buffer), metodo: 'sin-recorte' };
+    }
+    const visual = recorte.metodo === 'sin-recorte' ? null : await vision.analizarPrenda(recorte.png);
     const texto = nombre ? ropa.clasificar({ titulo: nombre }) : { categoria: null, tipo: null, confianza: 'ninguna', fuentes: [] };
     texto.fuentes = (texto.fuentes ?? []).map((f) => (f === 'titulo' ? 'nombre' : f));
     const decision = decidir(texto, visual);
-    if (item.tipo) {
+    if (item.tipo === 'outfit') {
+      decision.evidencias.unshift('lo indicaste tú: outfit completo');
+      Object.assign(decision, { categoria: 'Outfit', tipo: 'outfit', confianza: 'alta' });
+    } else if (item.tipo) {
       // Respuesta del usuario antes de subir ("es una sudadera"): manda sobre todo lo demás.
       const categoriaUsuario = Object.entries(CATEGORIA_ARMARIO).find(([, c]) => c === item.category)?.[0];
       decision.evidencias.unshift(`lo indicaste tú: ${item.tipo}`);
@@ -128,7 +139,11 @@ async function procesarFoto(item, buffer, { nombre = null, origen = 'foto subida
     if (calidad.fraccionPiel > 0.15) avisos.push('Se ve piel en la foto: el resultado es mejor con la prenda sola, extendida o en gancho.');
     if (Math.min(calidad.ancho, calidad.alto) < 400) avisos.push('La foto es pequeña: con más resolución la prenda se verá más nítida.');
     if (recorte.metodo === 'recorte-tolerante') avisos.push('El fondo no era liso: revisa que el recorte haya quedado bien.');
+    if (recorte.metodo === 'sin-recorte') avisos.push('No pudimos separar la prenda del fondo: se usará la foto completa. Confirma qué prenda es.');
     if (decision.confianza === 'baja') avisos.push('No estamos seguros del tipo de prenda: confírmalo en el armario.');
+    // Una foto con varias prendas (o puesta en una persona) puede ser un outfit completo: se pregunta.
+    const posibleOutfit = decision.tipo !== 'outfit' && Boolean(visual?.detalle?.posibleOutfit || calidad.fraccionPiel > 0.12);
+    if (posibleOutfit) avisos.push('Parece un outfit completo: elige si quieres usar todo o solo una parte.');
 
     const imagePath = guardarRecorte(item, recorte.png, deps);
     const categoriaUsuario = item.category ?? null;
@@ -137,7 +152,7 @@ async function procesarFoto(item, buffer, { nombre = null, origen = 'foto subida
       status: categoria ? 'ready' : 'review',
       category: categoria ?? (decision.categoria ? CATEGORIA_ARMARIO[decision.categoria] : null),
       tipo: decision.tipo,
-      nombre: nombre || visual?.nombreSugerido || 'Prenda',
+      nombre: nombre || (decision.tipo === 'outfit' ? 'Outfit completo' : visual?.nombreSugerido) || 'Prenda',
       color: visual?.color?.principal.hex ?? null,
       tienda: conservar?.tienda ?? null,
       precio: conservar?.precio ?? null,
@@ -151,7 +166,9 @@ async function procesarFoto(item, buffer, { nombre = null, origen = 'foto subida
         metodoRecorte: recorte.metodo,
         calidadFoto: calidad,
         visual: resumenVisual(visual),
+        posibleOutfit,
       }),
+      ...(decision.tipo === 'outfit' ? { ajustes_json: JSON.stringify({ usar: ['top', 'bottom', 'shoes'] }) } : {}),
     });
   } catch (err) {
     deps.actualizar(item.id, {

@@ -49,3 +49,20 @@ Object.assign(SILUETAS, {
 // Logo claro (casi del color de la pared) en el pecho: debe conservarse en el recorte.
 SILUETAS['camiseta-logo'] =
   '<path d="M240,120 Q300,160 360,120 L520,200 L470,300 L420,270 L425,560 L175,560 L180,270 L130,300 L80,200 Z" fill="#5f6b38"/><rect x="250" y="300" width="100" height="60" fill="#efeae0"/>';
+
+// Outfit en una sola foto: playera arriba, pantalón abajo, tenis al final (flat lay).
+SILUETAS['outfit-apilado'] =
+  '<path d="M250,30 Q300,55 350,30 L430,70 L405,120 L380,105 L382,230 L218,230 L220,105 L195,120 L170,70 Z" fill="#b3282d"/>' +
+  '<polygon points="230,260 370,260 385,520 320,520 300,330 280,520 215,520" fill="#2f4f86"/>' +
+  '<ellipse cx="255" cy="565" rx="45" ry="18" fill="#222"/><ellipse cx="345" cy="565" rx="45" ry="18" fill="#222"/>';
+
+/** Foto sintética de una persona de cuerpo entero (para las pruebas con IA). */
+async function fotoPersona({ fondo = '#e9e4da' } = {}) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"><rect width="100%" height="100%" fill="${fondo}"/>
+    <ellipse cx="300" cy="120" rx="55" ry="70" fill="#c99a76"/><rect x="200" y="200" width="200" height="300" rx="40" fill="#8b8b88"/>
+    <rect x="215" y="500" width="70" height="330" fill="#3b5578"/><rect x="315" y="500" width="70" height="330" fill="#3b5578"/>
+    <rect x="150" y="210" width="45" height="250" rx="20" fill="#c99a76"/><rect x="405" y="210" width="45" height="250" rx="20" fill="#c99a76"/></svg>`;
+  return require('sharp')(Buffer.from(svg)).jpeg({ quality: 90 }).withMetadata({ exif: { IFD0: { Artist: 'gps-y-datos-privados' } } }).toBuffer();
+}
+
+module.exports.fotoPersona = fotoPersona;

@@ -611,4 +611,9 @@ async function colorDominante(png) {
   return `#${hex(mayor.r)}${hex(mayor.g)}${hex(mayor.b)}`;
 }
 
-module.exports = { evaluarImagen, quitarFondo, analizarSilueta, votarSilueta, colorDominante, esPiel };
+/** Foto completa normalizada (orientación EXIF, sin metadatos, 1024 px) cuando no se puede recortar. */
+async function fotoCompleta(buffer) {
+  return sharp(buffer, { failOn: 'none' }).rotate().resize(LADO_SALIDA, LADO_SALIDA, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
+}
+
+module.exports = { fotoCompleta, evaluarImagen, quitarFondo, analizarSilueta, votarSilueta, colorDominante, esPiel };
