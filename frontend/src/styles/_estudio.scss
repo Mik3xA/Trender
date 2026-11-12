@@ -184,6 +184,52 @@ app-avatar-setup {
   @apply fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-tinta px-5 py-2.5 text-sm text-papel;
 }
 
+// Agregar prenda: pestañas, zona para soltar fotos.
+.pestanas {
+  @apply grid grid-cols-2 rounded-full bg-hueso p-1;
+}
+
+.pestana {
+  @apply rounded-full py-1.5 text-xs text-tinta-2 transition-colors hover:text-tinta;
+}
+
+.pestana--activa {
+  @apply bg-papel font-medium text-tinta shadow-[0_0_0_1px_theme(colors.linea)];
+}
+
+.zona-subida {
+  @apply flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-tinta/25 bg-hueso px-4 py-5 text-center transition-colors hover:border-oliva focus-within:border-oliva;
+}
+
+.zona-subida--activa {
+  @apply border-oliva bg-oliva-tenue;
+}
+
+.tarjeta {
+  .anadir-foto {
+    @apply absolute inset-x-2 top-[62px] cursor-pointer rounded-full bg-tinta py-1 text-center text-[10px] font-medium text-papel hover:bg-oliva-oscuro;
+  }
+
+  .info {
+    @apply absolute bottom-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-linea bg-papel font-serif text-[10px] italic text-tinta-2 hover:border-tinta hover:text-tinta;
+  }
+}
+
+// Ficha con el análisis de una prenda (sobre el visor).
+.ficha {
+  @apply absolute bottom-4 right-4 top-14 z-20 w-[280px] overflow-y-auto rounded-2xl border border-linea bg-papel p-4 text-tinta;
+}
+
+.ficha-datos {
+  @apply mt-3 grid grid-cols-[84px_1fr] items-center gap-x-2 gap-y-1.5 text-xs;
+  dt {
+    @apply text-tinta-3;
+  }
+  dd {
+    @apply capitalize text-tinta;
+  }
+}
+
 // Tutorial guiado.
 .tutorial-resalte {
   @apply pointer-events-none fixed z-[60] rounded-2xl border-2 border-oliva transition-all duration-300;

@@ -20,13 +20,13 @@ export const PASOS_TUTORIAL: PasoTutorial[] = [
   },
   {
     objetivo: 'importar',
-    titulo: 'Trae prendas de tu tienda',
-    texto: 'Pega el link de un producto de Amazon, Mercado Libre, Nike, Zara, H&M u otra tienda. Analizamos la foto, el tipo de prenda y su color.',
+    titulo: 'Agrega tus prendas',
+    texto: 'Sube fotos de tu ropa (o pega el link de una tienda). Detectamos si es prenda superior, inferior, vestido o calzado, su color y estampado, y la guardamos en tu armario.',
   },
   {
     objetivo: 'armario',
     titulo: 'Tu armario',
-    texto: 'Las prendas importadas aparecen aquí. Toca una para probártela; si la clasificamos mal, pasa el cursor y corrige su categoría.',
+    texto: 'Tus prendas quedan guardadas aquí. Toca una para probártela; con la "i" ves su análisis y si la clasificamos mal puedes corregirla.',
   },
   {
     objetivo: 'visor',

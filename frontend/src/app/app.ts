@@ -28,14 +28,14 @@ export class AppComponent {
   protected readonly PASOS: Array<{ titulo: string; texto: string }> = [
     { titulo: 'Elige Mujer u Hombre', texto: 'Cada apartado tiene su propio avatar y su propio armario.' },
     { titulo: 'Ajusta tu cuerpo', texto: 'Altura, peso y tipo de cuerpo. Las medidas exactas son opcionales.' },
-    { titulo: 'Pega el link de la prenda', texto: 'Analizamos la foto, el tipo y el color del producto en segundos.' },
+    { titulo: 'Sube la foto de la prenda', texto: 'O pega el link de la tienda. Detectamos el tipo, el color y el estampado.' },
     { titulo: 'Pruébatela y elige talla', texto: 'Gira el avatar, combina prendas y mira la talla recomendada.' },
   ];
 
   protected readonly CARACTERISTICAS: Bloque[] = [
     {
-      titulo: 'Prendas reales de tiendas',
-      texto: 'La foto del producto se limpia de fondo y se proyecta sobre la prenda 3D.',
+      titulo: 'Tu ropa, de verdad',
+      texto: 'Sube fotos de tus prendas: quitamos el fondo y las ponemos en el avatar con pliegues y caída de tela.',
       icono: 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244',
     },
     {

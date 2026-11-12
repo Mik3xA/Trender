@@ -12,14 +12,19 @@ export const PREGUNTAS: Pregunta[] = [
       'No. Al entrar te asignamos una sesión de invitado automáticamente. Tu armario y tus medidas quedan guardados en este navegador y en el servidor, sin correo ni contraseña.',
   },
   {
+    pregunta: '¿Puedo subir fotos de mi propia ropa?',
+    respuesta:
+      'Sí, es la forma más fiable. Elige "Subir foto" y arrastra una o varias imágenes: detectamos si es prenda superior, inferior, vestido o calzado, su color y estampado, recortamos el fondo y la guardamos en tu armario. Funciona mejor con la prenda sola, extendida o en gancho, sobre un fondo liso.',
+  },
+  {
     pregunta: '¿De qué tiendas puedo importar prendas?',
     respuesta:
-      'Tenemos lectores específicos para Amazon, Mercado Libre, Nike, Zara y H&M, y uno general que funciona con la mayoría de tiendas en línea. Basta con pegar el link de la página del producto.',
+      'Tenemos lectores para Amazon, Mercado Libre, Nike, Zara y H&M, y uno general para la mayoría de tiendas. Algunas tiendas bloquean la lectura automática: en ese caso guardamos la prenda con los datos del link y puedes añadirle una foto o captura con "Añadir foto".',
   },
   {
     pregunta: '¿Cómo sabe Trender qué tipo de prenda es?',
     respuesta:
-      'Leemos el nombre, la categoría y la descripción del producto, y elegimos la foto más limpia. Con eso decidimos si es una prenda superior, inferior, vestido o calzado. Si dudamos, te preguntamos y puedes corregirla en el armario.',
+      'Analizamos la silueta de la foto: mangas, escote, dos perneras, una falda que se abre hacia abajo, la forma de un zapato… y, si lo hay, el texto del producto o el nombre que escribiste. Con el botón "i" de cada prenda ves el análisis y puedes corregir el tipo.',
   },
   {
     pregunta: '¿Qué tan exacta es la talla recomendada?',

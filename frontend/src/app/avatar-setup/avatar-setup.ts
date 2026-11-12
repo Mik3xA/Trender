@@ -1,12 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Subscription, from, switchMap } from 'rxjs';
 
 import { TONOS } from '../motor-3d/piel';
 import { Genero, LIMITES, MEDIDAS_INICIALES, Medidas, TIPOS_CUERPO, TipoCuerpo, estimarContornos, sanearMedidas } from '../probador/cuerpo';
 import { MUESTRAS, NOMBRE_CATEGORIA, PrendaVirtual, vestirConjunto } from '../probador/prendas';
 import { recomendarTalla } from '../probador/tallas';
-import { ArmarioService, CATEGORIA_PROBADOR, CategoriaArmario, PrendaArmario, aPrendaVirtual } from '../servicios/armario.service';
+import { ArmarioService, CATEGORIA_PROBADOR, CategoriaArmario, PrendaArmario, aPrendaVirtual, prepararFoto } from '../servicios/armario.service';
 import { PerfilGenero, PerfilService, Perfiles } from '../servicios/perfil.service';
 import { SesionService } from '../servicios/sesion.service';
 import { TutorialService } from '../tutorial/tutorial.service';
@@ -20,6 +20,14 @@ const CLAVE_PERFILES = 'trender.perfiles';
 const CLAVE_GENERO = 'trender.genero';
 const GUARDADO_MS = 700;
 const MAX_PRENDAS = 6;
+const MAX_FOTOS_A_LA_VEZ = 6;
+const MAX_BYTES_FOTO = 25 * 1024 * 1024;
+const TIPOS_POR_CATEGORIA: Record<CategoriaArmario, string[]> = {
+  top: ['camiseta', 'camisa', 'blusa', 'top', 'sueter', 'sudadera', 'chamarra', 'blazer', 'abrigo'],
+  bottom: ['pantalon', 'jeans', 'jogger', 'leggings', 'short', 'falda'],
+  dress: ['vestido'],
+  shoes: ['tenis', 'zapatos', 'botas', 'sandalias'],
+};
 
 const perfilInicial = (genero: Genero): PerfilGenero => ({ medidas: { ...MEDIDAS_INICIALES[genero] }, conjunto: [], tono: 'maniqui' });
 
@@ -80,7 +88,14 @@ export class AvatarSetupComponent implements OnInit {
     return f === 'todo' ? this.armario() : this.armario().filter((p) => p.category === f);
   });
 
-  // ---- importación
+  // ---- importación (link o foto)
+  readonly modoAgregar = signal<'foto' | 'link'>('foto');
+  readonly subiendo = signal(0);
+  readonly arrastrando = signal(false);
+  readonly nombreFoto = signal('');
+  private readonly fichaId = signal<string | null>(null);
+  /** Prenda cuyo análisis se muestra (se mantiene al día con el armario). */
+  readonly ficha = computed(() => this.armario().find((p) => p.id === this.fichaId()) ?? null);
   readonly enlace = signal('');
   readonly importando = signal(0);
   readonly errorImportacion = signal<string | null>(null);
@@ -251,6 +266,86 @@ export class AvatarSetupComponent implements OnInit {
     this.seguimientos.add(sub);
   }
 
+  /** Sube una o varias fotos de prendas (se analizan en el servidor). */
+  subirArchivos(archivos: FileList | File[] | null | undefined): void {
+    this.errorImportacion.set(null);
+    const lista = Array.from(archivos ?? []);
+    const fotos = lista.filter((f) => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name));
+    if (!fotos.length) {
+      if (lista.length) this.errorImportacion.set('Elige una imagen (JPG, PNG, WEBP o HEIC).');
+      return;
+    }
+    if (fotos.length > MAX_FOTOS_A_LA_VEZ) this.avisar(`Se subirán las primeras ${MAX_FOTOS_A_LA_VEZ} fotos.`);
+    const genero = this.genero();
+    const nombre = fotos.length === 1 ? this.nombreFoto().trim() : '';
+    this.nombreFoto.set('');
+    this.filtro.set('todo');
+    for (const archivo of fotos.slice(0, MAX_FOTOS_A_LA_VEZ)) {
+      if (archivo.size > MAX_BYTES_FOTO) {
+        this.errorImportacion.set(`"${archivo.name}" pesa más de 25 MB.`);
+        continue;
+      }
+      this.subiendo.update((n) => n + 1);
+      from(prepararFoto(archivo))
+        .pipe(switchMap((blob) => this.armarioApi.subirFoto(blob, genero, nombre || undefined)))
+        .subscribe({
+          next: (item) => this.recibir(item, genero),
+          error: (error: HttpErrorResponse) => {
+            this.subiendo.update((n) => n - 1);
+            this.errorImportacion.set(this.mensajeError(error));
+          },
+          complete: () => this.subiendo.update((n) => n - 1),
+        });
+    }
+  }
+
+  /** Añade o cambia la foto de una prenda (p. ej. un link cuya tienda no dejó ver la foto). */
+  agregarFotoA(item: PrendaArmario, archivos: FileList | null | undefined): void {
+    const archivo = archivos?.[0];
+    if (!archivo) return;
+    const genero = this.genero();
+    this.quitar(item.id);
+    this.reemplazar({ ...item, status: 'processing' });
+    from(prepararFoto(archivo))
+      .pipe(switchMap((blob) => this.armarioApi.agregarFoto(item.id, blob)))
+      .subscribe({
+        next: (actualizada) => this.recibir(actualizada, genero),
+        error: (error: HttpErrorResponse) => {
+          this.reemplazar(item);
+          this.avisar(this.mensajeError(error));
+        },
+      });
+  }
+
+  verFicha(item: PrendaArmario, evento?: Event): void {
+    evento?.stopPropagation();
+    this.fichaId.set(this.fichaId() === item.id ? null : item.id);
+  }
+
+  cerrarFicha(): void {
+    this.fichaId.set(null);
+  }
+
+  tiposDe(categoria: CategoriaArmario): string[] {
+    return TIPOS_POR_CATEGORIA[categoria];
+  }
+
+  /** Corrige el tipo concreto (p. ej. "sueter" -> "sudadera") y vuelve a vestirla. */
+  cambiarTipo(item: PrendaArmario, tipo: string): void {
+    if (!item.category || tipo === item.tipo) return;
+    this.armarioApi.clasificar(item.id, item.category, tipo).subscribe({
+      next: (actualizada) => {
+        this.reemplazar(actualizada);
+        if (this.estaPuesta(item.id)) {
+          this.quitar(item.id);
+          const prenda = aPrendaVirtual(actualizada);
+          if (prenda) this.vestir(prenda);
+        }
+      },
+      error: (error: HttpErrorResponse) => this.avisar(this.mensajeError(error)),
+    });
+  }
+
   /** Corrige o elige la categoría de una prenda y la viste. */
   clasificar(item: PrendaArmario, categoria: CategoriaArmario): void {
     this.armarioApi.clasificar(item.id, categoria, categoria === item.category ? undefined : this.tipoPor(categoria)).subscribe({
@@ -308,10 +403,11 @@ export class AvatarSetupComponent implements OnInit {
       const prenda = aPrendaVirtual(item);
       if (prenda) {
         this.vestir(prenda);
-        this.avisar(`${NOMBRE_CATEGORIA[prenda.categoria]} · ${prenda.tipo}: ${prenda.nombre}`);
+        const sinFoto = item.analisis?.sinFoto ? ' · añade una foto para verla en el avatar' : '';
+        this.avisar(`${NOMBRE_CATEGORIA[prenda.categoria]} · ${prenda.tipo}: ${prenda.nombre}${sinFoto}`);
       }
     } else if (item.status === 'review') {
-      this.avisar('No pudimos identificar la prenda: elige qué es en tu armario.');
+      this.avisar('No estamos seguros del tipo de prenda: elige qué es en tu armario.');
     } else if (item.status === 'failed') {
       this.avisar(item.error ?? 'No se pudo importar la prenda.');
     }

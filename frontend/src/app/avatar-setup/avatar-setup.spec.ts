@@ -44,6 +44,8 @@ describe('AvatarSetupComponent', () => {
       seguir: vi.fn(() => of()),
       clasificar: vi.fn(),
       eliminar: vi.fn(() => of({})),
+      subirFoto: vi.fn(),
+      agregarFoto: vi.fn(),
     };
     perfil = { obtener: vi.fn(() => of({ activo: null, perfiles: {} })), guardar: vi.fn(() => of({})) };
     await TestBed.configureTestingModule({
@@ -195,5 +197,62 @@ describe('AvatarSetupComponent', () => {
     fixture.detectChanges();
     expect(c.panelAbierto()).toBe(true);
     expect(fixture.nativeElement.querySelector('aside')).not.toBeNull();
+  });
+
+  it('sube fotos: cada una se analiza, aparece en el armario y se viste al quedar lista', async () => {
+    const lista = prenda({ id: 'f1', source_url: 'foto:Femenino:abc', genero: 'Femenino', category: 'top', tipo: 'camiseta', nombre: 'Camiseta rojo' });
+    armario['subirFoto'].mockReturnValue(of({ ...lista, status: 'processing' }, lista));
+    const foto = new File([new Uint8Array([1, 2, 3])], 'camiseta.jpg', { type: 'image/jpeg' });
+    c.nombreFoto.set('Mi camiseta');
+    c.subirArchivos([foto, new File(['x'], 'notas.txt', { type: 'text/plain' })]);
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+    expect(armario['subirFoto']).toHaveBeenCalledTimes(1);
+    expect(armario['subirFoto']).toHaveBeenCalledWith(foto, 'Femenino', 'Mi camiseta');
+    expect(c.armario()[0].id).toBe('f1');
+    expect(c.estaPuesta('f1')).toBe(true);
+    expect(c.subiendo()).toBe(0);
+  });
+
+  it('rechaza archivos que no son imágenes', () => {
+    c.subirArchivos([new File(['x'], 'notas.txt', { type: 'text/plain' })]);
+    expect(armario['subirFoto']).not.toHaveBeenCalled();
+    expect(c.errorImportacion()).toContain('imagen');
+  });
+
+  it('una prenda sin foto ofrece "Añadir foto" y la ficha muestra el análisis', async () => {
+    const sinFoto = prenda({
+      id: 'l1',
+      imagen_url: null,
+      analisis: { confianza: 'media', evidencias: ['título del producto: jeans'], avisos: ['La tienda bloqueó la lectura automática: se analizó solo el link.'], metodoRecorte: null, sinFoto: true },
+    });
+    armario['listar'].mockReturnValue(of([sinFoto]));
+    c.cambiarGenero('Masculino');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-anadir-foto]')).not.toBeNull();
+
+    c.verFicha(sinFoto);
+    fixture.detectChanges();
+    const ficha = fixture.nativeElement.querySelector('[data-ficha]') as HTMLElement;
+    expect(ficha.textContent).toContain('bloqueó');
+    expect(ficha.textContent).toContain('título del producto');
+
+    const conFoto = { ...sinFoto, imagen_url: '/media/closet/u/l1.png', status: 'ready' as const };
+    armario['agregarFoto'].mockReturnValue(of(conFoto));
+    c.agregarFotoA(sinFoto, [new File([new Uint8Array([1])], 'jeans.png', { type: 'image/png' })] as unknown as FileList);
+    await vi.runAllTimersAsync();
+    expect(armario['agregarFoto']).toHaveBeenCalledWith('l1', expect.any(File));
+    expect(c.armario()[0].imagen_url).toBe('/media/closet/u/l1.png');
+  });
+
+  it('desde la ficha se corrige el tipo de la prenda', () => {
+    const item = prenda();
+    armario['listar'].mockReturnValue(of([item]));
+    armario['clasificar'].mockReturnValue(of({ ...item, tipo: 'jeans' }));
+    c.cambiarGenero('Masculino');
+    c.cambiarTipo(item, 'jeans');
+    expect(armario['clasificar']).toHaveBeenCalledWith('p1', 'bottom', 'jeans');
+    expect(c.armario()[0].tipo).toBe('jeans');
+    expect(c.tiposDe('bottom')).toContain('short');
   });
 });

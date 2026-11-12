@@ -28,15 +28,44 @@
   @if (panelAbierto()) {
     <aside class="panel" aria-label="Configuración">
       <section class="bloque" data-tutorial="importar">
-        <h2 class="titulo">Importar desde tienda</h2>
-        <p class="mt-1 text-xs leading-relaxed text-tinta-3">Amazon, Mercado Libre, Nike, Zara, H&amp;M o cualquier tienda.</p>
-        <form class="mt-3 flex flex-col gap-2" (submit)="$event.preventDefault(); importar()">
-          <input id="enlace" name="enlace" type="url" [value]="enlace()" (input)="enlace.set($any($event.target).value)"
-                 placeholder="https://…" autocomplete="off" class="campo" aria-label="Link del producto">
-          <button type="submit" class="boton" [disabled]="!enlace().trim()">
-            {{ importando() ? 'Analizando ' + importando() + '…' : 'Importar prenda' }}
-          </button>
-        </form>
+        <h2 class="titulo">Agregar prenda</h2>
+        <div class="pestanas mt-3" role="tablist" aria-label="Cómo agregar la prenda">
+          <button type="button" role="tab" class="pestana" [class.pestana--activa]="modoAgregar() === 'foto'"
+                  [attr.aria-selected]="modoAgregar() === 'foto'" (click)="modoAgregar.set('foto')">Subir foto</button>
+          <button type="button" role="tab" class="pestana" [class.pestana--activa]="modoAgregar() === 'link'"
+                  [attr.aria-selected]="modoAgregar() === 'link'" (click)="modoAgregar.set('link')">Link de tienda</button>
+        </div>
+
+        @if (modoAgregar() === 'foto') {
+          <label class="zona-subida mt-3" [class.zona-subida--activa]="arrastrando()"
+                 (dragover)="$event.preventDefault(); arrastrando.set(true)" (dragleave)="arrastrando.set(false)"
+                 (drop)="$event.preventDefault(); arrastrando.set(false); subirArchivos($any($event).dataTransfer?.files)">
+            <input type="file" accept="image/*,.heic,.heif" multiple class="sr-only" data-subir-foto
+                   (change)="subirArchivos($any($event.target).files); $any($event.target).value = ''">
+            <svg class="h-6 w-6 text-oliva" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            <span class="text-sm font-medium text-tinta">{{ subiendo() ? 'Analizando ' + subiendo() + '…' : 'Elige o arrastra fotos' }}</span>
+            <span class="text-[11px] text-tinta-3">Detectamos si es superior, inferior, vestido o calzado</span>
+          </label>
+          <input type="text" class="campo mt-2" placeholder="Nombre (opcional)" maxlength="120" [value]="nombreFoto()"
+                 (input)="nombreFoto.set($any($event.target).value)" aria-label="Nombre de la prenda (opcional)">
+          <p class="mt-2 text-[11px] leading-relaxed text-tinta-3">
+            Mejor resultado: la prenda sola, extendida o en gancho, de frente, sobre un fondo liso y con buena luz.
+          </p>
+        } @else {
+          <form class="mt-3 flex flex-col gap-2" (submit)="$event.preventDefault(); importar()">
+            <input id="enlace" name="enlace" type="url" [value]="enlace()" (input)="enlace.set($any($event.target).value)"
+                   placeholder="https://…" autocomplete="off" class="campo" aria-label="Link del producto">
+            <button type="submit" class="boton" [disabled]="!enlace().trim()">
+              {{ importando() ? 'Analizando ' + importando() + '…' : 'Importar prenda' }}
+            </button>
+          </form>
+          <p class="mt-2 text-[11px] leading-relaxed text-tinta-3">
+            Algunas tiendas no dejan leer sus páginas. También puedes pegar la dirección de la foto
+            (clic derecho sobre la imagen → “Copiar dirección de imagen”) o subir una captura.
+          </p>
+        }
         @if (errorImportacion()) {
           <p class="mt-2 text-xs text-[#b4532a]" role="alert">{{ errorImportacion() }}</p>
         }
@@ -128,6 +157,55 @@
         Mientras tanto puedes probar los básicos.
       </p>
     }
+    @if (ficha(); as f) {
+      <section class="ficha" aria-label="Análisis de la prenda" data-ficha>
+        <header class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-oliva">Análisis</p>
+            <h3 class="mt-1 truncate text-sm font-semibold">{{ f.nombre ?? 'Prenda' }}</h3>
+          </div>
+          <button type="button" class="icono !h-7 !w-7 shrink-0" (click)="cerrarFicha()" aria-label="Cerrar análisis">×</button>
+        </header>
+        <dl class="ficha-datos">
+          <dt>Tipo</dt>
+          <dd>
+            @if (f.category) {
+              <select class="campo !py-1 !text-xs" [value]="f.tipo ?? ''" (change)="cambiarTipo(f, $any($event.target).value)" aria-label="Tipo de prenda">
+                @for (t of tiposDe(f.category); track t) { <option [value]="t" [selected]="t === f.tipo">{{ t }}</option> }
+              </select>
+            } @else { Por confirmar }
+          </dd>
+          <dt>Categoría</dt><dd>{{ f.category ? NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[f.category]] : 'Por confirmar' }}</dd>
+          <dt>Seguridad</dt><dd>{{ confianza(f) || '—' }}</dd>
+          @if (f.analisis?.visual?.detalle; as d) {
+            @if (d.manga) { <dt>Manga</dt><dd>{{ d.manga }}</dd> }
+            @if (d.largo) { <dt>Largo</dt><dd>{{ d.largo }}</dd> }
+            @if (d.estampado) { <dt>Estampado</dt><dd>{{ d.estampado }}</dd> }
+            @if (d.tela) { <dt>Tela</dt><dd>{{ d.tela }}</dd> }
+            @if (d.colores.length) {
+              <dt>Colores</dt>
+              <dd class="flex flex-wrap gap-2">
+                @for (c of d.colores; track c.hex) {
+                  <span class="inline-flex items-center gap-1"><span class="h-3 w-3 rounded-full border border-black/10" [style.background]="c.hex"></span>{{ c.nombre }}</span>
+                }
+              </dd>
+            }
+          }
+          @if (f.tienda) { <dt>Tienda</dt><dd>{{ f.tienda }}{{ f.precio ? ' · ' + f.precio : '' }}</dd> }
+        </dl>
+        @if (f.analisis?.evidencias?.length) {
+          <p class="mt-3 text-[11px] font-medium text-tinta-2">Por qué lo creemos</p>
+          <ul class="mt-1 space-y-0.5 text-[11px] text-tinta-3">
+            @for (e of f.analisis!.evidencias; track e) { <li>· {{ e }}</li> }
+          </ul>
+        }
+        @if (f.analisis?.avisos?.length) {
+          <ul class="mt-3 space-y-1 rounded-lg bg-oliva-tenue px-3 py-2 text-[11px] text-oliva-oscuro">
+            @for (a of f.analisis!.avisos; track a) { <li>{{ a }}</li> }
+          </ul>
+        }
+      </section>
+    }
     @if (conjunto().length) {
       <button type="button" class="marca absolute right-4 top-4 pointer-events-auto hover:text-tinta" (click)="quitarTodo()">Quitar todo</button>
     }
@@ -160,7 +238,7 @@
                   @if (item.imagen_url) {
                     <img [src]="item.imagen_url ? apiUrl + item.imagen_url : ''" alt="" class="h-full w-full object-contain p-2" loading="lazy">
                   } @else {
-                    <span class="h-10 w-10 border border-linea" [style.background]="item.color ?? '#d9d7cf'"></span>
+                    <span class="h-10 w-10 rounded-md border border-linea" [style.background]="item.color ?? '#d9d7cf'"></span>
                   }
                 }
               }
@@ -182,6 +260,16 @@
                           [title]="'Es ' + NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[c]]">{{ NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[c]] }}</button>
                 }
               </span>
+            }
+            @if (item.status !== 'processing' && !item.imagen_url) {
+              <label class="anadir-foto" [title]="'Añadir foto a ' + (item.nombre ?? 'la prenda')">
+                <input type="file" accept="image/*,.heic,.heif" class="sr-only" data-anadir-foto
+                       (change)="agregarFotoA(item, $any($event.target).files); $any($event.target).value = ''">
+                + Añadir foto
+              </label>
+            }
+            @if (item.analisis && item.status !== 'processing') {
+              <button type="button" class="info" (click)="verFicha(item, $event)" [attr.aria-label]="'Ver análisis de ' + (item.nombre ?? 'la prenda')">i</button>
             }
             <button type="button" class="borrar" (click)="eliminar(item, $event)" [attr.aria-label]="'Eliminar ' + (item.nombre ?? 'prenda')">×</button>
           </div>
