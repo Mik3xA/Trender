@@ -20,6 +20,7 @@ import {
 } from './cuerpo-3d';
 import { aplicarMedidasAGlb, alturaDe } from './avatar-glb';
 import { aplicarTono } from './piel';
+import { materialInterior } from './acabado';
 import { liberarFotos, liberarTexturas, materialConFoto, materialTela, proyectarFoto } from './telas';
 
 const DURACION_TRANSICION_MS = 380;
@@ -44,7 +45,7 @@ export class MotorAvatar {
     sheenColor: new THREE.Color('#ffffff'),
   });
   private readonly materialSuela = new THREE.MeshStandardMaterial({ color: '#f4f2ee', roughness: 0.7 });
-  private readonly materialesPrenda = new Map<string, THREE.MeshPhysicalMaterial>();
+  private readonly materialesPrenda = new Map<string, THREE.MeshPhysicalMaterial | THREE.MeshStandardMaterial>();
   private readonly avatar = new THREE.Group();
 
   private medidasActuales: Medidas | null = null;
@@ -208,14 +209,19 @@ export class MotorAvatar {
 
   private materialesPara(prenda: PrendaVirtual): MaterialesPrenda {
     const estilo = estiloDe(prenda);
-    const clave = `${prenda.color}|${estilo.tela}|${prenda.imagen ?? ''}`;
+    const conZonas = !!prenda.zonas;
+    const clave = `${prenda.color}|${estilo.tela}|${prenda.imagen ?? ''}|${conZonas}`;
     if (!this.materialesPrenda.has(clave)) {
-      // Con foto de la tienda: la prenda real proyectada; si no, tela procedimental de su color.
-      const material = prenda.imagen ? materialConFoto(prenda.imagen, prenda.color, estilo.tela) : materialTela(prenda.color, estilo.tela);
+      // Con foto: la prenda real proyectada; si no, tela procedimental de su color.
+      const material = prenda.imagen ? materialConFoto(prenda.imagen, prenda.color, estilo.tela, conZonas) : materialTela(prenda.color, estilo.tela);
       this.materialesPrenda.set(clave, material);
     }
-    const detalle = prenda.categoria === 'Calzado' ? this.materialSuela : this.materialesPrenda.get(clave)!;
-    return { tela: this.materialesPrenda.get(clave)!, detalle };
+    const claveInterior = `interior|${prenda.color}`;
+    if (!this.materialesPrenda.has(claveInterior)) this.materialesPrenda.set(claveInterior, materialInterior(prenda.color));
+    const tela = this.materialesPrenda.get(clave)!;
+    const detalle = prenda.categoria === 'Calzado' ? this.materialSuela : tela;
+    const interior = prenda.categoria === 'Calzado' ? undefined : this.materialesPrenda.get(claveInterior)!;
+    return { tela, detalle, interior };
   }
 
   private vestir(esq: Esqueleto): THREE.Object3D[] {
@@ -239,11 +245,7 @@ export class MotorAvatar {
         default:
           grupo = construirCalzado(esq, estilo, mat);
       }
-      if (prenda.imagen) {
-        const esTela = (m: THREE.Mesh) => m.material === mat.tela;
-        if (prenda.categoria === 'Calzado') grupo.children.forEach((zapato) => proyectarFoto(zapato, 'lado', esTela));
-        else proyectarFoto(grupo, 'frente', esTela);
-      }
+      if (prenda.imagen) proyectarFoto(grupo, prenda, (m: THREE.Mesh) => m.material === mat.tela);
       return grupo;
     });
   }

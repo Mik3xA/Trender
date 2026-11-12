@@ -84,7 +84,7 @@ function puntoAnillo(a: Anillo, theta: number, exponente: number): [number, numb
 }
 
 /** Une los vértices duplicados de la costura (u = 0 y u = 1) para que no se vea una línea. */
-function soldarCostura(geo: THREE.BufferGeometry, filas: number, columnas: number): void {
+export function soldarCostura(geo: THREE.BufferGeometry, filas: number, columnas: number): void {
   const normales = geo.getAttribute('normal') as THREE.BufferAttribute;
   for (let f = 0; f < filas; f += 1) {
     const i0 = f * columnas;
@@ -145,6 +145,7 @@ export function loft(anillosBase: Anillo[], opciones: OpcionesLoft = {}): THREE.
   geo.setIndex(indices);
   geo.computeVertexNormals();
   soldarCostura(geo, anillos.length, columnas);
+  geo.userData['rejilla'] = { filas: anillos.length, columnas };
   return geo;
 }
 
@@ -222,6 +223,7 @@ export function tubo(secciones: SeccionTubo[], { segmentos = 28, pasos = 40, tap
   geo.setIndex(indices);
   geo.computeVertexNormals();
   soldarCostura(geo, pasos + 1, columnas);
+  geo.userData['rejilla'] = { filas: pasos + 1, columnas };
   return geo;
 }
 

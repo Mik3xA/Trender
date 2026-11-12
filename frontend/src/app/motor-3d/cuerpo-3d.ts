@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { Proporciones } from '../probador/cuerpo';
 import { Estilo } from '../probador/prendas';
+import { Pliegue, dobladillo, plegar } from './acabado';
 import { Anillo, SeccionTubo, elipsoide, loft, tubo } from './geometria';
 
 const mezcla = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -173,6 +174,10 @@ function geometriaPie(esq: Esqueleto, inflado = 1, extra = 0): THREE.BufferGeome
 }
 
 function malla(geo: THREE.BufferGeometry, material: THREE.Material, nombre: string): THREE.Mesh {
+  // Las telas usan colores de vértice (oclusión de pliegues): sin ellos se verían negras.
+  if (!geo.getAttribute('color')) {
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.getAttribute('position').count * 3).fill(1), 3));
+  }
   const m = new THREE.Mesh(geo, material);
   m.name = nombre;
   m.castShadow = true;
@@ -355,6 +360,33 @@ function fraccionPierna(esq: Esqueleto, y: number): number {
 export interface MaterialesPrenda {
   tela: THREE.Material;
   detalle: THREE.Material;
+  /** Cara interior (más oscura); si falta, la prenda no muestra interior. */
+  interior?: THREE.Material;
+}
+
+/**
+ * Pieza de tela acabada: superficie con pliegues, dobladillos en sus bordes
+ * libres y cara interior. Devuelve un grupo con nombre `nombre`.
+ */
+function pieza(
+  geo: THREE.BufferGeometry,
+  mat: MaterialesPrenda,
+  nombre: string,
+  pliegue: Pliegue | null,
+  bordes: Array<{ borde: 'primera' | 'ultima'; grosor: number }> = []
+): THREE.Mesh[] {
+  if (pliegue && pliegue.amplitud > 0) plegar(geo, pliegue);
+  const piezas = [malla(geo, mat.tela, nombre)];
+  for (const { borde, grosor } of bordes) {
+    const tuboBorde = dobladillo(geo, borde, grosor);
+    if (tuboBorde) piezas.push(malla(tuboBorde, mat.tela, `${nombre}_borde`));
+  }
+  if (mat.interior) {
+    const interior = malla(geo, mat.interior, `${nombre}_interior`);
+    interior.castShadow = false;
+    piezas.push(interior);
+  }
+  return piezas;
 }
 
 /** Prenda superior: cuerpo, mangas y detalles (capucha, cuello, tirantes). */
@@ -366,13 +398,40 @@ export function construirSuperior(esq: Esqueleto, estilo: Estilo, mat: Materiale
   const sinManga = estilo.manga === 0;
   const hasta = sinManga ? p.y.axila + 0.012 * H : 0.832 * H;
   const desde = estilo.largo * H;
+  const holgura = Math.max(0, estilo.holgura - 1);
   // Las prendas superiores van por fuera del pantalón: más separación del cuerpo.
-  grupo.add(malla(loft(anillosPrenda(esq, desde, hasta, estilo, 'cuelga', 0.014)), mat.tela, 'superior_cuerpo'));
+  const cuerpo = loft(anillosPrenda(esq, desde, hasta, estilo, 'cuelga', 0.016), { segmentos: 96 });
+  grupo.add(
+    ...pieza(
+      cuerpo,
+      mat,
+      'superior_cuerpo',
+      { amplitud: H * (0.0018 + holgura * 0.05 + estilo.vuelo * 0.02), pliegues: 7, libre: 'v0', semilla: 0.7 },
+      [
+        { borde: 'primera', grosor: 0.0022 * H },
+        { borde: 'ultima', grosor: 0.0016 * H },
+      ]
+    )
+  );
 
   if (!sinManga) {
     for (const brazo of esq.brazos) {
-      const manga = tramoExtremidad(brazo, 0.02, Math.min(estilo.manga, 0.97), estilo.holgura * 1.04, 0.006, estilo.manga < 0.5 ? 0.12 : 0.05);
-      grupo.add(malla(tubo(manga, { segmentos: 24, pasos: 28 }), mat.tela, 'manga'));
+      const manga = tramoExtremidad(brazo, 0.02, Math.min(estilo.manga, 0.97), estilo.holgura * 1.06, 0.008, estilo.manga < 0.5 ? 0.14 : 0.06);
+      grupo.add(
+        ...pieza(
+          tubo(manga, { segmentos: 36, pasos: 32 }),
+          mat,
+          brazo.lado > 0 ? 'manga_izq' : 'manga_der',
+          {
+            amplitud: H * (0.0012 + holgura * 0.03),
+            pliegues: 3,
+            libre: 'v1',
+            arrugas: estilo.manga > 0.6 ? H * 0.0011 : 0,
+            semilla: brazo.lado > 0 ? 1.1 : 2.3,
+          },
+          [{ borde: 'ultima', grosor: 0.0018 * H }]
+        )
+      );
     }
   } else {
     // Tirantes sobre los hombros.
@@ -418,16 +477,45 @@ export function construirInferior(esq: Esqueleto, estilo: Estilo, tipo: string, 
   const cintura = p.y.cintura - (tipo === 'leggings' ? 0 : 0.012 * H);
   const bajo = estilo.largo * H;
 
+  const holgura = Math.max(0, estilo.holgura - 1);
   if (tipo === 'falda') {
-    grupo.add(malla(loft(anillosPrenda(esq, bajo, cintura, estilo)), mat.tela, 'falda'));
+    grupo.add(
+      ...pieza(
+        loft(anillosPrenda(esq, bajo, cintura, estilo), { segmentos: 96 }),
+        mat,
+        'falda',
+        { amplitud: H * (0.0025 + estilo.vuelo * 0.05), pliegues: 9, libre: 'v0', semilla: 0.4 },
+        [{ borde: 'primera', grosor: 0.002 * H }]
+      )
+    );
   } else {
     // La holgura de un jogger o pantalón suelto está en las perneras; en la cadera se ajusta.
-    const pelvis = anillosPrenda(esq, p.y.entrepierna + 0.002 * H, cintura, { ...estilo, holgura: Math.min(estilo.holgura, 1.05) }, 'ajusta');
+    const pelvis = anillosPrenda(esq, p.y.entrepierna - 0.01 * H, cintura, { ...estilo, holgura: Math.min(estilo.holgura, 1.05) }, 'ajusta');
     grupo.add(malla(loft(pelvis, { tapaInferior: true }), mat.tela, 'pelvis'));
     const hasta = fraccionPierna(esq, Math.max(bajo, p.y.tobillo - 0.004 * H));
     for (const pierna of esq.piernas) {
-      const pernera = tramoExtremidad(pierna, 0, hasta, estilo.holgura, 0.005, estilo.vuelo * 4);
-      grupo.add(malla(tubo(pernera, { segmentos: 28, pasos: 36 }), mat.tela, 'pernera'));
+      const pernera = tramoExtremidad(pierna, 0, hasta, estilo.holgura, 0.006, estilo.vuelo * 4).map((s, i, todas) => {
+        // Arriba la pernera recoge el glúteo y la entrepierna: más ancha, para que la
+        // transición desde la pelvis sea continua (sin "escalón" bajo la cadera).
+        const t = i / (todas.length - 1);
+        const arriba = Math.max(0, 1 - (t * hasta) / 0.18);
+        return { ...s, radio: s.radio * (1 + 0.2 * arriba ** 1.5) };
+      });
+      grupo.add(
+        ...pieza(
+          tubo(pernera, { segmentos: 40, pasos: 44 }),
+          mat,
+          'pernera',
+          {
+            amplitud: H * (0.0008 + holgura * 0.035),
+            pliegues: 3,
+            libre: 'v1',
+            arrugas: H * (holgura > 0.03 ? 0.0014 : 0.0004),
+            semilla: pierna.lado > 0 ? 0.3 : 1.9,
+          },
+          [{ borde: 'ultima', grosor: 0.002 * H }]
+        )
+      );
     }
   }
   // Pretina.
@@ -440,8 +528,17 @@ export function construirInferior(esq: Esqueleto, estilo: Estilo, tipo: string, 
 export function construirVestido(esq: Esqueleto, estilo: Estilo, mat: MaterialesPrenda): THREE.Group {
   const grupo = construirSuperior(esq, { ...estilo, manga: 0, largo: esq.p.y.cintura / esq.p.altura, holgura: 1.02, vuelo: 0 }, mat);
   grupo.name = 'vestido';
-  const falda = anillosPrenda(esq, estilo.largo * esq.p.altura, esq.p.y.cintura + 0.004 * esq.p.altura, estilo);
-  grupo.add(malla(loft(falda), mat.tela, 'falda_vestido'));
+  const H = esq.p.altura;
+  const falda = anillosPrenda(esq, estilo.largo * H, esq.p.y.cintura + 0.004 * H, estilo);
+  grupo.add(
+    ...pieza(
+      loft(falda, { segmentos: 96 }),
+      mat,
+      'falda_vestido',
+      { amplitud: H * (0.003 + estilo.vuelo * 0.05), pliegues: 9, libre: 'v0', semilla: 1.3 },
+      [{ borde: 'primera', grosor: 0.002 * H }]
+    )
+  );
   return grupo;
 }
 
