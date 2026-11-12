@@ -132,7 +132,7 @@ function medirRasgos(mascara) {
       if (medio > W * 0.3 && medio < W * 0.7) huecoCentral = true;
     }
     const centro = t.length ? t.reduce((s, [a, b]) => s + ((a + b) / 2) * (b - a + 1), 0) / t.reduce((s, [a, b]) => s + b - a + 1, 0) : W / 2;
-    return { tramos: t.length, span, huecoCentral, centro };
+    return { tramos: t.length, largos: t.map(([a, b]) => b - a + 1), span, huecoCentral, centro };
   });
   const filaEn = (f) => info[Math.min(H - 1, Math.max(0, Math.floor(f * H)))];
   const anchoEn = (f) => filaEn(f).span / W;
@@ -167,10 +167,29 @@ function medirRasgos(mascara) {
   const centroArriba = mediana(rango(0, 0.4).map((f) => f.centro));
   const estrechez = Math.min(...rango(0.25, 0.55).map((f) => f.span)) / Math.max(1, Math.min(filaEn(0.15).span, filaEn(0.85).span));
 
+  // Capucha: arriba una sola pieza estrecha y centrada que se ensancha de golpe en los hombros.
+  const capucha =
+    !escote &&
+    filaEn(0.03).tramos === 1 &&
+    anchoEn(0.03) < 0.42 &&
+    Math.abs(filaEn(0.03).centro - W / 2) < W * 0.08 &&
+    Math.max(...rango(0.12, 0.3).map((f) => f.span)) / W > 0.55;
+
+  // Perneras: ancho de cada pierna abajo frente a la rodilla (puño elástico = jogger).
+  const anchoPierna = (f) => {
+    const fila = filaEn(f);
+    return fila.largos.length >= 2 ? (fila.largos[0] + fila.largos[fila.largos.length - 1]) / 2 : null;
+  };
+  const piernaAbajo = anchoPierna(0.95);
+  const piernaRodilla = anchoPierna(0.65);
+  const estrechaAbajo = piernaAbajo && piernaRodilla ? piernaAbajo / piernaRodilla : 1;
+
   return {
     caja,
     anchoTorsoPx: anchoTorso,
     rasgos: {
+      capucha,
+      estrechaAbajo: redondear(estrechaAbajo),
       proporcion: redondear(W / H),
       relleno: redondear(area / (W * H)),
       piezas,
@@ -192,6 +211,47 @@ function medirRasgos(mascara) {
   };
 }
 
+/**
+ * Abertura al frente (cierre o botones): una línea vertical al centro del torso
+ * con un cambio de luz marcado entre la izquierda y la derecha de la línea, en
+ * la mayoría de las filas. Las rayas horizontales no la activan.
+ */
+async function detectarCierre(png, mascara, caja) {
+  const { data } = await sharp(png)
+    .ensureAlpha()
+    .resize(mascara.ancho, mascara.alto, { fit: 'fill' })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const lum = (x, y) => {
+    const i = (y * mascara.ancho + x) * 4;
+    return data[i + 3] < 128 ? null : 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+  };
+  const W = caja.x1 - caja.x0 + 1;
+  const H = caja.y1 - caja.y0 + 1;
+  const centro = Math.round(caja.x0 + W / 2);
+  // ¿Hay una línea (o un cambio de luz entre ambos lados) en la columna cx de la fila y?
+  const lineaEn = (cx, y) => {
+    const v = [-6, -3, -1, 0, 1, 3, 6].map((d) => lum(Math.min(caja.x1, Math.max(caja.x0, cx + d)), y));
+    if (v.some((x) => x === null)) return null;
+    const [l6, l3, l1, c, r1, r3, r6] = v;
+    const vecinos = (l3 + r3) / 2;
+    const linea = Math.abs(Math.min(l1, c, r1) - vecinos) > 22 || Math.abs(Math.max(l1, c, r1) - vecinos) > 22;
+    const lados = Math.abs((l6 + l3) / 2 - (r6 + r3) / 2) > 26;
+    return linea || lados;
+  };
+  let filas = 0;
+  let conLinea = 0;
+  const lateral = Math.round(W * 0.2);
+  for (let y = caja.y0 + Math.round(H * 0.3); y < caja.y0 + Math.round(H * 0.92); y += 1) {
+    const enCentro = lineaEn(centro, y);
+    if (enCentro === null) continue;
+    filas += 1;
+    // Al centro sí y a los lados no: es una abertura, no la textura de la tela.
+    if (enCentro && !lineaEn(centro - lateral, y) && !lineaEn(centro + lateral, y)) conLinea += 1;
+  }
+  return filas >= 6 ? conLinea / filas : 0;
+}
+
 // ------------------------------------------------------------------ clasificación
 
 /** Puntos por categoría con el motivo de cada punto (para mostrarlos al usuario). */
@@ -209,19 +269,22 @@ function puntuar(r) {
   // Calzado
   if (r.proporcion > 1.3) sumar('Calzado', 3, 'silueta apaisada, como un zapato de perfil');
   else if (r.proporcion > 1.1 && r.masaInferior > 0.55) sumar('Calzado', 1.5, 'más ancha que alta y con el peso abajo (suela)');
-  if (r.piezas === 2 && !conPiernas) sumar('Calzado', 2.5, 'dos piezas separadas (un par)');
+  const mitades = r.piezas === 2 && r.tresTramos > 0.25;
+  if (r.piezas === 2 && !conPiernas && !mitades) sumar('Calzado', 2.5, 'dos piezas separadas (un par)');
+  if (mitades) sumar('Torso', 1.5, 'prenda abierta al frente (dos mitades con mangas)');
   if (bota) sumar('Calzado', 2.5, 'caña alta a un lado y pie ancho abajo (bota)');
 
   // Piernas
   if (conPiernas) sumar('Piernas', 3, 'dos perneras separadas abajo');
   if (r.unTramoArriba && r.anchoSuperior > 0.6 && !r.escote && !conMangas) sumar('Piernas', 1, 'pretina recta arriba');
-  const falda = !conPiernas && !r.escote && !conMangas && r.trapecio > 1.25 && r.proporcion > 0.55 && r.proporcion < 1.5 && r.anchoSuperior > 0.45;
+  const falda = !conPiernas && !r.escote && !conMangas && r.tresTramos < 0.2 && !r.capucha && r.trapecio > 1.25 && r.proporcion > 0.55 && r.proporcion < 1.5 && r.anchoSuperior > 0.45;
   if (falda) sumar('Piernas', 2.5, 'se abre hacia abajo desde una pretina (falda)');
 
   // Torso
   if (conMangas && !conPiernas) sumar('Torso', 2.5, 'hombros con mangas más anchos que el cuerpo');
   if (r.tresTramos > 0.25 && !conPiernas) sumar('Torso', 2, 'mangas largas a los lados del cuerpo');
   if (r.escote) sumar('Torso', 1.5, 'escote o cuello arriba al centro');
+  if (r.capucha) sumar('Torso', 1.5, 'capucha arriba al centro');
   if (r.proporcion > 0.6 && r.proporcion < 1.45 && !conPiernas && r.piezas === 1 && r.trapecio < 1.25) sumar('Torso', 1, 'proporción de prenda superior');
 
   // Vestido
@@ -239,19 +302,24 @@ function puntuar(r) {
 
 const CATEGORIA_ARMARIO = { Torso: 'top', Piernas: 'bottom', Vestido: 'dress', Calzado: 'shoes' };
 
+const evidencias0 = (motivos, categoria, texto) => motivos[categoria].push(texto);
+
 /** Tipo concreto dentro de la categoría a partir de la silueta y el color. */
 function elegirTipo(categoria, r, extra, color) {
   const hsv = color?.hsv;
   const esMezclilla = hsv && hsv.h >= 195 && hsv.h <= 232 && hsv.s >= 0.2 && hsv.s <= 0.58 && hsv.v >= 0.28 && hsv.v <= 0.72;
   switch (categoria) {
     case 'Torso':
+      if (r.capucha) return 'sudadera';
       if (extra.manga === 'sin') return 'top';
-      if (extra.manga === 'corta') return 'camiseta';
+      if (extra.manga === 'corta') return extra.abertura ? 'camisa' : 'camiseta';
       if (r.proporcion < 0.62) return 'abrigo';
+      if (extra.abertura) return esMezclilla || (hsv && hsv.v < 0.45) ? 'chamarra' : 'camisa';
       return esMezclilla ? 'chamarra' : 'sueter';
     case 'Piernas':
       if (extra.falda) return 'falda';
       if (r.huecoInicio > 0.5 || r.proporcion > 0.85) return 'short';
+      if (r.estrechaAbajo < 0.72) return 'jogger';
       return esMezclilla ? 'jeans' : 'pantalon';
     case 'Vestido':
       return 'vestido';
@@ -383,8 +451,19 @@ async function analizarColor(png) {
 
 // ------------------------------------------------------------------ análisis completo
 
+const ALTERNATIVAS = {
+  Torso: ['camiseta', 'camisa', 'sueter', 'sudadera', 'chamarra', 'top', 'blusa', 'blazer', 'abrigo'],
+  Piernas: ['pantalon', 'jeans', 'jogger', 'short', 'falda', 'leggings'],
+  Vestido: ['vestido'],
+  Calzado: ['tenis', 'zapatos', 'botas', 'sandalias'],
+};
+
+function sugerencias(categoria, tipo) {
+  return [tipo, ...ALTERNATIVAS[categoria].filter((t) => t !== tipo)].filter(Boolean).slice(0, 5);
+}
+
 const NOMBRE_TIPO = {
-  camiseta: 'Camiseta', top: 'Top sin mangas', sueter: 'Suéter', sudadera: 'Sudadera', chamarra: 'Chamarra', abrigo: 'Abrigo',
+  camiseta: 'Camiseta', camisa: 'Camisa', jogger: 'Pants', top: 'Top sin mangas', sueter: 'Suéter', sudadera: 'Sudadera', chamarra: 'Chamarra', abrigo: 'Abrigo',
   pantalon: 'Pantalón', jeans: 'Jeans', short: 'Short', falda: 'Falda', vestido: 'Vestido',
   tenis: 'Tenis', botas: 'Botas', zapatos: 'Zapatos',
 };
@@ -401,6 +480,7 @@ async function analizarPrenda(png) {
   const { rasgos: r, caja, anchoTorsoPx } = medida;
   const { puntos, motivos, conMangas, bota, falda } = puntuar(r);
   const color = await analizarColor(png);
+  r.cierre = redondear(await detectarCierre(png, mascara, caja));
 
   const ranking = Object.entries(puntos).sort((a, b) => b[1] - a[1]);
   const [[mejor, p1], [, p2]] = ranking;
@@ -413,11 +493,15 @@ async function analizarPrenda(png) {
 
   let manga = null;
   if (categoria === 'Torso' || categoria === 'Vestido') {
-    if (r.tresTramos > 0.25 || (conMangas && r.finManga >= 0.55)) manga = 'larga';
+    if (r.tresTramos > 0.25 || (conMangas && r.finManga >= 0.7)) manga = 'larga';
+    else if (conMangas && r.finManga >= 0.5) manga = 'tres-cuartos';
     else if (conMangas) manga = 'corta';
     else manga = 'sin';
   }
-  const tipo = categoria ? elegirTipo(categoria, r, { manga, bota, falda }, color) : null;
+  const abertura = (r.cierre >= 0.55 && color?.estampado !== 'rayas verticales') || (r.piezas === 2 && r.tresTramos > 0.25);
+  const tipo = categoria ? elegirTipo(categoria, r, { manga, bota, falda, abertura }, color) : null;
+  if (categoria === 'Torso' && abertura) evidencias0(motivos, 'Torso', 'abertura al frente (cierre o botones)');
+  if (tipo === 'jogger') evidencias0(motivos, 'Piernas', 'perneras que se cierran en el tobillo');
   let largo = null;
   if (categoria === 'Piernas' && !falda) largo = r.huecoInicio > 0.5 || r.proporcion > 0.85 ? 'corto' : 'largo';
   if (categoria === 'Vestido' || falda) largo = r.proporcion < 0.5 ? 'largo' : r.proporcion < 0.8 ? 'midi' : 'corto';
@@ -451,7 +535,17 @@ async function analizarPrenda(png) {
     confianza,
     puntos: Object.fromEntries(Object.entries(puntos).map(([k, v]) => [k, redondear(v, 2)])),
     evidencias,
-    detalle: { manga, largo, tela, estampado: color?.estampado ?? null, colores: color ? [color.principal, color.secundario].filter(Boolean) : [] },
+    detalle: {
+      manga,
+      largo,
+      tela,
+      capucha: categoria === 'Torso' ? r.capucha : null,
+      abertura: categoria === 'Torso' ? abertura : null,
+      estampado: color?.estampado ?? null,
+      colores: color ? [color.principal, color.secundario].filter(Boolean) : [],
+    },
+    // Tipos alternativos ordenados (para el cuestionario): el elegido primero.
+    sugerencias: categoria ? sugerencias(categoria, tipo) : [],
     color,
     rasgos: r,
     zonas,

@@ -36,3 +36,16 @@ async function fotoPrenda(forma, { fondo = 'liso', formato = 'jpeg' } = {}) {
 }
 
 module.exports = { SILUETAS, fotoPrenda };
+
+/** Variantes con detalles: capucha, cierre al frente y pants con puño. */
+Object.assign(SILUETAS, {
+  'sudadera-capucha':
+    '<path d="M255,40 Q300,10 345,40 L355,105 L450,140 L540,520 L470,540 L420,300 L425,560 L175,560 L180,300 L130,540 L60,520 L150,140 L245,105 Z" fill="#7d7d7a"/>',
+  'chamarra-cierre':
+    '<path d="M240,110 Q300,150 360,110 L450,140 L540,520 L470,540 L420,300 L425,560 L175,560 L180,300 L130,540 L60,520 L150,140 Z" fill="#3a3b2c"/><rect x="297" y="130" width="6" height="430" fill="#c9c9c0"/>',
+  jogger: '<polygon points="190,40 410,40 425,470 380,560 330,560 312,470 300,230 288,470 270,560 220,560 175,470" fill="#4a4a4f"/>',
+});
+
+// Logo claro (casi del color de la pared) en el pecho: debe conservarse en el recorte.
+SILUETAS['camiseta-logo'] =
+  '<path d="M240,120 Q300,160 360,120 L520,200 L470,300 L420,270 L425,560 L175,560 L180,270 L130,300 L80,200 Z" fill="#5f6b38"/><rect x="250" y="300" width="100" height="60" fill="#efeae0"/>';

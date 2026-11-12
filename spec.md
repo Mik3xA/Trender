@@ -230,14 +230,12 @@ así el logout invalida el token aunque su firma siga vigente. Contraseñas con 
 | GET | `/api/profile` | ✅ | — | `200 { altura, pecho, cintura, cadera, avatar_config, updated_at }` |
 | PUT | `/api/profile` | ✅ | campos parciales (cm, `null` borra) + `avatar_config` objeto | `200` perfil |
 | GET | `/api/closet?genero=&category=` | ✅ | — | `200 { items, count }` (armario de un género) |
-| POST | `/api/closet/importar` (alias `/add-from-link`) | ✅ | `{ url, genero?, category? }` | `202` prenda `processing` + `Location` · `409 PRENDA_DUPLICADA` |
 | POST | `/api/closet/subir?genero&nombre&category` | ✅ | imagen (cuerpo `image/*`, ≤ 12 MB) | `202` prenda `processing` · `400` · `409 PRENDA_DUPLICADA` · `413` · `415 IMAGEN_INVALIDA` · `422 IMAGEN_PEQUENA` |
 | POST | `/api/closet/:id/foto` | ✅ | imagen (cuerpo `image/*`) | `202` la prenda vuelve a `processing` con la nueva foto · `404` · `409 EN_PROCESO` |
 | GET | `/api/closet/:id` | ✅ | — | `200` prenda (consultar hasta `ready` / `review` / `failed`) · `404` si es de otro usuario |
 | PATCH | `/api/closet/:id` | ✅ | `{ category, tipo? }` | `200` prenda (una prenda en `review` pasa a `ready`) |
 | DELETE | `/api/closet/:id` | ✅ | — | `200 { id, deleted: true }` (borra también su recorte) |
 | GET | `/media/closet/<user>/<id>.png` | — | — | recorte PNG con transparencia (rutas con UUID; `Cross-Origin-Resource-Policy: cross-origin` para WebGL) |
-| POST | `/api/ropa/escanear-link` | — | `{ url }` | `200 { prenda }` (ver abajo) · `400` URL inválida o interna |
 
 `prenda` = `{ id, nombre, categoria: 'Torso'|'Piernas'|'Calzado'|'Vestido'|null, tipo, confianza:
 'alta'|'media'|'baja'|'ninguna', color: { nombre, hex }|null, precio|null, marca|null, imagen|null, tienda,
@@ -250,28 +248,21 @@ Prenda del armario = `{ id, genero, source_url, imagen_url, category: top|bottom
 nombre, color, tienda, precio, status: processing|ready|review|failed, error, analisis: { confianza,
 evidencias[], avisos[], metodoLectura, metodoRecorte, fotosEvaluadas[], silueta }, created_at, updated_at }`.
 
-### Importación de prendas (asíncrona)
+### Fotos de prendas (análisis asíncrono)
 
-1. `POST /api/closet/importar` valida la URL, inserta la prenda `processing` y responde **202** al instante.
-2. Una cola en memoria (2 en paralelo) ejecuta `importacion.service`:
-   - `scraper.service`: descarga el HTML (SSRF-safe); si la tienda bloquea (403/429, captcha, Cloudflare) y
-     Puppeteer está instalado, la renderiza con un navegador sin interfaz. Adaptadores para Amazon,
-     Mercado Libre, Nike, Zara, H&M y genérico (JSON-LD, og:image, galerías); descarta logos, banners,
-     reseñas, iconos y GIF.
-   - `imagen.service` (Sharp): descarga hasta 6 fotos y elige la más limpia (fondo liso, sin piel visible,
-     buena resolución, no apaisada); quita el fondo (remove.bg si hay `REMOVE_BG_API_KEY`, si no recorte
-     local con descontaminación del borde); analiza la silueta (dos piernas, calzado apaisado, mangas,
-     vestido o falda) y el color dominante.
-   - `decidir`: el texto (categoría de la tienda > título > URL) manda si es claro; si no, decide la silueta;
-     si ninguno es concluyente queda en `review`. Los accesorios terminan en `failed`.
-3. El cliente consulta `GET /api/closet/:id` cada segundo. Al reiniciar el servidor, las importaciones a
-   medias pasan a `failed`.
-
-`user` = `{ id, nombre, email, created_at }`. El frontend guarda estatura en `altura` y
-peso/complexión/género en `avatar_config`.
-
-`/api/auth/register` y `/api/auth/login` tienen su propio límite (30 req / 15 min / IP) contra fuerza bruta.
-Las cuentas del prototipo anterior (hash scrypt) siguen funcionando y pasan a bcrypt en su siguiente login.
+1. `POST /api/closet/subir` valida la imagen (formato, tamaño), inserta la prenda `processing` y responde **202**.
+   Un `?tipo=` opcional (respuesta del usuario: "es una sudadera") manda sobre el análisis.
+2. Una cola en memoria (2 en paralelo) ejecuta `importacion.procesarFoto`:
+   - `imagen.service` (Sharp): calidad de la foto; quita el fondo (remove.bg si hay `REMOVE_BG_API_KEY`;
+     si no, recorte local: relleno desde el borde, o modelo de fondo aprendido del borde para fotos
+     caseras con varios colores/degradados, huecos encerrados, limpieza de hilos).
+   - `vision.service`: silueta (perneras, escote, mangas, capucha, falda, calzado de perfil, par de
+     zapatos), abertura al frente, puños de jogger, colores con nombre, estampado, tela probable y zonas
+     de la foto (torso y mangas) para el 3D; tipos alternativos para el cuestionario.
+   - `decidir`: el nombre que escribió el usuario manda si es claro; si no, decide la foto; si ninguno es
+     concluyente la prenda queda en `review`.
+3. El cliente consulta `GET /api/closet/:id` hasta `ready`, `review` o `failed`.
+4. `PATCH /api/closet/:id` guarda tipo y `ajustes` del cuestionario (ajuste, largo, manga, capucha, cuello).
 
 ### Aislamiento por cuenta
 
@@ -305,7 +296,7 @@ deberá volver a validar la resolución DNS al descargar.
 La aplicación Angular vive en `frontend/` (rama de frontend) y consume esta API desde
 `environment.apiUrl` (`http://localhost:3000`): `/api/auth/*`, `/api/profile` (estatura en `altura`,
 contornos exactos en `pecho/cintura/cadera`, y peso, género, tipo de cuerpo y conjunto en
-`avatar_config`) y `/api/ropa/escanear-link`, que no requiere sesión. `POST /webhooks/recibir`
+`avatar_config`)  `POST /webhooks/recibir`
 sigue aceptando `avatar_data` para integraciones externas.
 
 ### Variables de entorno adicionales
@@ -318,12 +309,10 @@ sigue aceptando `avatar_data` para integraciones externas.
 | `DATABASE_URL` | `./dev.db` | Ruta SQLite (`:memory:` en pruebas) |
 | `UPLOADS_DIR` | `./uploads` | Imágenes procesadas del armario |
 | `AUTH_RATE_LIMIT` | `30` | Peticiones de login/registro por 15 min |
-| `SCAN_FETCH_PAGES` | `true` | El escáner lee la página del producto; `false` = solo analiza la URL |
-| `SCRAPER_BROWSER` | `true` | Reintentar con Puppeteer si la tienda bloquea (requiere `npm install puppeteer`) |
 | `REMOVE_BG_API_KEY` | — | Recorte con remove.bg; sin clave se usa el recorte local |
 | `GUEST_RATE_LIMIT` / `IMPORT_RATE_LIMIT` | `20` / `40` | Sesiones de invitado por hora / importaciones por 15 min (por IP) |
 
-Pruebas: `tests/auth.test.js`, `tests/closet.test.js`, `tests/ropa.test.js`, `tests/scraper.test.js`, `tests/imagen.test.js`, `tests/importacion.test.js`, `tests/servicios.test.js`, `tests/webhooks.test.js`
+Pruebas: `tests/auth.test.js`, `tests/closet.test.js`, `tests/ropa.test.js`, `tests/fotos.test.js`, `tests/imagen.test.js`, `tests/importacion.test.js`, `tests/servicios.test.js`, `tests/webhooks.test.js`
 (cada archivo con su propia base en memoria).
 ---
 

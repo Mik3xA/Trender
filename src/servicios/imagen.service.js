@@ -337,31 +337,62 @@ function mascaraPorModelo(mini) {
   // cortadas por la prenda): zonas grandes parecidas al fondo que no tocan el borde.
   // Si aparecen MUCHAS es un estampado (rayas claras como la pared): entonces solo
   // se quitan las de color casi idéntico al fondo.
-  const regiones = [];
-  const visto = new Uint8Array(ancho * alto);
-  const minimo = Math.max(12, ancho * alto * 0.0004);
-  for (let inicio = 0; inicio < esFondo.length; inicio += 1) {
-    if (esFondo[inicio] || visto[inicio] || cercania(inicio) >= 1.2) continue;
-    const region = [inicio];
-    let suma = 0;
-    visto[inicio] = 1;
-    for (let n = 0; n < region.length; n += 1) {
-      const k = region[n];
-      suma += cercania(k);
-      const x = k % ancho;
-      const y = (k - x) / ancho;
-      for (const v of [x > 0 ? k - 1 : -1, x < ancho - 1 ? k + 1 : -1, y > 0 ? k - ancho : -1, y < alto - 1 ? k + ancho : -1]) {
-        if (v >= 0 && !esFondo[v] && !visto[v] && cercania(v) < 1.2) {
-          visto[v] = 1;
-          region.push(v);
+  // Dos pasadas: lo que se quita en la primera puede dejar "tocando fondo" a otra zona.
+  for (let pasada = 0; pasada < 2; pasada += 1) {
+    const regiones = [];
+    const visto = new Uint8Array(ancho * alto);
+    const minimo = Math.max(12, ancho * alto * 0.0004);
+    for (let inicio = 0; inicio < esFondo.length; inicio += 1) {
+      if (esFondo[inicio] || visto[inicio] || cercania(inicio) >= 1.8) continue;
+      const region = [inicio];
+      let suma = 0;
+      let tocaFondo = false;
+      visto[inicio] = 1;
+      for (let n = 0; n < region.length; n += 1) {
+        const k = region[n];
+        suma += cercania(k);
+        const x = k % ancho;
+        const y = (k - x) / ancho;
+        for (const v of [x > 0 ? k - 1 : -1, x < ancho - 1 ? k + 1 : -1, y > 0 ? k - ancho : -1, y < alto - 1 ? k + ancho : -1]) {
+          if (v >= 0 && esFondo[v]) tocaFondo = true;
+          if (v >= 0 && !esFondo[v] && !visto[v] && cercania(v) < 1.8) {
+            visto[v] = 1;
+            region.push(v);
+          }
         }
       }
+      if (region.length >= minimo) regiones.push({ pixeles: region, media: suma / region.length, tocaFondo });
     }
-    if (region.length >= minimo) regiones.push({ pixeles: region, media: suma / region.length });
-  }
-  const esEstampado = regiones.filter((r) => r.pixeles.length >= ancho * alto * 0.002).length >= 5;
-  for (const r of regiones) {
-    if (!esEstampado || r.media < 0.4) for (const k of r.pixeles) esFondo[k] = 1;
+    const esEstampado = regiones.filter((r) => r.pixeles.length >= ancho * alto * 0.002).length >= 5;
+    // Alto de la prenda (lo que no es fondo): un hueco real (entre las piernas, entre la
+    // manga y el cuerpo) es alargado; un logo o letras claras son manchas pequeñas.
+    let yMin = alto;
+    let yMax = 0;
+    for (let k = 0; k < esFondo.length; k += 1) {
+      if (esFondo[k]) continue;
+      const y = Math.floor(k / ancho);
+      if (y < yMin) yMin = y;
+      if (y > yMax) yMax = y;
+    }
+    const altoPrenda = Math.max(1, yMax - yMin);
+    for (const r of regiones) {
+      let r0 = alto;
+      let r1 = 0;
+      for (const k of r.pixeles) {
+        const y = Math.floor(k / ancho);
+        if (y < r0) r0 = y;
+        if (y > r1) r1 = y;
+      }
+      const altoRegion = r1 - r0 + 1;
+      // Alto respecto a la prenda y alargado (alto ≥ 2.5 × ancho medio): un estampado es más "redondo".
+    const alargado = altoRegion >= altoPrenda * 0.1 && altoRegion >= (r.pixeles.length / altoRegion) * 2.5;
+      // Un cierre o una costura clara es alto pero muy fino: no es un hueco.
+      const anchoMedio = r.pixeles.length / altoRegion;
+      const ancho_ = anchoMedio >= Math.max(3, ancho * 0.008);
+      // Continuación del fondo ya quitado (la "V" de la entrepierna, sombras junto al borde).
+      const continuaFondo = r.tocaFondo && r.media < 1.2 && !esEstampado;
+      if (continuaFondo || (alargado && ancho_ && !esEstampado && r.media < 1.45) || r.media < 0.25) for (const k of r.pixeles) esFondo[k] = 1;
+    }
   }
 
   let mascara = new Uint8Array(ancho * alto);

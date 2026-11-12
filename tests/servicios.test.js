@@ -6,7 +6,6 @@ const { enviarAlerta } = require('../src/servicios/email.service');
 const { MIGRACIONES, migrar } = require('../src/servicios/migraciones.service');
 const ropaService = require('../src/servicios/ropa.service');
 const cache = require('../src/servicios/cache.service');
-const { normalizarUrlProducto } = require('../src/servicios/url.service');
 const authService = require('../src/servicios/auth.service');
 const perfilService = require('../src/servicios/perfil.service');
 const closetService = require('../src/servicios/closet.service');
@@ -52,7 +51,7 @@ describe('migraciones.service', () => {
       INSERT INTO user_measurements (user_id, estatura, peso, complexion, genero) VALUES ('u1', 165, 60, 'Media', 'Femenino');
     `);
 
-    expect(migrar(legado)).toEqual([1, 2, 3]);
+    expect(migrar(legado)).toEqual([1, 2, 3, 4]);
     const perfil = legado.prepare('SELECT altura, avatar_config_json FROM user_profiles WHERE user_id = ?').get('u1');
     expect(perfil.altura).toBe(165);
     expect(JSON.parse(perfil.avatar_config_json)).toEqual({ peso: 60, complexion: 'Media', genero: 'Femenino' });
@@ -65,11 +64,11 @@ describe('migraciones.service', () => {
 });
 
 describe('ropa.service', () => {
-  it('normaliza acentos y deduce la categoría del armario', () => {
+  it('normaliza acentos y entiende el nombre que escribe el usuario', () => {
     expect(ropaService.normalizarTexto('Pantalón ÚNICO')).toBe('pantalon unico');
-    expect(ropaService.categoriaArmario('https://x.example/botas-cuero')).toBe('shoes');
-    expect(ropaService.categoriaArmario('https://x.example/falda-plisada')).toBe('bottom');
-    expect(ropaService.categoriaArmario('https://x.example/algo')).toBeNull();
+    expect(ropaService.clasificar({ titulo: 'Botas de cuero' })).toMatchObject({ categoria: 'Calzado', tipo: 'botas' });
+    expect(ropaService.clasificar({ titulo: 'Falda plisada' })).toMatchObject({ categoria: 'Piernas', tipo: 'falda' });
+    expect(ropaService.clasificar({ titulo: 'algo' }).categoria).toBeNull();
   });
 });
 
@@ -93,29 +92,6 @@ describe('cache.service', () => {
   it('expira entradas según su TTL', () => {
     cache.guardar('u3', 'k', 'v', -1);
     expect(cache.obtener('u3', 'k')).toBeUndefined();
-  });
-});
-
-describe('url.service', () => {
-  it('normaliza URLs públicas y quita el fragmento', () => {
-    expect(normalizarUrlProducto(' https://Shop.example.com/p/1?c=red#reviews ')).toBe('https://shop.example.com/p/1?c=red');
-  });
-
-  it.each([
-    'ftp://shop.example.com/a',
-    'javascript:alert(1)',
-    'http://localhost:3000/x',
-    'http://127.0.0.1/x',
-    'http://10.1.2.3/x',
-    'http://192.168.0.10/x',
-    'http://169.254.169.254/latest/meta-data',
-    'http://[::1]/x',
-    'http://intranet/x',
-    'http://printer.local/x',
-    'https://user:pass@shop.example.com/x',
-    'no es una url',
-  ])('rechaza %s', (url) => {
-    expect(() => normalizarUrlProducto(url)).toThrow(expect.objectContaining({ statusCode: 400 }));
   });
 });
 
@@ -172,10 +148,11 @@ describe('auth.service / perfil.service / closet.service', () => {
   });
 
   it('nunca expone prendas de otro usuario', async () => {
-    const { prenda, terminado } = closetService.importarDesdeLink(beto.user.id, { url: 'https://shop.example.com/camisa-a', genero: 'Masculino' });
+    const { fotoPrenda } = require('./siluetas-prueba');
+    const { prenda, terminado } = await closetService.subirFoto(beto.user.id, { buffer: await fotoPrenda('camiseta'), genero: 'Masculino' });
     expect(prenda).toMatchObject({ status: 'processing', genero: 'Masculino' });
     await terminado;
-    expect(closetService.obtenerPrenda(beto.user.id, prenda.id)).toMatchObject({ status: 'ready', category: 'top', tipo: 'camisa' });
+    expect(closetService.obtenerPrenda(beto.user.id, prenda.id)).toMatchObject({ status: 'ready', category: 'top', tipo: 'camiseta' });
 
     expect(closetService.listarPrendas(ana.user.id)).toEqual([]);
     expect(() => closetService.obtenerPrenda(ana.user.id, prenda.id)).toThrow(expect.objectContaining({ statusCode: 404 }));
@@ -231,6 +208,38 @@ describe('vision.service (análisis visual de prendas)', () => {
   it.each(['degradado', 'casa'])('funciona con fondos caseros (%s)', async (fondo) => {
     expect(await analizar('pantalon', fondo)).toMatchObject({ categoria: 'Piernas', tipo: 'pantalon' });
     expect(await analizar('sudadera', fondo)).toMatchObject({ categoria: 'Torso' });
+  });
+
+  it.each([
+    ['sudadera-capucha', 'sudadera', 'capucha'],
+    ['chamarra-cierre', 'chamarra', 'abertura'],
+  ])('%s: detecta el detalle y el tipo', async (forma, tipo, detalle) => {
+    const a = await analizar(forma);
+    expect(a.tipo).toBe(tipo);
+    expect(a.detalle[detalle]).toBe(true);
+    expect(a.sugerencias[0]).toBe(tipo);
+  });
+
+  it('pants con puño en el tobillo -> jogger', async () => {
+    const a = await analizar('jogger');
+    expect(a).toMatchObject({ categoria: 'Piernas', tipo: 'jogger' });
+    expect(a.evidencias.join(' ')).toContain('tobillo');
+  });
+
+  it('una sudadera sin capucha ni cierre no los inventa', async () => {
+    const a = await analizar('sudadera');
+    expect(a.detalle).toMatchObject({ capucha: false, abertura: false });
+  });
+
+  it('conserva un logo claro parecido a la pared y quita los huecos reales', async () => {
+    const sharp = require('sharp');
+    const { png } = await imagen.quitarFondo(await fotoPrenda('camiseta-logo', { fondo: 'casa' }), { tolerante: true });
+    const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    // Centro del logo (300, 330 en la foto de 600 px) relativo al recorte (que empieza en la prenda).
+    const alfaEn = (fx, fy) => data[(Math.round(fy * info.height) * info.width + Math.round(fx * info.width)) * 4 + 3];
+    expect(alfaEn(0.5, 0.48)).toBe(255);
+    const pantalon = await analizar('pantalon', 'casa');
+    expect(pantalon.rasgos.huecoInicio).toBeLessThan(0.5); // el hueco entre las piernas sí se quitó
   });
 
   it('describe el color y el estampado', async () => {

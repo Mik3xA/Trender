@@ -3,8 +3,6 @@ const request = require('supertest');
 const sharp = require('sharp');
 
 const app = require('../src/app');
-const pagina = require('../src/servicios/pagina.service');
-const scraper = require('../src/servicios/scraper.service');
 const closet = require('../src/servicios/closet.service');
 const { fotoPrenda } = require('./siluetas-prueba');
 
@@ -97,38 +95,59 @@ describe('POST /api/closet/subir (fotos de prendas)', () => {
   });
 });
 
-describe('links que no se pueden leer', () => {
-  it('un link directo a una imagen se analiza como foto', async () => {
+describe('cuestionario de la prenda', () => {
+  async function lista(auth, forma = 'sudadera', query = {}) {
+    const res = await subir(auth, await fotoPrenda(forma), query);
+    return esperar(auth, res.body.data.id);
+  }
+
+  it('si el usuario dice qué es antes de subirla, su respuesta manda', async () => {
     const auth = await invitado();
-    const espia = jest.spyOn(scraper, 'extraerProducto');
-    jest.spyOn(pagina, 'obtenerImagen').mockResolvedValue({ url: 'x', buffer: await fotoPrenda('pantalon'), tipo: 'image/jpeg' });
-    const res = await request(app).post('/api/closet/importar').set(auth).send({ url: 'https://cdn.tienda.example/fotos/pantalon-recto.jpg' });
-    expect(await esperar(auth, res.body.data.id)).toMatchObject({ status: 'ready', category: 'bottom' });
-    expect(espia).not.toHaveBeenCalled();
+    const prenda = await lista(auth, 'sudadera', { tipo: 'chamarra' });
+    expect(prenda).toMatchObject({ status: 'ready', category: 'top', tipo: 'chamarra' });
+    expect(prenda.analisis.evidencias[0]).toContain('lo indicaste tú');
+    expect((await subir(auth, await fotoPrenda('falda'), { tipo: 'capa' })).status).toBe(400);
   });
 
-  it('si la tienda bloquea la página, la prenda se guarda con el link y se le puede añadir una foto', async () => {
+  it('guarda el ajuste, largo, manga, capucha y cuello, y los combina', async () => {
     const auth = await invitado();
-    jest.spyOn(scraper, 'extraerProducto').mockImplementation(async (url) => ({ url, tienda: 'zara', imagenes: [], metodo: 'url', bloqueado: true }));
-    const res = await request(app).post('/api/closet/importar').set(auth).send({ url: 'https://www.zara.com/mx/es/pantalon-recto-p1.html' });
-    const sinFoto = await esperar(auth, res.body.data.id);
-    expect(sinFoto).toMatchObject({ imagen_url: null, tienda: 'zara', category: 'bottom' });
-    expect(sinFoto.analisis.sinFoto).toBe(true);
-    expect(sinFoto.analisis.avisos.join(' ')).toMatch(/bloqueó.*Añade una foto/);
-
-    const conFoto = await request(app).post(`/api/closet/${sinFoto.id}/foto`).set(auth).set('Content-Type', 'image/jpeg').send(await fotoPrenda('pantalon'));
-    expect(conFoto.status).toBe(202);
-    const lista = await esperar(auth, sinFoto.id);
-    expect(lista).toMatchObject({ status: 'ready', category: 'bottom', tienda: 'zara', nombre: sinFoto.nombre });
-    expect(lista.imagen_url).toMatch(/\.png$/);
+    const prenda = await lista(auth);
+    const patch = (cuerpo) => request(app).patch(`/api/closet/${prenda.id}`).set(auth).send(cuerpo);
+    let res = await patch({ category: 'top', tipo: 'sudadera', ajustes: { ajuste: 'holgado', manga: 'larga', capucha: true } });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ tipo: 'sudadera', ajustes: { ajuste: 'holgado', manga: 'larga', capucha: true } });
+    res = await patch({ category: 'top', ajustes: { largo: 'corto' } });
+    expect(res.body.data.ajustes).toEqual({ ajuste: 'holgado', manga: 'larga', capucha: true, largo: 'corto' });
+    // Persistente: aparece igual al listar.
+    const armario = await request(app).get('/api/closet').set(auth);
+    expect(armario.body.data.items[0].ajustes.largo).toBe('corto');
   });
 
-  it('añadir foto a una prenda ajena es 404 y sin imagen es 400', async () => {
+  it('rechaza respuestas inválidas y tipos de otra categoría (400)', async () => {
+    const auth = await invitado();
+    const prenda = await lista(auth);
+    const patch = (cuerpo) => request(app).patch(`/api/closet/${prenda.id}`).set(auth).send(cuerpo);
+    expect((await patch({ category: 'top', ajustes: { ajuste: 'gigante' } })).status).toBe(400);
+    expect((await patch({ category: 'top', ajustes: { color: 'rojo' } })).status).toBe(400);
+    expect((await patch({ category: 'top', ajustes: { capucha: 'si' } })).status).toBe(400);
+    expect((await patch({ category: 'top', tipo: 'jeans' })).body.code).toBe('TIPO_INVALIDO');
+    expect((await patch({ category: 'top', tipo: 'nave' })).status).toBe(400);
+  });
+
+  it('se puede cambiar la foto de una prenda; en una ajena es 404 y sin imagen 400', async () => {
     const [a, b] = [await invitado(), await invitado()];
-    const res = await subir(a, await fotoPrenda('falda'));
-    await esperar(a, res.body.data.id);
-    const ajena = await request(app).post(`/api/closet/${res.body.data.id}/foto`).set(b).set('Content-Type', 'image/jpeg').send(await fotoPrenda('falda'));
+    const prenda = await lista(a, 'falda');
+    const nueva = await request(app).post(`/api/closet/${prenda.id}/foto`).set(a).set('Content-Type', 'image/jpeg').send(await fotoPrenda('pantalon'));
+    expect(nueva.status).toBe(202);
+    expect(await esperar(a, prenda.id)).toMatchObject({ status: 'ready', category: 'bottom' });
+    const ajena = await request(app).post(`/api/closet/${prenda.id}/foto`).set(b).set('Content-Type', 'image/jpeg').send(await fotoPrenda('falda'));
     expect(ajena.status).toBe(404);
-    expect((await request(app).post(`/api/closet/${res.body.data.id}/foto`).set(a)).status).toBe(400);
+    expect((await request(app).post(`/api/closet/${prenda.id}/foto`).set(a)).status).toBe(400);
+  });
+
+  it('las rutas de links ya no existen', async () => {
+    const auth = await invitado();
+    expect((await request(app).post('/api/closet/importar').set(auth).send({ url: 'https://x.example/a' })).status).toBe(404);
+    expect((await request(app).post('/api/ropa/escanear-link').send({ url: 'https://x.example/a' })).status).toBe(404);
   });
 });

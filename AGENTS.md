@@ -3,7 +3,7 @@
 ## Stack
 - **Backend:** Node.js + Express 5 + SQLite (`better-sqlite3`) + Nodemailer + JWT (`jsonwebtoken`) + `bcrypt`. Sin Python, Java ni TypeScript en el backend.
 - **Frontend:** Angular 22 Standalone + Three.js + Tailwind CSS.
-- **Integración:** HTTP JSON hacia `${environment.apiUrl}`: `/api/auth/*`, `/api/profile`, `/api/closet`, `/api/ropa/escanear-link` y `/webhooks/recibir`. Contrato completo en `spec.md` §9.
+- **Integración:** HTTP JSON hacia `${environment.apiUrl}`: `/api/auth/*`, `/api/profile`, `/api/closet` y `/webhooks/recibir`. Contrato completo en `spec.md` §9.
 - **Ramas:** el backend (todo lo que está fuera de `frontend/`) y el frontend (`frontend/`) se desarrollan en ramas separadas que no tocan los archivos de la otra, para fusionar en `main` sin conflictos.
 
 ---
@@ -34,7 +34,7 @@
   - `app/visor-3d/`: componente que crea y destruye `MotorAvatar`.
 - **Three.js** debe liberar geometrías, materiales, texturas, renderer y observadores al destruir el visor.
 - El visor 3D debe mantener un `ResizeObserver` sobre su contenedor y mostrar un aviso si no hay WebGL.
-- La importación es asíncrona: `POST /api/closet/importar` responde 202 y `ArmarioService` consulta `GET /api/closet/:id` cada segundo hasta `ready`, `review` o `failed`.
+- El análisis de fotos es asíncrono: `POST /api/closet/subir` responde 202 y `ArmarioService` consulta `GET /api/closet/:id` cada segundo hasta `ready`, `review` o `failed`.
 - Si no se identifica la prenda (`review`) el usuario elige la categoría; nunca se viste una prenda adivinada.
 - Prohibido implementar carga de modelos `.GLB` por parte del usuario (los avatares GLB se configuran en el entorno).
 
@@ -137,7 +137,7 @@ npm test
 - `tests/auth.test.js`: registro con nombre, login, logout, `/me` y `/api/profile`.
 - `tests/closet.test.js`: armario y aislamiento entre usuarios.
 - `tests/ropa.test.js`: clasificador de texto, extracción de metadatos y SSRF.
-- `tests/scraper.test.js`: adaptadores por tienda y detección de bloqueos.
+- `tests/fotos.test.js`: subir fotos, análisis visual y cuestionario.
 - `tests/imagen.test.js`: elección de foto, recorte, silueta y color (imágenes sintéticas).
 - `tests/importacion.test.js`: importación completa, invitados y armario por género.
 - Las pruebas nunca salen a internet (`SCAN_FETCH_PAGES=false`, `SCRAPER_BROWSER=false`).

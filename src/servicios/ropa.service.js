@@ -1,6 +1,3 @@
-const { generarId } = require('./db.service');
-const { normalizarUrlProducto } = require('./url.service');
-const pagina = require('./pagina.service');
 
 /**
  * Escáner de prendas.
@@ -249,64 +246,9 @@ function nombreDesdeUrl(url) {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
-/**
- * Escanea el link de una tienda.
- * @param {string} url
- * @param {{ leerPagina?: boolean }} [opciones] leerPagina=false solo analiza la URL.
- */
-async function escanearUrl(url, { leerPagina = process.env.SCAN_FETCH_PAGES !== 'false' } = {}) {
-  const urlNormalizada = normalizarUrlProducto(url);
-  let meta = null;
-  if (leerPagina) {
-    try {
-      meta = pagina.extraerMetadatos((await pagina.obtenerHtml(urlNormalizada)).html);
-    } catch {
-      meta = null; // tienda que bloquea bots, sin red, etc.: se analiza solo la URL
-    }
-  }
-
-  const categoriaTienda = meta ? [meta.categoria, ...(meta.migas ?? [])].filter(Boolean).join(' ') : '';
-  const resultado = clasificar({
-    categoria: categoriaTienda,
-    titulo: meta?.titulo,
-    url: urlNormalizada,
-    descripcion: meta?.descripcion,
-  });
-
-  const color = detectarColor(meta?.color, meta?.titulo, urlNormalizada.replace(/^https?:\/\/[^/]+/, '')) ??
-    (resultado.tipo === 'jeans' ? { nombre: 'mezclilla', hex: '#3b5578' } : null);
-
-  let motivo = null;
-  if (resultado.accesorio) motivo = 'Parece un accesorio; el probador viste prendas superiores, inferiores, vestidos y calzado.';
-  else if (!resultado.categoria) motivo = 'No pudimos identificar el tipo de prenda. Elige la categoría.';
-
-  return {
-    id: `scanned_${generarId()}`,
-    nombre: meta?.titulo || nombreDesdeUrl(urlNormalizada) || (resultado.categoria ? CATEGORIAS[resultado.categoria].nombre : 'Prenda'),
-    categoria: resultado.categoria,
-    tipo: resultado.tipo,
-    confianza: resultado.confianza,
-    color,
-    precio: formatearPrecio(meta?.precio, meta?.moneda),
-    marca: meta?.marca ?? null,
-    imagen: meta?.imagen && /^https?:\/\//.test(meta.imagen) ? meta.imagen : null,
-    tienda: new URL(urlNormalizada).hostname.replace(/^www\d?\./, ''),
-    fuente: meta ? 'pagina' : 'url',
-    motivo,
-  };
-}
-
-/** Categoría del armario (top/bottom/shoes) deducida solo de la URL; null si no se reconoce. */
-function categoriaArmario(url) {
-  const { categoria } = clasificar({ url });
-  return categoria ? CATEGORIAS[categoria].closet : null;
-}
-
 module.exports = {
-  escanearUrl,
   nombreDesdeUrl,
   clasificar,
-  categoriaArmario,
   detectarColor,
   formatearPrecio,
   normalizarTexto,

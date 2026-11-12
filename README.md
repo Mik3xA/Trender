@@ -34,14 +34,13 @@ La base `dev.db` se crea y migra sola al arrancar (o con `npm run db:migrate`).
   se analiza en segundo plano: recorte del fondo (también fondos caseros), tipo de prenda
   (superior, inferior, vestido o calzado y el tipo concreto), manga, largo, colores, estampado
   y zonas de la foto para el avatar 3D. Consulta `GET /api/closet/:id` hasta `ready`/`review`.
-- **Link de tienda**: `POST /api/closet/importar`. Muchas tiendas bloquean la lectura automática;
-  en ese caso la prenda se guarda con los datos del link y se le puede añadir una foto con
-  `POST /api/closet/:id/foto` (mismo formato que `subir`). Un link directo a una imagen
-  (`.jpg`, `.png`, `.webp`) se analiza como foto.
+- **Cuestionario**: `PATCH /api/closet/:id` con `{ category, tipo?, ajustes? }`, donde `ajustes` admite
+  `ajuste` (ajustado/regular/holgado), `largo` (corto/normal/largo), `manga` (sin/corta/tres-cuartos/larga),
+  `capucha` y `cuello` (true/false). El avatar 3D usa estas respuestas para vestir la prenda.
+  También se puede decir el tipo al subir: `POST /api/closet/subir?tipo=sudadera`.
+- **Cambiar la foto** de una prenda: `POST /api/closet/:id/foto` (mismo formato que `subir`).
 
-Opcional, para tiendas que bloquean la lectura automática (Amazon, captchas):
-`npm install puppeteer` (descarga un Chromium de ~170 MB). Para recortes de mayor calidad,
-`REMOVE_BG_API_KEY` en `.env` (remove.bg).
+Opcional, para recortes de mayor calidad: `REMOVE_BG_API_KEY` en `.env` (remove.bg).
 
 ## 2. Frontend (carpeta `frontend/`)
 

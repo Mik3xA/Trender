@@ -7,15 +7,29 @@ const sharp = require('sharp');
 const { db, generarId } = require('./db.service');
 const cache = require('./cache.service');
 const { errorOperacional } = require('./errores.service');
-const { normalizarUrlProducto } = require('./url.service');
 const importacion = require('./importacion.service');
 
 const CATEGORIAS = ['top', 'bottom', 'dress', 'shoes'];
+/** Tipos concretos de cada categoría (los que el avatar 3D sabe vestir). */
+const TIPOS_POR_CATEGORIA = {
+  top: ['camiseta', 'camisa', 'blusa', 'top', 'sueter', 'sudadera', 'chamarra', 'blazer', 'abrigo'],
+  bottom: ['pantalon', 'jeans', 'jogger', 'leggings', 'short', 'falda'],
+  dress: ['vestido'],
+  shoes: ['tenis', 'zapatos', 'botas', 'sandalias'],
+};
+const TIPOS = Object.values(TIPOS_POR_CATEGORIA).flat();
+const categoriaDeTipo = (tipo) => Object.keys(TIPOS_POR_CATEGORIA).find((c) => TIPOS_POR_CATEGORIA[c].includes(tipo)) ?? null;
+/** Respuestas válidas del cuestionario de la prenda. */
+const OPCIONES_AJUSTES = {
+  ajuste: ['ajustado', 'regular', 'holgado'],
+  largo: ['corto', 'normal', 'largo'],
+  manga: ['sin', 'corta', 'tres-cuartos', 'larga'],
+};
 const GENEROS = ['Femenino', 'Masculino'];
 const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads'));
 const PREFIJO_CACHE = 'closet:';
 const COLUMNAS = `id, genero, source_url, image_path, category, tipo, nombre, color, tienda, precio,
-  analisis_json, error, status, created_at, updated_at`;
+  analisis_json, ajustes_json, error, status, created_at, updated_at`;
 
 // TODAS las consultas incluyen `user_id = ?`: un usuario nunca ve ni modifica
 // prendas de otro. Un id ajeno se trata igual que uno inexistente (404).
@@ -46,15 +60,18 @@ function rutaAbsoluta(rutaRelativa) {
 
 /** Forma pública de una prenda (JSON para Angular y Flutter). */
 function serializar(fila) {
-  const { analisis_json: analisis, image_path: imagen, ...resto } = fila;
+  const { analisis_json: analisis, ajustes_json: ajustes, image_path: imagen, source_url: origen, ...resto } = fila;
   return {
     ...resto,
+    // Las fotos se identifican por su huella; no hace falta exponerla.
+    source_url: origen?.startsWith('foto:') ? null : origen,
     imagen_url: imagen ? `/media/${imagen}` : null,
     analisis: analisis ? JSON.parse(analisis) : null,
+    ajustes: ajustes ? JSON.parse(ajustes) : null,
   };
 }
 
-const COLUMNAS_EDITABLES = ['status', 'category', 'tipo', 'nombre', 'color', 'tienda', 'precio', 'image_path', 'imagen_origen', 'analisis_json', 'error'];
+const COLUMNAS_EDITABLES = ['status', 'category', 'tipo', 'nombre', 'color', 'tienda', 'precio', 'image_path', 'imagen_origen', 'analisis_json', 'ajustes_json', 'error'];
 
 /** Actualización interna (la usa el trabajo de importación). */
 function actualizarInterno(itemId, cambios) {
@@ -86,27 +103,6 @@ function obtenerPrenda(userId, itemId) {
   const fila = consultas.obtener.get(itemId, userId);
   if (!fila) throw errorOperacional(404, 'Prenda no encontrada');
   return serializar(fila);
-}
-
-/**
- * Registra la prenda en estado "processing" y encola su importación.
- * Responde de inmediato: el análisis (segundos) sigue en segundo plano.
- */
-function importarDesdeLink(userId, { url, genero = 'Femenino', category = null }) {
-  const sourceUrl = normalizarUrlProducto(url);
-  const itemId = generarId();
-  try {
-    consultas.insertar.run(itemId, userId, genero, sourceUrl, category);
-  } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      throw errorOperacional(409, 'Esta prenda ya está en tu armario', 'PRENDA_DUPLICADA');
-    }
-    throw err;
-  }
-  cache.invalidar(userId, PREFIJO_CACHE);
-  const item = { id: itemId, user_id: userId, source_url: sourceUrl, category };
-  const terminado = importacion.encolar(() => importacion.procesar(item, { actualizar: actualizarInterno, rutaAbsoluta, rutaImagen }));
-  return { prenda: obtenerPrenda(userId, itemId), terminado };
 }
 
 const FORMATOS_FOTO = new Set(['jpeg', 'png', 'webp', 'avif', 'gif', 'tiff', 'heif']);
@@ -143,8 +139,10 @@ async function validarFoto(buffer) {
  * @param {string} userId
  * @param {{ buffer: Buffer, genero?: string, nombre?: string|null, category?: string|null }} datos
  */
-async function subirFoto(userId, { buffer, genero = 'Femenino', nombre = null, category = null }) {
+async function subirFoto(userId, { buffer, genero = 'Femenino', nombre = null, category = null, tipo = null }) {
   await validarFoto(buffer);
+  // Si el usuario dijo qué es ("es una sudadera"), su respuesta manda sobre el análisis.
+  if (tipo) category = categoriaDeTipo(tipo);
   // El origen de una foto es su huella: identifica duplicados sin guardar el original.
   const huella = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 24);
   const sourceUrl = `foto:${genero}:${huella}`;
@@ -159,7 +157,7 @@ async function subirFoto(userId, { buffer, genero = 'Femenino', nombre = null, c
   }
   if (nombre) actualizarInterno(itemId, { nombre });
   cache.invalidar(userId, PREFIJO_CACHE);
-  const item = { id: itemId, user_id: userId, source_url: sourceUrl, category };
+  const item = { id: itemId, user_id: userId, source_url: sourceUrl, category, tipo };
   const terminado = importacion.encolar(() =>
     importacion.procesarFoto(item, buffer, { nombre }, { actualizar: actualizarInterno, rutaAbsoluta, rutaImagen })
   );
@@ -192,12 +190,16 @@ async function agregarFoto(userId, itemId, buffer) {
 }
 
 /** El usuario corrige o elige la categoría (y opcionalmente el tipo). */
-function actualizarPrenda(userId, itemId, { category, tipo }) {
+function actualizarPrenda(userId, itemId, { category, tipo, ajustes }) {
   const actual = obtenerPrenda(userId, itemId);
   if (actual.status === 'processing') throw errorOperacional(409, 'La prenda aún se está analizando', 'EN_PROCESO');
+  if (tipo !== undefined && !TIPOS_POR_CATEGORIA[category].includes(tipo)) {
+    throw errorOperacional(400, `El tipo "${tipo}" no corresponde a la categoría ${category}`, 'TIPO_INVALIDO');
+  }
   actualizarInterno(itemId, {
     category,
     ...(tipo !== undefined ? { tipo } : {}),
+    ...(ajustes !== undefined ? { ajustes_json: ajustes === null ? null : JSON.stringify({ ...(actual.ajustes ?? {}), ...ajustes }) } : {}),
     ...(actual.status === 'review' ? { status: 'ready' } : {}),
   });
   return obtenerPrenda(userId, itemId);
@@ -214,11 +216,14 @@ function eliminarPrenda(userId, itemId) {
 
 module.exports = {
   CATEGORIAS,
+  TIPOS,
+  TIPOS_POR_CATEGORIA,
+  OPCIONES_AJUSTES,
+  categoriaDeTipo,
   GENEROS,
   UPLOADS_DIR,
   listarPrendas,
   obtenerPrenda,
-  importarDesdeLink,
   subirFoto,
   agregarFoto,
   actualizarPrenda,
