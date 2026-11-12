@@ -190,3 +190,9 @@ describe('auth.service / perfil.service / closet.service', () => {
     }
   });
 });
+
+describe('scripts/verificar-dependencias', () => {
+  it('no encuentra dependencias faltantes cuando todo está instalado', () => {
+    expect(require('../scripts/verificar-dependencias').faltantes()).toEqual([]);
+  });
+});

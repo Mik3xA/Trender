@@ -4,7 +4,9 @@
   "description": "Trender — API REST (Node.js, Express, SQLite) para el frontend Angular y la app Flutter",
   "main": "index.js",
   "scripts": {
+    "predev": "node scripts/verificar-dependencias.js",
     "dev": "nodemon src/index.js",
+    "prestart": "node scripts/verificar-dependencias.js",
     "start": "node src/index.js",
     "test": "jest --detectOpenHandles",
     "postinstall": "prisma skills sync || exit 0",
