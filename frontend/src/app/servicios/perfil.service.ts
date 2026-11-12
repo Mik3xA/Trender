@@ -3,84 +3,70 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
 import { environment } from '../../environments/environment';
-import { Medidas, TipoCuerpo, sanearMedidas } from '../probador/cuerpo';
+import { Genero, Medidas, sanearMedidas } from '../probador/cuerpo';
 import { PrendaVirtual } from '../probador/prendas';
-import { AuthService } from './auth.service';
 
-/** Forma de GET/PUT /api/profile en el backend. */
+/** Lo que guarda cada apartado (Mujer / Hombre). */
+export interface PerfilGenero {
+  medidas: Medidas;
+  conjunto: PrendaVirtual[];
+  tono: string;
+}
+
+export type Perfiles = Record<Genero, PerfilGenero>;
+
 interface PerfilApi {
   altura: number | null;
   pecho: number | null;
   cintura: number | null;
   cadera: number | null;
-  avatar_config: {
-    peso?: number;
-    genero?: string;
-    tipoCuerpo?: string;
-    /** Prototipo anterior: Delgada | Atlética | Media | Robusta. */
-    complexion?: string;
-    conjunto?: PrendaVirtual[];
-  };
+  avatar_config: { genero?: Genero; perfiles?: Partial<Record<Genero, Partial<PerfilGenero>>> };
 }
 
-export interface PerfilProbador {
-  medidas: Medidas;
-  conjunto: PrendaVirtual[];
-}
+const MAX_PRENDAS = 6;
 
-const COMPLEXION_A_TIPO: Record<string, TipoCuerpo> = {
-  Atlética: 'triangulo-invertido',
-  Robusta: 'ovalo',
-  Delgada: 'rectangulo',
-  Media: 'rectangulo',
-};
-
-const MAX_PRENDAS_GUARDADAS = 6;
-
-/** Medidas y conjunto del usuario en su cuenta (estatura en `altura`, el resto en `avatar_config`). */
+/**
+ * Medidas, conjunto y tono de cada apartado en /api/profile. Las columnas
+ * altura/pecho/cintura/cadera guardan las del último apartado usado (para
+ * otros clientes, p. ej. la app Flutter) y avatar_config.perfiles guarda ambos.
+ */
 @Injectable({ providedIn: 'root' })
 export class PerfilService {
   private readonly http = inject(HttpClient);
-  private readonly auth = inject(AuthService);
   private readonly url = `${environment.apiUrl}/api/profile`;
 
-  /** null si el perfil todavía no tiene medidas guardadas. */
-  obtener(): Observable<PerfilProbador | null> {
-    return this.http.get<{ status: string; data: PerfilApi }>(this.url, { headers: this.auth.cabecerasAuth() }).pipe(
+  obtener(): Observable<{ activo: Genero | null; perfiles: Partial<Perfiles> }> {
+    return this.http.get<{ data: PerfilApi }>(this.url).pipe(
       map(({ data }) => {
-        const config = data?.avatar_config ?? {};
-        if (!data?.altura && !config.peso) return null;
-        const medidas = sanearMedidas({
-          genero: config.genero as Medidas['genero'],
-          altura: data.altura ?? undefined,
-          peso: config.peso,
-          tipoCuerpo: (config.tipoCuerpo ?? COMPLEXION_A_TIPO[config.complexion ?? '']) as TipoCuerpo,
-          pecho: data.pecho,
-          cintura: data.cintura,
-          cadera: data.cadera,
-        });
-        const conjunto = Array.isArray(config.conjunto) ? config.conjunto.slice(0, MAX_PRENDAS_GUARDADAS) : [];
-        return { medidas, conjunto };
+        const guardados = data?.avatar_config?.perfiles ?? {};
+        const perfiles: Partial<Perfiles> = {};
+        for (const genero of ['Femenino', 'Masculino'] as const) {
+          const p = guardados[genero];
+          if (!p?.medidas) continue;
+          perfiles[genero] = {
+            medidas: sanearMedidas({ ...p.medidas, genero }),
+            conjunto: Array.isArray(p.conjunto) ? p.conjunto.slice(0, MAX_PRENDAS) : [],
+            tono: typeof p.tono === 'string' ? p.tono : 'maniqui',
+          };
+        }
+        return { activo: data?.avatar_config?.genero ?? null, perfiles };
       })
     );
   }
 
-  guardar({ medidas, conjunto }: PerfilProbador): Observable<unknown> {
-    return this.http.put(
-      this.url,
-      {
-        altura: Math.round(medidas.altura * 10) / 10,
-        pecho: medidas.pecho ?? null,
-        cintura: medidas.cintura ?? null,
-        cadera: medidas.cadera ?? null,
-        avatar_config: {
-          peso: Math.round(medidas.peso * 10) / 10,
-          genero: medidas.genero,
-          tipoCuerpo: medidas.tipoCuerpo,
-          conjunto: conjunto.slice(0, MAX_PRENDAS_GUARDADAS).map(({ imagen, ...resto }) => resto),
-        },
+  guardar(activo: Genero, perfiles: Perfiles): Observable<unknown> {
+    const m = perfiles[activo].medidas;
+    return this.http.put(this.url, {
+      altura: Math.round(m.altura * 10) / 10,
+      pecho: m.pecho ?? null,
+      cintura: m.cintura ?? null,
+      cadera: m.cadera ?? null,
+      avatar_config: {
+        genero: activo,
+        perfiles: Object.fromEntries(
+          Object.entries(perfiles).map(([g, p]) => [g, { ...p, conjunto: p.conjunto.slice(0, MAX_PRENDAS) }])
+        ),
       },
-      { headers: this.auth.cabecerasAuth() }
-    );
+    });
   }
 }

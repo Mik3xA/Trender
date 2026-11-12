@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+
+import { environment } from '../../environments/environment';
 
 import { Medidas, calcularProporciones, interpolarMedidas } from '../probador/cuerpo';
 import { PrendaVirtual, estiloDe } from '../probador/prendas';
@@ -14,7 +18,9 @@ import {
   construirSuperior,
   construirVestido,
 } from './cuerpo-3d';
-import { liberarTexturas, materialTela } from './telas';
+import { aplicarMedidasAGlb, alturaDe } from './avatar-glb';
+import { aplicarTono } from './piel';
+import { liberarFotos, liberarTexturas, materialConFoto, materialTela, proyectarFoto } from './telas';
 
 const DURACION_TRANSICION_MS = 380;
 
@@ -42,6 +48,9 @@ export class MotorAvatar {
   private readonly avatar = new THREE.Group();
 
   private medidasActuales: Medidas | null = null;
+  /** Avatar GLB realista (opcional) por género y su altura original. */
+  private readonly modelosGlb = new Map<string, { escena: THREE.Object3D; altura: number } | null>();
+  private readonly pmrem: THREE.PMREMGenerator;
   private medidasDestino: Medidas | null = null;
   private conjunto: PrendaVirtual[] = [];
   private inicioTransicion = 0;
@@ -58,12 +67,13 @@ export class MotorAvatar {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    // Iluminación basada en imagen: estudio procedimental, o un HDRI si se configura.
+    this.pmrem = new THREE.PMREMGenerator(this.renderer);
     const habitacion = new RoomEnvironment();
-    this.entorno = pmrem.fromScene(habitacion, 0.04).texture;
+    this.entorno = this.pmrem.fromScene(habitacion, 0.04).texture;
     habitacion.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-    pmrem.dispose();
     this.escena.environment = this.entorno;
+    if (environment.hdri) this.cargarHdri(environment.hdri);
     this.escena.environmentIntensity = 0.55;
 
     this.prepararLuces();
@@ -96,6 +106,11 @@ export class MotorAvatar {
     }
   }
 
+  /** Tono del cuerpo: maniquí de porcelana o piel PBR. */
+  setTono(tono: string): void {
+    aplicarTono(this.materialPiel, tono);
+  }
+
   setAutoRotar(activo: boolean): void {
     this.controles.autoRotate = activo;
   }
@@ -121,10 +136,16 @@ export class MotorAvatar {
     });
     this.materialPiel.dispose();
     this.materialSuela.dispose();
-    for (const m of this.materialesPrenda.values()) m.dispose();
+    for (const m of this.materialesPrenda.values()) {
+      m.map?.dispose();
+      m.dispose();
+    }
     this.materialesPrenda.clear();
     liberarTexturas();
+    liberarFotos();
     this.entorno.dispose();
+    this.escena.environment?.dispose();
+    this.pmrem.dispose();
     this.renderer.dispose();
   }
 
@@ -157,7 +178,7 @@ export class MotorAvatar {
   }
 
   private prepararSuelo(): void {
-    const suelo = new THREE.Mesh(new THREE.CircleGeometry(1.6, 64), new THREE.ShadowMaterial({ opacity: 0.16 }));
+    const suelo = new THREE.Mesh(new THREE.CircleGeometry(1.6, 64), new THREE.ShadowMaterial({ opacity: 0.4 }));
     suelo.rotation.x = -Math.PI / 2;
     suelo.receiveShadow = true;
     this.escena.add(suelo);
@@ -177,10 +198,22 @@ export class MotorAvatar {
 
   // ------------------------------------------------------------ avatar
 
+  private cargarHdri(url: string): void {
+    new HDRLoader().load(url, (hdr) => {
+      hdr.mapping = THREE.EquirectangularReflectionMapping;
+      this.escena.environment = this.pmrem.fromEquirectangular(hdr).texture;
+      hdr.dispose();
+    });
+  }
+
   private materialesPara(prenda: PrendaVirtual): MaterialesPrenda {
     const estilo = estiloDe(prenda);
-    const clave = `${prenda.color}|${estilo.tela}`;
-    if (!this.materialesPrenda.has(clave)) this.materialesPrenda.set(clave, materialTela(prenda.color, estilo.tela));
+    const clave = `${prenda.color}|${estilo.tela}|${prenda.imagen ?? ''}`;
+    if (!this.materialesPrenda.has(clave)) {
+      // Con foto de la tienda: la prenda real proyectada; si no, tela procedimental de su color.
+      const material = prenda.imagen ? materialConFoto(prenda.imagen, prenda.color, estilo.tela) : materialTela(prenda.color, estilo.tela);
+      this.materialesPrenda.set(clave, material);
+    }
     const detalle = prenda.categoria === 'Calzado' ? this.materialSuela : this.materialesPrenda.get(clave)!;
     return { tela: this.materialesPrenda.get(clave)!, detalle };
   }
@@ -192,16 +225,26 @@ export class MotorAvatar {
     return this.conjunto.map((prenda) => {
       const estilo = prenda.categoria === 'Torso' ? { ...estiloDe(prenda), holguraCadera } : estiloDe(prenda);
       const mat = this.materialesPara(prenda);
+      let grupo: THREE.Object3D;
       switch (prenda.categoria) {
         case 'Torso':
-          return construirSuperior(esq, estilo, mat);
+          grupo = construirSuperior(esq, estilo, mat);
+          break;
         case 'Piernas':
-          return construirInferior(esq, estilo, prenda.tipo, mat);
+          grupo = construirInferior(esq, estilo, prenda.tipo, mat);
+          break;
         case 'Vestido':
-          return construirVestido(esq, estilo, mat);
+          grupo = construirVestido(esq, estilo, mat);
+          break;
         default:
-          return construirCalzado(esq, estilo, mat);
+          grupo = construirCalzado(esq, estilo, mat);
       }
+      if (prenda.imagen) {
+        const esTela = (m: THREE.Mesh) => m.material === mat.tela;
+        if (prenda.categoria === 'Calzado') grupo.children.forEach((zapato) => proyectarFoto(zapato, 'lado', esTela));
+        else proyectarFoto(grupo, 'frente', esTela);
+      }
+      return grupo;
     });
   }
 
@@ -210,14 +253,53 @@ export class MotorAvatar {
     this.avatar.clear();
     const proporciones = calcularProporciones(medidas);
     const esqueleto = construirEsqueleto(proporciones);
-    this.avatar.add(construirCuerpo(esqueleto, this.materialPiel));
+    const glb = this.modeloGlb(medidas.genero);
+    if (glb) {
+      aplicarMedidasAGlb(glb.escena, medidas, glb.altura);
+      this.avatar.add(glb.escena);
+    } else {
+      this.avatar.add(construirCuerpo(esqueleto, this.materialPiel));
+    }
     for (const prenda of this.vestir(esqueleto)) this.avatar.add(prenda);
     this.medidasActuales = medidas;
     if (encuadrar) this.encuadrar(proporciones.altura);
   }
 
+  /** Avatar GLB del género si está configurado y ya cargó; lo carga la primera vez. */
+  private modeloGlb(genero: Medidas['genero']): { escena: THREE.Object3D; altura: number } | null {
+    const url = environment.avatares[genero];
+    if (!url) return null;
+    if (!this.modelosGlb.has(genero)) {
+      this.modelosGlb.set(genero, null);
+      new GLTFLoader().load(
+        url,
+        (gltf) => {
+          gltf.scene.traverse((o) => {
+            const m = o as THREE.Mesh;
+            if (m.isMesh) {
+              m.castShadow = true;
+              m.receiveShadow = true;
+            }
+          });
+          this.modelosGlb.set(genero, { escena: gltf.scene, altura: alturaDe(gltf.scene) });
+          if (this.medidasActuales?.genero === genero) this.reconstruir(this.medidasActuales, false);
+        },
+        undefined,
+        () => console.warn(`No se pudo cargar el avatar ${url}; se usa el cuerpo paramétrico.`)
+      );
+    }
+    return this.modelosGlb.get(genero) ?? null;
+  }
+
   private liberar(objeto: THREE.Object3D): void {
-    objeto.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    // El GLB se reutiliza entre reconstrucciones: no se liberan sus geometrías.
+    const glbs = new Set([...this.modelosGlb.values()].map((g) => g?.escena));
+    objeto.traverse((o) => {
+      if (glbs.has(o)) return;
+      let dentroDeGlb = false;
+      o.traverseAncestors((a) => (dentroDeGlb ||= glbs.has(a)));
+      if (!dentroDeGlb) (o as THREE.Mesh).geometry?.dispose();
+    });
   }
 
   private animar = (): void => {

@@ -6,7 +6,7 @@ describe('cuerpo', () => {
     const hombre = estimarContornos(MEDIDAS_INICIALES.Masculino);
     expect(mujer.pecho).toBeGreaterThan(84);
     expect(mujer.pecho).toBeLessThan(96);
-    expect(mujer.cintura).toBeLessThan(mujer.cadera - 20); // reloj de arena
+    expect(mujer.cintura).toBeLessThan(mujer.cadera - 20);
     expect(hombre.pecho).toBeGreaterThan(92);
     expect(hombre.pecho).toBeLessThan(104);
     expect(mujer.estimados).toBe(true);
@@ -15,8 +15,13 @@ describe('cuerpo', () => {
   it('el peso y el tipo de cuerpo cambian los contornos', () => {
     const base = MEDIDAS_INICIALES.Masculino;
     expect(estimarContornos({ ...base, peso: 95 }).cintura).toBeGreaterThan(estimarContornos(base).cintura + 8);
-    expect(estimarContornos({ ...base, tipoCuerpo: 'ovalo' }).cintura).toBeGreaterThan(estimarContornos(base).cintura);
-    expect(estimarContornos({ ...base, tipoCuerpo: 'triangulo' }).cadera).toBeGreaterThan(estimarContornos(base).cadera);
+    expect(estimarContornos({ ...base, tipoCuerpo: 'sobrepeso' }).cintura).toBeGreaterThan(estimarContornos(base).cintura + 8);
+    expect(estimarContornos({ ...base, tipoCuerpo: 'delgado' }).pecho).toBeLessThan(estimarContornos(base).pecho);
+    const fit = calcularProporciones({ ...base, tipoCuerpo: 'fit' });
+    const normal = calcularProporciones(base);
+    expect(fit.hombros).toBeGreaterThan(normal.hombros);
+    expect(fit.cintura.ancho).toBeLessThan(normal.cintura.ancho);
+    expect(fit.musculo).toBeGreaterThan(normal.musculo);
   });
 
   it('respeta las medidas exactas del usuario', () => {
@@ -43,7 +48,10 @@ describe('cuerpo', () => {
   it('sanea datos guardados: límites, tipos inválidos y nulos', () => {
     expect(sanearMedidas(null)).toEqual({ ...MEDIDAS_INICIALES.Femenino, pecho: null, cintura: null, cadera: null });
     const m = sanearMedidas({ genero: 'Masculino', altura: 400, peso: 10, tipoCuerpo: 'x' as never, pecho: 5 });
-    expect(m).toMatchObject({ genero: 'Masculino', altura: 210, peso: 35, tipoCuerpo: 'rectangulo', pecho: null });
+    expect(m).toMatchObject({ genero: 'Masculino', altura: 210, peso: 35, tipoCuerpo: 'normal', pecho: null });
+    // Tipos del probador anterior.
+    expect(sanearMedidas({ tipoCuerpo: 'ovalo' as never }).tipoCuerpo).toBe('sobrepeso');
+    expect(sanearMedidas({ tipoCuerpo: 'triangulo-invertido' as never }).tipoCuerpo).toBe('fit');
   });
 
   it('interpola entre dos cuerpos', () => {

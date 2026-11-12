@@ -1,3 +1,31 @@
+@use './styles/estudio';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+// Trender: pantalla completa, negro mate, sin sombras ni efectos de cristal.
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #0e0e0d;
+  color: #ece8de;
+  font-family: Inter, 'Helvetica Neue', Arial, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(236, 232, 222, 0.2) transparent;
+}
+
+:focus-visible {
+  outline: 1px solid #8a8f58;
+  outline-offset: 2px;
+}
