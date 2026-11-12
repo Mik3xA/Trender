@@ -1,30 +1,21 @@
-// Estudio (probador): barra con apartados, panel lateral colapsable, visor 3D y armario inferior.
-// Blanco, negro y verde oliva; bordes finos, sin sombras.
+// Probador con IA: tres columnas (Tu foto | Resultado | Armario) a todo lo ancho.
+// Blanco, negro y verde oliva; superficies suaves y bordes finos.
 
-app-avatar-setup {
-  @apply block overflow-hidden rounded-3xl border border-linea bg-papel;
-  height: min(880px, calc(100vh - 104px));
-  min-height: 640px;
+tr-estudio {
+  @apply block;
 }
 
 .estudio {
-  @apply relative grid h-full text-tinta;
-  grid-template-columns: 330px minmax(0, 1fr);
-  grid-template-rows: 56px minmax(0, 1fr) 200px;
-  grid-template-areas:
-    'barra barra'
-    'panel visor'
-    'panel armario';
+  @apply relative flex flex-col overflow-hidden rounded-[28px] border border-linea bg-papel text-tinta;
+  box-shadow: 0 40px 80px -60px rgba(20, 20, 20, 0.45);
 }
 
-.estudio--sin-panel {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'barra' 'visor' 'armario';
+.estudio-barra {
+  @apply flex flex-wrap items-center justify-between gap-3 border-b border-linea px-5 py-3;
 }
 
-.barra {
-  grid-area: barra;
-  @apply flex items-center justify-between gap-3 border-b border-linea px-4;
+.estudio-titulo {
+  @apply text-sm font-semibold tracking-tight;
 }
 
 .apartados {
@@ -32,195 +23,360 @@ app-avatar-setup {
 }
 
 .apartado {
-  @apply rounded-full px-6 py-1.5 text-sm text-tinta-2 transition-colors hover:text-tinta;
+  @apply rounded-full px-5 py-1.5 text-sm text-tinta-2 transition-colors hover:text-tinta;
 }
 
 .apartado--activo {
   @apply bg-tinta text-papel hover:text-papel;
 }
 
+.estado-ia {
+  @apply inline-flex items-center gap-2 rounded-full border border-oliva/30 bg-oliva-tenue px-3 py-1 text-xs font-medium text-oliva-oscuro;
+}
+
+.estado-ia--local {
+  @apply border-[#e7c9a9] bg-[#fdf6ee] text-[#7a4b1e];
+}
+
+.estado-ia-punto {
+  @apply h-1.5 w-1.5 rounded-full bg-current;
+}
+
 .icono {
-  @apply flex h-9 w-9 items-center justify-center rounded-full border border-linea text-tinta-2 transition-colors hover:border-tinta hover:text-tinta;
+  @apply flex h-9 w-9 items-center justify-center rounded-full border border-linea text-sm font-semibold text-tinta-2 transition-colors hover:border-tinta hover:text-tinta;
 }
 
-.panel {
-  grid-area: panel;
-  @apply overflow-y-auto border-r border-linea bg-papel;
+.sin-conexion {
+  @apply border-b border-[#e7c9a9] bg-[#fdf6ee] px-5 py-2.5 text-xs text-[#7a4b1e];
 }
 
-.bloque {
-  @apply border-b border-linea px-5 py-5;
+.estudio-cuerpo {
+  @apply grid min-h-0 flex-1 gap-0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.titulo {
-  @apply text-sm font-semibold text-tinta;
+@media (min-width: 1100px) {
+  .estudio-cuerpo {
+    grid-template-columns: minmax(250px, 290px) minmax(0, 1fr) minmax(340px, 430px);
+    height: min(940px, calc(100vh - 120px));
+    min-height: 700px;
+  }
+}
+
+.columna {
+  @apply flex min-h-0 flex-col gap-4 overflow-y-auto border-b border-linea p-5;
+}
+
+@media (min-width: 1100px) {
+  .columna {
+    @apply border-b-0 border-r;
+  }
+  .columna--armario {
+    @apply border-r-0;
+  }
+}
+
+.columna--escena {
+  @apply bg-hueso;
+}
+
+.columna-cabeza {
+  @apply flex items-start gap-3;
+}
+
+.paso-chip {
+  @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-tinta text-xs font-semibold text-papel;
+}
+
+.columna-titulo {
+  @apply flex items-center gap-2 text-base font-semibold;
+}
+
+.columna-texto {
+  @apply mt-0.5 text-xs text-tinta-3;
+}
+
+.contador {
+  @apply rounded-full bg-hueso px-2 py-0.5 text-[11px] font-medium text-tinta-2;
 }
 
 .etiqueta {
   @apply text-xs font-medium text-tinta-2;
 }
 
-.fila {
-  @apply mb-2 flex items-baseline justify-between text-xs font-medium text-tinta-2;
-  span {
-    @apply font-normal text-tinta-3;
-  }
+.error-texto {
+  @apply text-xs text-[#b4532a];
 }
 
-.campo {
-  @apply w-full rounded-xl border border-linea bg-papel px-3 py-2.5 text-sm text-tinta outline-none transition-colors placeholder:text-tinta-3 focus:border-oliva;
-}
-
-.numero {
-  @apply w-14 rounded-md border border-transparent bg-transparent text-right text-sm font-medium text-tinta outline-none hover:border-linea focus:border-oliva;
-}
-
-.deslizador {
-  @apply h-1 w-full cursor-pointer appearance-none rounded-full bg-hueso-2 accent-oliva;
-}
-
-.boton {
-  @apply rounded-full bg-tinta px-4 py-2.5 text-sm font-medium text-papel transition-colors hover:bg-oliva-oscuro disabled:cursor-not-allowed disabled:bg-hueso-2 disabled:text-tinta-3;
-}
-
-.chip {
-  @apply rounded-lg border border-linea py-2 text-xs text-tinta-2 transition-colors hover:border-tinta/30 hover:text-tinta;
-}
-
-.chip--activo {
-  @apply border-oliva bg-oliva-tenue font-medium text-oliva-oscuro;
-}
-
-.tono {
-  @apply h-7 w-7 rounded-full border border-black/10;
-}
-
-.tono--activo {
-  @apply outline outline-2 outline-offset-2 outline-oliva;
-}
-
-.detalles summary {
-  @apply flex cursor-pointer list-none justify-between text-xs font-medium text-tinta-2;
-}
-
-.talla {
-  @apply flex h-8 min-w-[2.5rem] items-center justify-center rounded-lg bg-tinta px-1.5 text-xs font-semibold text-papel;
-}
-
-.visor {
-  grid-area: visor;
-  @apply relative bg-hueso;
-}
-
-.marca {
-  @apply rounded-full border border-linea bg-papel px-3 py-1 text-xs text-tinta-2;
-}
-
-.sin-conexion {
-  @apply absolute inset-x-4 top-14 z-10 rounded-xl border border-[#e7c9a9] bg-[#fdf6ee] px-4 py-3 text-xs leading-relaxed text-[#7a4b1e];
-}
-
-.armario {
-  grid-area: armario;
-  @apply flex flex-col border-t border-linea bg-papel px-4 pt-3;
-}
-
-.filtro {
-  @apply shrink-0 rounded-full px-3 py-1 text-xs text-tinta-2 transition-colors hover:text-tinta;
-}
-
-.filtro--activo {
-  @apply bg-tinta text-papel hover:text-papel;
-}
-
-.rejilla {
-  @apply flex min-h-0 flex-1 gap-2.5 overflow-x-auto pb-3;
-}
-
-.tarjeta {
-  @apply relative flex w-36 shrink-0 flex-col overflow-hidden rounded-xl border border-linea bg-papel text-left transition-colors hover:border-tinta/30;
-
-  .foto {
-    @apply flex h-[100px] w-full items-center justify-center bg-hueso;
-  }
-
-  .pie-tarjeta {
-    @apply flex flex-col gap-0.5 px-2.5 py-2 text-[11px] leading-tight;
-  }
-
-  .borrar {
-    @apply absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded-full border border-linea bg-papel text-xs text-tinta-2 hover:text-tinta;
-  }
-
-  .categorias {
-    @apply absolute inset-x-0 top-0 hidden grid-cols-2 gap-px bg-linea;
-    button {
-      @apply bg-papel py-1 text-[10px] text-tinta-2 hover:text-tinta;
-      &.activa {
-        @apply bg-oliva-tenue font-medium text-oliva-oscuro;
-      }
-    }
-  }
-
-  &:hover .borrar {
-    @apply flex;
-  }
-
-  &:hover .categorias,
-  .categorias--fijas {
-    @apply grid;
-  }
-}
-
-.tarjeta--puesta {
-  @apply border-oliva ring-1 ring-oliva;
-}
-
-.vacio {
-  @apply flex items-center text-xs text-tinta-3;
-}
-
-.aviso {
-  @apply fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-tinta px-5 py-2.5 text-sm text-papel;
-}
-
-// Agregar prenda: pestañas, zona para soltar fotos.
-.pestanas {
-  @apply grid grid-cols-2 rounded-full bg-hueso p-1;
-}
-
-.pestana {
-  @apply rounded-full py-1.5 text-xs text-tinta-2 transition-colors hover:text-tinta;
-}
-
-.pestana--activa {
-  @apply bg-papel font-medium text-tinta shadow-[0_0_0_1px_theme(colors.linea)];
-}
-
+// Zonas para soltar fotos.
 .zona-subida {
-  @apply flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-tinta/25 bg-hueso px-4 py-5 text-center transition-colors hover:border-oliva focus-within:border-oliva;
+  @apply flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border border-dashed border-tinta/25 bg-hueso px-4 py-5 text-center text-tinta transition-colors hover:border-oliva hover:bg-oliva-tenue focus-within:border-oliva;
+  svg {
+    @apply text-oliva;
+  }
 }
 
 .zona-subida--activa {
   @apply border-oliva bg-oliva-tenue;
 }
 
+.zona-subida--persona {
+  @apply border-solid border-tinta bg-tinta py-7 text-papel hover:border-oliva-oscuro hover:bg-oliva-oscuro;
+  svg {
+    @apply text-oliva-claro;
+  }
+}
+
+// Tus fotos.
+.personas {
+  @apply grid grid-cols-3 gap-2;
+}
+
+.persona {
+  @apply relative overflow-hidden rounded-xl border-2 border-transparent;
+}
+
+.persona--activa {
+  @apply border-oliva;
+}
+
+.persona-foto {
+  @apply block aspect-[3/4] w-full bg-hueso;
+  img {
+    @apply h-full w-full object-cover;
+  }
+}
+
+.persona-borrar {
+  @apply absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-tinta/70 text-xs text-papel opacity-0 transition-opacity hover:bg-tinta;
+}
+
+.persona:hover .persona-borrar,
+.persona-borrar:focus {
+  @apply opacity-100;
+}
+
+.consejos-mini {
+  @apply mt-auto space-y-1.5 rounded-2xl bg-hueso p-3 text-[11px] text-tinta-2;
+  span {
+    @apply mr-1 font-semibold text-oliva;
+  }
+}
+
+// Escena (resultado).
+.escena {
+  @apply relative flex min-h-[420px] flex-1 items-center justify-center overflow-hidden rounded-3xl bg-papel;
+  background-image: radial-gradient(circle at 50% 30%, #ffffff 0%, #f1f0ea 70%);
+}
+
+.escena-img {
+  @apply h-full max-h-full w-full object-contain;
+}
+
+.escena-vacia {
+  @apply flex flex-col items-center px-8 text-center text-tinta;
+}
+
+.escena-silueta {
+  @apply mb-6 h-40 w-28 rounded-t-full bg-gradient-to-b from-linea to-hueso-2;
+  mask-image: linear-gradient(#000 70%, transparent);
+}
+
+.escena-generando {
+  @apply absolute inset-0 flex flex-col items-center justify-center gap-2 bg-tinta/55 text-papel backdrop-blur-sm;
+}
+
+.generando-barra {
+  @apply mb-2 h-1 w-40 overflow-hidden rounded-full bg-white/20;
+  &::after {
+    content: '';
+    @apply block h-full w-1/3 rounded-full bg-oliva-claro;
+    animation: barra 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes barra {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+.escena-herramientas {
+  @apply absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-papel/90 p-1 backdrop-blur;
+  box-shadow: 0 10px 30px -15px rgba(20, 20, 20, 0.4);
+}
+
+.pildora {
+  @apply rounded-full px-3 py-1.5 text-xs text-tinta-2 transition-colors hover:text-tinta;
+}
+
+.pildora--activa {
+  @apply bg-tinta text-papel hover:text-papel;
+}
+
+.escena-marca {
+  @apply absolute left-4 top-4 rounded-full bg-papel/90 px-3 py-1 text-[11px] font-medium text-tinta-2;
+}
+
+.aviso-escena {
+  @apply rounded-xl bg-[#fdf6ee] px-3 py-2 text-[11px] text-[#7a4b1e];
+}
+
+.cargando-bloque {
+  @apply block h-full min-h-[60px] w-full animate-pulse bg-hueso-2;
+}
+
+// Bandeja de prendas elegidas.
+.bandeja {
+  @apply flex flex-col gap-3 rounded-2xl border border-linea bg-papel p-3 sm:flex-row sm:items-center;
+}
+
+.bandeja-prendas {
+  @apply flex min-w-0 flex-1 gap-2 overflow-x-auto;
+}
+
+.bandeja-item {
+  @apply relative flex w-48 shrink-0 items-center gap-2 rounded-xl bg-hueso p-1.5 pr-7;
+  img {
+    @apply h-12 w-12 shrink-0 rounded-lg bg-papel object-contain p-0.5;
+  }
+}
+
+.bandeja-quitar {
+  @apply absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-xs text-tinta-3 hover:bg-papel hover:text-tinta;
+}
+
+.bandeja-vacia {
+  @apply px-1 text-xs text-tinta-3;
+}
+
+.mini-chip {
+  @apply rounded-full border border-linea bg-papel px-1.5 py-0.5 text-[10px] text-tinta-3;
+}
+
+.mini-chip--activo {
+  @apply border-oliva bg-oliva-tenue font-medium text-oliva-oscuro;
+}
+
+.boton-generar {
+  @apply inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-oliva px-6 py-3 text-sm font-semibold text-papel transition-colors hover:bg-oliva-oscuro disabled:cursor-not-allowed disabled:bg-hueso-2 disabled:text-tinta-3;
+}
+
+// Historial de pruebas.
+.historial {
+  @apply flex gap-2 overflow-x-auto pb-1;
+}
+
+.historial-item {
+  @apply relative w-20 shrink-0 overflow-hidden rounded-xl border-2 border-transparent bg-papel;
+}
+
+.historial-item--activo {
+  @apply border-tinta;
+}
+
+.historial-foto {
+  @apply block aspect-[3/4] w-full;
+  img {
+    @apply h-full w-full object-cover;
+  }
+}
+
+.historial-error {
+  @apply flex h-full items-center justify-center text-lg font-semibold text-[#b4532a];
+}
+
+.historial-acciones {
+  @apply absolute inset-x-1 bottom-1 hidden justify-between;
+  button {
+    @apply flex h-6 w-6 items-center justify-center rounded-full bg-tinta/75 text-xs text-papel hover:bg-tinta;
+  }
+}
+
+.historial-item:hover .historial-acciones,
+.historial-item:focus-within .historial-acciones {
+  @apply flex;
+}
+
+// Armario.
+.filtros {
+  @apply -mx-1 flex gap-1 overflow-x-auto px-1;
+}
+
+.filtro {
+  @apply shrink-0 rounded-full px-3 py-1 text-xs text-tinta-2 transition-colors hover:bg-hueso hover:text-tinta;
+}
+
+.filtro--activo {
+  @apply bg-tinta text-papel hover:bg-tinta hover:text-papel;
+}
+
+.rejilla {
+  @apply grid grid-cols-2 gap-3 sm:grid-cols-3;
+}
+
+@media (min-width: 1100px) {
+  .rejilla {
+    @apply grid-cols-2;
+  }
+}
+
+@media (min-width: 1600px) {
+  .rejilla {
+    @apply grid-cols-3;
+  }
+}
+
 .tarjeta {
-  .anadir-foto {
-    @apply absolute inset-x-2 top-[62px] cursor-pointer rounded-full bg-tinta py-1 text-center text-[10px] font-medium text-papel hover:bg-oliva-oscuro;
-  }
+  @apply flex flex-col overflow-hidden rounded-2xl border border-linea bg-papel transition-all hover:-translate-y-0.5 hover:border-tinta/25;
+}
 
-  .info {
-    @apply absolute bottom-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-linea bg-papel font-serif text-[10px] italic text-tinta-2 hover:border-tinta hover:text-tinta;
+.tarjeta--elegida {
+  @apply border-oliva ring-2 ring-oliva;
+}
+
+.tarjeta-foto {
+  @apply relative flex aspect-square w-full items-center justify-center bg-hueso p-2;
+  img {
+    @apply h-full w-full object-contain;
   }
 }
 
-// Ficha con el análisis de una prenda (sobre el visor).
-.ficha {
-  @apply absolute bottom-4 right-4 top-14 z-20 w-[330px] max-w-[calc(100%-2rem)] overflow-y-auto rounded-2xl border border-linea bg-papel p-4 text-tinta;
-  box-shadow: 0 18px 40px -24px rgba(20, 20, 20, 0.35);
+.tarjeta-estado {
+  @apply absolute inset-x-2 bottom-2 text-center text-[10px] text-tinta-3;
 }
 
+.tarjeta-check {
+  @apply absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-oliva text-xs font-bold text-papel;
+}
+
+.tarjeta-pie {
+  @apply flex items-center gap-1 px-2.5 py-2;
+  > div {
+    @apply flex-1;
+  }
+}
+
+.tarjeta-accion {
+  @apply flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full border border-linea px-1.5 text-[10px] font-medium text-tinta-2 transition-colors hover:border-tinta hover:text-tinta;
+}
+
+.tarjeta-accion--borrar:hover {
+  @apply border-[#b4532a] text-[#b4532a];
+}
+
+.tarjeta-accion--confirmar {
+  @apply border-[#b4532a] bg-[#b4532a] text-papel hover:text-papel;
+}
+
+.armario-vacio {
+  @apply col-span-full rounded-2xl border border-dashed border-linea p-6 text-center text-xs text-tinta-3;
+}
+
+// Chips y controles del cuestionario.
 .chip-pequeno {
   @apply rounded-full border border-linea px-2.5 py-1 text-[11px] text-tinta-2 transition-colors hover:border-tinta/40 hover:text-tinta;
 }
@@ -233,8 +389,29 @@ app-avatar-setup {
   @apply border-oliva/50 bg-oliva-tenue text-oliva-oscuro;
 }
 
+.velo {
+  @apply fixed inset-0 z-40 bg-tinta/30 backdrop-blur-[2px];
+}
+
+.hoja {
+  @apply fixed inset-y-0 right-0 z-50 w-[420px] max-w-full overflow-y-auto bg-papel p-6 text-tinta;
+  box-shadow: -30px 0 60px -40px rgba(20, 20, 20, 0.5);
+  animation: entrar 0.25s ease-out;
+}
+
+@keyframes entrar {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+}
+
+.pregunta-outfit {
+  @apply mt-5 rounded-2xl bg-tinta p-4 text-papel;
+}
+
 .pregunta-ficha {
-  @apply mt-4;
+  @apply mt-5;
   > p {
     @apply mb-2 text-xs font-semibold text-tinta;
   }
@@ -245,9 +422,9 @@ app-avatar-setup {
 }
 
 .segmentos {
-  @apply grid auto-cols-fr grid-flow-col rounded-lg bg-hueso p-0.5;
+  @apply grid auto-cols-fr grid-flow-col rounded-xl bg-hueso p-0.5;
   button {
-    @apply rounded-md py-1.5 text-[11px] text-tinta-2 transition-colors hover:text-tinta;
+    @apply rounded-lg py-1.5 text-[11px] text-tinta-2 transition-colors hover:text-tinta;
     &.activo {
       @apply bg-papel font-semibold text-tinta shadow-[0_0_0_1px_theme(colors.linea)];
     }
@@ -255,10 +432,14 @@ app-avatar-setup {
 }
 
 .interruptor {
-  @apply mt-4 flex cursor-pointer items-center gap-2 rounded-lg border border-linea px-3 py-2 text-xs text-tinta;
+  @apply flex cursor-pointer items-center gap-2 rounded-xl border border-linea px-3 py-2 text-xs text-tinta;
   input {
     @apply accent-oliva;
   }
+}
+
+.detalles summary {
+  @apply flex cursor-pointer list-none justify-between text-xs font-medium text-tinta-2;
 }
 
 .ficha-datos {
@@ -271,6 +452,11 @@ app-avatar-setup {
   }
 }
 
+.aviso {
+  @apply fixed bottom-6 left-1/2 z-[70] max-w-[90vw] -translate-x-1/2 rounded-full bg-tinta px-5 py-2.5 text-sm text-papel;
+  box-shadow: 0 20px 40px -20px rgba(20, 20, 20, 0.6);
+}
+
 // Tutorial guiado.
 .tutorial-resalte {
   @apply pointer-events-none fixed z-[60] rounded-2xl border-2 border-oliva transition-all duration-300;
@@ -279,20 +465,4 @@ app-avatar-setup {
 
 .tutorial-tarjeta {
   @apply fixed z-[61] w-[320px] rounded-2xl border border-linea bg-papel p-5 text-tinta;
-}
-
-@media (max-width: 900px) {
-  app-avatar-setup {
-    height: auto;
-    min-height: 0;
-  }
-  .estudio,
-  .estudio--sin-panel {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 56px 60vh auto 200px;
-    grid-template-areas: 'barra' 'visor' 'panel' 'armario';
-  }
-  .panel {
-    @apply border-r-0 border-t;
-  }
 }

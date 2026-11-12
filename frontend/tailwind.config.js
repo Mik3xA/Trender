@@ -14,7 +14,7 @@ module.exports = {
       fontFamily: {
         sans: ['Inter', 'Helvetica Neue', 'Arial', 'system-ui', 'sans-serif'],
       },
-      maxWidth: { pagina: '1240px' },
+      maxWidth: { pagina: '1480px', ancho: '1760px' },
     },
   },
   plugins: [],

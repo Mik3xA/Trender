@@ -1,7 +1,11 @@
 // Secciones de la página: cabecera, portada, cómo funciona, características, preguntas y pie.
 
 .contenedor {
-  @apply mx-auto w-full max-w-pagina px-5 lg:px-8;
+  @apply mx-auto w-full max-w-pagina px-5 lg:px-10;
+}
+
+.contenedor-ancho {
+  @apply mx-auto w-full max-w-ancho px-3 sm:px-5 lg:px-8;
 }
 
 .cabecera {
@@ -186,4 +190,89 @@
 
 .consejo-marca--no {
   @apply bg-[#b4532a];
+}
+
+.comparador-prenda {
+  @apply pointer-events-none absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-papel/95 py-2 pl-2 pr-4 text-tinta;
+  box-shadow: 0 20px 40px -24px rgba(20, 20, 20, 0.6);
+}
+
+// ---------------------------------------------------------------- diseño ancho
+
+.portada {
+  background: radial-gradient(1200px 500px at 85% 0%, theme('colors.oliva.tenue'), transparent 60%);
+}
+
+.titulo-portada {
+  @apply mt-6 text-5xl font-semibold leading-[1.02] tracking-tight text-tinta md:text-7xl;
+}
+
+.pasos-linea {
+  @apply flex flex-wrap items-center gap-2 text-xs text-tinta-2;
+  li {
+    @apply flex items-center gap-2 rounded-full border border-linea bg-papel px-3 py-1.5;
+  }
+  span {
+    @apply flex h-5 w-5 items-center justify-center rounded-full bg-tinta text-[10px] font-semibold text-papel;
+  }
+}
+
+.paso-grande {
+  @apply rounded-3xl border border-linea bg-papel p-6;
+}
+
+.paso-ilustracion {
+  @apply flex h-40 items-center justify-center rounded-2xl bg-hueso text-oliva;
+  background-image: radial-gradient(circle at 50% 40%, theme('colors.oliva.tenue'), transparent 70%);
+}
+
+.outfit-demo {
+  @apply grid grid-cols-[1fr_1fr] items-center gap-4 rounded-3xl border border-linea bg-hueso p-5;
+}
+
+.outfit-demo-foto {
+  @apply relative aspect-[200/260] overflow-hidden rounded-2xl;
+}
+
+.outfit-demo-etiqueta {
+  @apply absolute left-3 top-3 rounded-full bg-papel/90 px-2.5 py-1 text-[11px] font-medium;
+}
+
+.outfit-demo-partes {
+  @apply space-y-2;
+}
+
+.outfit-parte {
+  @apply flex items-center gap-3 rounded-2xl border border-linea bg-papel p-3 text-tinta;
+}
+
+.outfit-parte--activa {
+  @apply border-oliva ring-1 ring-oliva;
+}
+
+.outfit-parte-check {
+  @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-linea text-xs font-bold;
+  .outfit-parte--activa & {
+    @apply border-oliva bg-oliva text-papel;
+  }
+}
+
+.bento {
+  @apply grid gap-4 md:grid-cols-3;
+}
+
+.bento-celda {
+  @apply rounded-3xl border border-linea bg-papel p-7 text-tinta;
+}
+
+.bento-celda--grande {
+  @apply md:col-span-2 md:row-span-2 md:flex md:flex-col md:justify-end md:p-10;
+  h3 {
+    @apply md:text-3xl;
+  }
+}
+
+.bento-celda--oscura {
+  @apply border-tinta bg-tinta text-papel;
+  background-image: radial-gradient(600px 300px at 80% 10%, rgba(122, 134, 80, 0.35), transparent 70%);
 }
