@@ -16,10 +16,11 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     await fixture.whenStable();
     const el: HTMLElement = fixture.nativeElement;
-    for (const id of ['inicio', 'probador', 'como-funciona', 'caracteristicas', 'preguntas']) {
+    for (const id of ['inicio', 'probador', 'como-funciona', 'outfits', 'caracteristicas', 'consejos', 'privacidad', 'preguntas']) {
       expect(el.querySelector('#' + id)).not.toBeNull();
     }
-    expect(el.querySelector('#probador app-avatar-setup')).not.toBeNull();
+    expect(el.querySelector('#probador tr-estudio')).not.toBeNull();
+    expect(el.textContent).not.toMatch(/3D|avatar|Altura|Peso/);
     expect(el.textContent).toContain('Preguntas frecuentes');
     expect(el.textContent).toContain('Probar ahora');
   });

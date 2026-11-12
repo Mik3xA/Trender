@@ -3,86 +3,58 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map, switchMap, take, takeWhile, timer } from 'rxjs';
 
 import { environment } from '../../environments/environment';
-import { Genero } from '../probador/cuerpo';
-import { AjustesPrenda, CategoriaPrenda, COLOR_POR_DEFECTO, ESTILOS, PrendaVirtual, TIPO_POR_CATEGORIA, Tela } from '../probador/prendas';
+import { AjustesPrenda, CategoriaArmario, Parte } from '../probador/prendas';
 
-export type CategoriaArmario = 'top' | 'bottom' | 'dress' | 'shoes';
+export type Genero = 'Femenino' | 'Masculino';
+
+/** Lo que el servidor vio en la foto (análisis visual). */
+export interface AnalisisVisual {
+  categoria: string | null;
+  tipo: string | null;
+  confianza: 'alta' | 'media' | 'baja' | 'ninguna';
+  nombreSugerido: string | null;
+  sugerencias?: string[];
+  detalle: {
+    manga: 'sin' | 'corta' | 'tres-cuartos' | 'larga' | null;
+    largo: string | null;
+    tela: string | null;
+    estampado: string | null;
+    capucha?: boolean | null;
+    abertura?: boolean | null;
+    posibleOutfit?: boolean;
+    colores: Array<{ hex: string; nombre: string; proporcion: number }>;
+  };
+}
 
 /** Prenda del armario tal como la devuelve /api/closet. */
 export interface PrendaArmario {
   id: string;
   genero: Genero;
-  source_url: string;
   imagen_url: string | null;
   category: CategoriaArmario | null;
   tipo: string | null;
   nombre: string | null;
   color: string | null;
-  tienda: string | null;
-  precio: string | null;
   status: 'pending' | 'processing' | 'ready' | 'review' | 'failed';
-  ajustes?: AjustesPrenda | null;
   error: string | null;
+  ajustes?: AjustesPrenda | null;
   analisis: {
-    origen?: 'tienda' | 'foto subida' | 'foto añadida' | 'link de imagen';
-    sinFoto?: boolean;
+    origen?: string;
     confianza: 'alta' | 'media' | 'baja' | 'ninguna';
     evidencias: string[];
     avisos: string[];
     metodoRecorte: string | null;
+    posibleOutfit?: boolean;
     visual?: AnalisisVisual | null;
   } | null;
   created_at: string;
 }
 
-export interface Zona {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
-
-/** Zonas de la foto (0..1): la prenda completa y, en prendas con manga, el torso y cada manga. */
-export interface ZonasFoto {
-  prenda: Zona;
-  torso?: Zona;
-  mangaIzquierda?: Zona;
-  mangaDerecha?: Zona;
-}
-
-/** Lo que el servidor vio en la foto (análisis visual). */
-export interface AnalisisVisual {
-  categoria: CategoriaPrenda | null;
-  tipo: string | null;
-  confianza: 'alta' | 'media' | 'baja' | 'ninguna';
-  puntos: Record<CategoriaPrenda, number>;
-  nombreSugerido: string | null;
-  detalle: {
-    manga: 'sin' | 'corta' | 'tres-cuartos' | 'larga' | null;
-    capucha?: boolean | null;
-    abertura?: boolean | null;
-    largo: string | null;
-    tela: Tela | null;
-    estampado: string | null;
-    colores: Array<{ hex: string; nombre: string; proporcion: number }>;
-  };
-  zonas: ZonasFoto;
-  sugerencias?: string[];
-  rasgos?: { desplazamientoArriba?: number };
-}
-
-export const CATEGORIA_PROBADOR: Record<CategoriaArmario, CategoriaPrenda> = {
-  top: 'Torso',
-  bottom: 'Piernas',
-  dress: 'Vestido',
-  shoes: 'Calzado',
-};
-
 const INTERVALO_MS = 1000;
-const ESPERA_MAXIMA = 90; // consultas (≈ 90 s)
+const ESPERA_MAXIMA = 120; // consultas (≈ 2 min)
 
 /**
- * Armario en el servidor. La importación es asíncrona: POST devuelve 202 con la
+ * Armario en el servidor. Subir una foto es asíncrono: POST devuelve 202 con la
  * prenda en "processing" y aquí se consulta cada segundo hasta que termina.
  */
 @Injectable({ providedIn: 'root' })
@@ -91,13 +63,10 @@ export class ArmarioService {
   private readonly url = `${environment.apiUrl}/api/closet`;
 
   listar(genero: Genero): Observable<PrendaArmario[]> {
-    return this.http
-      .get<{ data: { items: PrendaArmario[] } }>(this.url, { params: { genero } })
-      .pipe(map((r) => r.data.items));
+    return this.http.get<{ data: { items: PrendaArmario[] } }>(this.url, { params: { genero } }).pipe(map((r) => r.data.items));
   }
 
-  /** Sube la FOTO de una prenda; se analiza en el servidor igual que un link. */
-  /** Emite la prenda en cada consulta y completa cuando deja de estar "processing". */
+  /** Sube la FOTO de una prenda; emite la prenda en cada consulta hasta que deja de estar "processing". */
   subirFoto(archivo: Blob, genero: Genero, opciones: { nombre?: string; tipo?: string } = {}): Observable<PrendaArmario> {
     const params: Record<string, string> = { genero };
     if (opciones.nombre?.trim()) params['nombre'] = opciones.nombre.trim().slice(0, 120);
@@ -107,7 +76,7 @@ export class ArmarioService {
       .pipe(switchMap(({ data }) => this.seguir(data.id)));
   }
 
-  /** Añade (o cambia) la foto de una prenda existente, p. ej. un link sin foto. */
+  /** Cambia la foto de una prenda existente. */
   agregarFoto(id: string, archivo: Blob): Observable<PrendaArmario> {
     return this.http
       .post<{ data: PrendaArmario }>(`${this.url}/${id}/foto`, archivo, { headers: { 'Content-Type': tipoImagen(archivo) } })
@@ -123,7 +92,7 @@ export class ArmarioService {
     );
   }
 
-  /** Categoría, tipo y respuestas del cuestionario (ajuste, largo, manga, capucha, cuello). */
+  /** Categoría, tipo y respuestas del cuestionario. */
   clasificar(id: string, category: CategoriaArmario, tipo?: string, ajustes?: AjustesPrenda): Observable<PrendaArmario> {
     return this.http
       .patch<{ data: PrendaArmario }>(`${this.url}/${id}`, { category, ...(tipo ? { tipo } : {}), ...(ajustes ? { ajustes } : {}) })
@@ -137,7 +106,7 @@ export class ArmarioService {
 
 const TIPOS_IMAGEN = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/heic', 'image/heif'];
 
-function tipoImagen(archivo: Blob): string {
+export function tipoImagen(archivo: Blob): string {
   if (TIPOS_IMAGEN.includes(archivo.type)) return archivo.type;
   const nombre = (archivo as File).name?.toLowerCase() ?? '';
   if (/\.hei[cf]$/.test(nombre)) return 'image/heic';
@@ -163,7 +132,6 @@ export async function prepararFoto(archivo: File): Promise<Blob> {
     if (!ctx) return archivo;
     ctx.drawImage(bitmap, 0, 0, lienzo.width, lienzo.height);
     bitmap.close?.();
-    // PNG conserva la transparencia de las fotos que ya vienen recortadas.
     const tipo = archivo.type === 'image/png' ? 'image/png' : 'image/jpeg';
     const blob = await new Promise<Blob | null>((r) => lienzo.toBlob(r, tipo, 0.9));
     return blob && blob.size > 0 ? blob : archivo;
@@ -172,29 +140,9 @@ export async function prepararFoto(archivo: File): Promise<Blob> {
   }
 }
 
-/** Prenda del armario lista para vestir en el avatar (null si aún no se puede). */
-export function aPrendaVirtual(p: PrendaArmario): PrendaVirtual | null {
-  if (p.status !== 'ready' || !p.category) return null;
-  const categoria = CATEGORIA_PROBADOR[p.category];
-  return {
-    id: p.id,
-    nombre: p.nombre ?? 'Prenda',
-    categoria,
-    tipo: p.tipo && ESTILOS[p.tipo] ? p.tipo : TIPO_POR_CATEGORIA[categoria],
-    color: p.color ?? COLOR_POR_DEFECTO[categoria],
-    tienda: p.tienda,
-    precio: p.precio,
-    imagen: p.imagen_url ? `${environment.apiUrl}${p.imagen_url}` : null,
-    zonas: p.analisis?.visual?.zonas,
-    tela: p.analisis?.visual?.detalle.tela ?? undefined,
-    estampado: p.analisis?.visual?.detalle.estampado ?? null,
-    // Lo que el usuario respondió manda; si no respondió, lo que se vio en la foto.
-    ajustes: {
-      ...(p.analisis?.visual?.detalle.manga ? { manga: p.analisis.visual.detalle.manga } : {}),
-      ...(p.analisis?.visual?.detalle.capucha ? { capucha: true } : {}),
-      ...(p.ajustes ?? {}),
-    },
-    // La caña/talón (parte alta) a la izquierda de la foto => la punta mira a la derecha.
-    puntaDerecha: (p.analisis?.visual?.rasgos?.desplazamientoArriba ?? 0) < 0,
-  };
+/** URL pública del recorte de una prenda. */
+export function urlPrenda(p: Pick<PrendaArmario, 'imagen_url'>): string | null {
+  return p.imagen_url ? `${environment.apiUrl}${p.imagen_url}` : null;
 }
+
+export type { Parte };

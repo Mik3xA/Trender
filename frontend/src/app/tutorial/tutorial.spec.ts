@@ -11,7 +11,7 @@ describe('TutorialService', () => {
     expect(t.visto()).toBe(false);
     t.iniciarSiEsNuevo();
     expect(t.activo()).toBe(true);
-    expect(t.paso().objetivo).toBe('apartados');
+    expect(t.paso().objetivo).toBe('persona');
     for (let i = 0; i < PASOS_TUTORIAL.length; i++) t.siguiente();
     expect(t.activo()).toBe(false);
     expect(t.visto()).toBe(true);

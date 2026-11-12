@@ -9,34 +9,29 @@ export interface PasoTutorial {
 
 export const PASOS_TUTORIAL: PasoTutorial[] = [
   {
-    objetivo: 'apartados',
-    titulo: 'Elige el apartado',
-    texto: 'Mujer y Hombre son probadores independientes: cada uno guarda su propio cuerpo, su conjunto y su armario.',
-  },
-  {
-    objetivo: 'cuerpo',
-    titulo: 'Ajusta tu cuerpo',
-    texto: 'Indica altura, peso y tipo de cuerpo (Fit, Delgado, Normal o Sobrepeso). Si conoces tus medidas, añádelas en "Medidas exactas".',
+    objetivo: 'persona',
+    titulo: 'Sube una foto tuya',
+    texto: 'De cuerpo entero, de frente y con buena luz. Es privada: solo tú puedes verla. Puedes guardar varias y elegir cuál usar.',
   },
   {
     objetivo: 'importar',
-    titulo: 'Agrega tus prendas',
-    texto: 'Sube fotos de tu ropa (si quieres, dinos antes qué es). Detectamos si es prenda superior, inferior, vestido o calzado, su color y estampado, y te hacemos unas preguntas para que se vea igual en el avatar.',
+    titulo: 'Sube fotos de tu ropa',
+    texto: 'Varias a la vez: prendas sueltas o un outfit completo. Si quieres, dinos antes qué es. Quitamos el fondo y detectamos el tipo, el color y los detalles.',
   },
   {
     objetivo: 'armario',
     titulo: 'Tu armario',
-    texto: 'Tus prendas quedan guardadas aquí. Toca una para probártela; con la "i" abres su cuestionario: tipo, ajuste, largo, manga y capucha.',
+    texto: 'Toca las prendas que quieras probarte (una por parte del cuerpo). Con el botón de ajustes respondes el cuestionario y con la papelera las quitas.',
   },
   {
-    objetivo: 'visor',
-    titulo: 'Mira cómo te queda',
-    texto: 'Arrastra para girar el avatar y usa la rueda o el gesto de pellizco para acercarte. Combina hasta seis prendas.',
+    objetivo: 'generar',
+    titulo: 'Genera la prueba',
+    texto: 'Las prendas elegidas aparecen aquí. De un outfit puedes usar todo o solo una parte. Pulsa "Generar prueba".',
   },
   {
-    objetivo: 'talla',
-    titulo: 'Talla recomendada',
-    texto: 'Con tus medidas calculamos la talla de cada prenda puesta. Puedes repetir este tutorial con el botón "?".',
+    objetivo: 'resultado',
+    titulo: 'Tu foto con la ropa puesta',
+    texto: 'Compara con la original, descárgala o repite las prendas de una prueba anterior. Repite este tutorial con el botón "?".',
   },
 ];
 

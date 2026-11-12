@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpEventType, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, catchError, finalize, map, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 
@@ -116,7 +116,8 @@ export const sesionInterceptor: HttpInterceptorFn = (req, next) => {
   return sesion.token().pipe(
     switchMap((token) =>
       next(conToken(token)).pipe(
-        tap({ next: () => sesion.marcarConectado() }),
+        // Solo la respuesta real (no el aviso de envío, que es síncrono) confirma la conexión.
+        tap({ next: (evento) => evento.type === HttpEventType.Response && sesion.marcarConectado() }),
         catchError((error: HttpErrorResponse) => {
           if (error.status === 0) sesion.marcarSinConexion();
           if (error.status !== 401) return throwError(() => error);

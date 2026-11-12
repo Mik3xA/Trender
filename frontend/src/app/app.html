@@ -1,11 +1,12 @@
 <header class="cabecera">
-  <div class="contenedor flex h-16 items-center justify-between gap-6">
+  <div class="contenedor-ancho flex h-16 items-center justify-between gap-6">
     <a href="#inicio" class="marca-logo">TRENDER</a>
-    <nav class="hidden items-center gap-8 md:flex" aria-label="Secciones">
+    <nav class="hidden items-center gap-8 lg:flex" aria-label="Secciones">
       <a href="#probador" class="enlace-nav">Probador</a>
       <a href="#como-funciona" class="enlace-nav">Cómo funciona</a>
-      <a href="#analisis" class="enlace-nav">Análisis</a>
+      <a href="#outfits" class="enlace-nav">Outfits</a>
       <a href="#consejos" class="enlace-nav">Consejos</a>
+      <a href="#privacidad" class="enlace-nav">Privacidad</a>
       <a href="#preguntas" class="enlace-nav">Preguntas</a>
     </nav>
     <a href="#probador" class="boton-negro !py-2">Probar ahora</a>
@@ -14,32 +15,34 @@
 
 <main>
   <!-- Portada -->
-  <section id="inicio" class="contenedor grid items-center gap-12 pb-14 pt-14 md:grid-cols-[1.05fr_0.95fr] md:pt-20">
-    <div>
-      <p class="insignia"><span class="insignia-punto"></span> Probador virtual 3D · sin registro</p>
-      <h1 class="mt-5 text-4xl font-medium leading-[1.06] tracking-tight text-tinta md:text-6xl">
-        Sube una foto de tu ropa y <span class="text-oliva">mírala puesta.</span>
-      </h1>
-      <p class="mt-6 max-w-xl text-lg leading-relaxed text-tinta-2">
-        Trender quita el fondo, reconoce si es playera, sudadera, chamarra, pants o tenis y la viste en un avatar con tu
-        altura, tu peso y tu tipo de cuerpo. Tú confirmas cómo te queda y el avatar se ajusta.
-      </p>
-      <div class="mt-8 flex flex-wrap gap-3">
-        <a href="#probador" class="boton-negro">Subir mi primera prenda</a>
-        <button type="button" class="boton-borde" (click)="verTutorial()">Ver tutorial</button>
+  <section id="inicio" class="portada">
+    <div class="contenedor-ancho grid items-center gap-12 py-14 lg:grid-cols-[1.05fr_0.95fr] lg:py-20">
+      <div>
+        <p class="insignia"><span class="insignia-punto"></span> Probador virtual con IA · sin registro</p>
+        <h1 class="titulo-portada">
+          Tu foto. Tu ropa.<br><span class="text-oliva">Mírate con ella puesta.</span>
+        </h1>
+        <p class="mt-6 max-w-xl text-lg leading-relaxed text-tinta-2">
+          Sube una foto tuya y fotos de tu ropa —prendas sueltas o un outfit completo—. Trender las reconoce, te pregunta
+          lo necesario y una IA genera una foto tuya con esa ropa puesta.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="#probador" class="boton-negro !px-6 !py-3">Empezar gratis</a>
+          <button type="button" class="boton-borde !px-6 !py-3" (click)="verTutorial()">Ver cómo funciona</button>
+        </div>
+        <dl class="mt-12 grid max-w-xl grid-cols-3 gap-6 border-t border-linea pt-6">
+          @for (c of CIFRAS; track c.etiqueta) {
+            <div>
+              <dd class="text-3xl font-semibold tracking-tight text-tinta">{{ c.valor }}</dd>
+              <dt class="mt-1 text-xs text-tinta-3">{{ c.etiqueta }}</dt>
+            </div>
+          }
+        </dl>
       </div>
-      <dl class="mt-10 grid max-w-lg grid-cols-3 gap-6">
-        @for (c of CIFRAS; track c.etiqueta) {
-          <div>
-            <dt class="text-xs text-tinta-3">{{ c.etiqueta }}</dt>
-            <dd class="mt-1 text-2xl font-semibold tracking-tight text-tinta">{{ c.valor }}</dd>
-          </div>
-        }
-      </dl>
-    </div>
-    <div>
-      <tr-comparador />
-      <p class="mt-3 text-center text-xs text-tinta-3">Arrastra el divisor: tu foto → puesta en el avatar</p>
+      <div class="relative">
+        <tr-comparador />
+        <p class="mt-3 text-center text-xs text-tinta-3">Arrastra el divisor para comparar</p>
+      </div>
     </div>
   </section>
 
@@ -55,28 +58,41 @@
   </section>
 
   <!-- Probador -->
-  <section id="probador" class="contenedor scroll-mt-20 pb-20 pt-14" aria-label="Probador">
-    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p class="antetitulo">Probador</p>
-        <h2 class="titulo-seccion">Tu armario, en 3D</h2>
+  <section id="probador" class="scroll-mt-16 py-10" aria-label="Probador">
+    <div class="contenedor-ancho">
+      <div class="mb-6 flex flex-wrap items-end justify-between gap-4 px-1">
+        <div>
+          <p class="antetitulo">Probador</p>
+          <h2 class="titulo-seccion">Pruébatelo en tu foto</h2>
+        </div>
+        <ol class="pasos-linea" aria-label="Pasos">
+          <li><span>1</span> Tu foto</li>
+          <li><span>2</span> Tu ropa</li>
+          <li><span>3</span> Generar</li>
+        </ol>
       </div>
-      <p class="max-w-md text-sm text-tinta-2">Sube fotos en "Agregar prenda", responde el cuestionario y combina hasta seis prendas.</p>
+      <tr-estudio />
     </div>
-    <app-avatar-setup />
   </section>
 
   <!-- Cómo funciona -->
   <section id="como-funciona" class="seccion seccion--hueso">
     <div class="contenedor">
-      <p class="antetitulo">Cómo funciona</p>
-      <h2 class="titulo-seccion">De tu foto al avatar en cuatro pasos</h2>
-      <p class="texto-seccion">Sin fotos tuyas ni cuenta: solo tus medidas aproximadas y fotos de la ropa.</p>
-      <ol class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+        <div>
+          <p class="antetitulo">Cómo funciona</p>
+          <h2 class="titulo-seccion">Tres pasos y listo: sin medidas ni maniquíes</h2>
+        </div>
+        <p class="texto-seccion lg:justify-self-end">Tu foto es la referencia: la IA respeta tu cara, tu cuerpo, tu pose y el fondo, y solo cambia la ropa.</p>
+      </div>
+      <ol class="mt-12 grid gap-4 md:grid-cols-3">
         @for (p of PASOS; track p.titulo; let i = $index) {
-          <li class="paso">
-            <span class="paso-numero">{{ i + 1 }}</span>
-            <h3 class="mt-5 text-base font-semibold text-tinta">{{ p.titulo }}</h3>
+          <li class="paso-grande">
+            <div class="paso-ilustracion" aria-hidden="true">
+              <span class="paso-icono" [innerHTML]="p.icono"></span>
+            </div>
+            <span class="paso-numero mt-6">{{ i + 1 }}</span>
+            <h3 class="mt-4 text-lg font-semibold text-tinta">{{ p.titulo }}</h3>
             <p class="mt-2 text-sm leading-relaxed text-tinta-2">{{ p.texto }}</p>
           </li>
         }
@@ -88,17 +104,36 @@
     </div>
   </section>
 
-  <!-- Lo que detectamos -->
-  <section id="analisis" class="seccion">
-    <div class="contenedor grid items-center gap-12 lg:grid-cols-2">
+  <!-- Outfits -->
+  <section id="outfits" class="seccion">
+    <div class="contenedor grid items-center gap-14 lg:grid-cols-2">
+      <div class="outfit-demo" aria-hidden="true">
+        <div class="outfit-demo-foto">
+          <svg viewBox="0 0 200 260" class="h-full w-full">
+            <rect width="200" height="260" fill="#ece7dd" />
+            <path d="M70 30q30 16 60 0l34 20-10 22-12-6v64H58V66l-12 6-10-22z" fill="#5f6b38" />
+            <path d="M66 140h68l6 82h-30l-10-60-10 60H60z" fill="#2f4f86" />
+            <ellipse cx="78" cy="240" rx="20" ry="8" fill="#222" /><ellipse cx="122" cy="240" rx="20" ry="8" fill="#222" />
+          </svg>
+          <span class="outfit-demo-etiqueta">Outfit completo</span>
+        </div>
+        <div class="outfit-demo-partes">
+          @for (p of PARTES_DEMO; track p.nombre) {
+            <div class="outfit-parte" [class.outfit-parte--activa]="p.activa">
+              <span class="outfit-parte-check">{{ p.activa ? '✓' : '' }}</span>
+              <span><strong class="block text-sm">{{ p.nombre }}</strong><span class="text-xs opacity-60">{{ p.detalle }}</span></span>
+            </div>
+          }
+        </div>
+      </div>
       <div>
-        <p class="antetitulo">Análisis de la foto</p>
-        <h2 class="titulo-seccion">Leemos la prenda como lo haría un vendedor</h2>
+        <p class="antetitulo">Outfits completos</p>
+        <h2 class="titulo-seccion">¿Todo el outfit o solo una parte? Tú eliges</h2>
         <p class="texto-seccion">
-          Recortamos el fondo (también en fotos caseras: pared, piso o cama) y estudiamos la silueta y los colores.
-          Si algo no queda claro, te lo preguntamos.
+          Si subes una foto con varias prendas, te preguntamos si es un outfit completo. Luego decides qué usar: todo, solo
+          la parte de arriba, el pantalón o los zapatos, y lo combinas con otras prendas de tu armario.
         </p>
-        <ul class="mt-8 grid gap-3 sm:grid-cols-2">
+        <ul class="mt-8 space-y-3">
           @for (d of DETECCIONES; track d.titulo) {
             <li class="deteccion">
               <span class="deteccion-icono" aria-hidden="true">{{ d.icono }}</span>
@@ -107,97 +142,71 @@
           }
         </ul>
       </div>
-      <div class="ficha-demo" aria-label="Ejemplo de análisis">
-        <div class="flex items-center gap-4">
-          <div class="ficha-demo-foto" aria-hidden="true">
-            <svg viewBox="0 0 120 120" class="h-full w-full">
-              <path d="M44 22q16 10 32 0l8 4 26 52-14 6-12-24 1 54H35l1-54-12 24-14-6 26-52z" fill="#7d7d7a" />
-              <path d="M48 20q12-16 24 0l-2 8q-10 6-20 0z" fill="#6c6c69" />
-              <path d="M60 30v62" stroke="#c9c9c0" stroke-width="2" />
-            </svg>
-          </div>
-          <div>
-            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-oliva">Detectado · seguro</p>
-            <p class="text-lg font-semibold text-tinta">Sudadera gris</p>
-            <p class="text-xs text-tinta-3">Superior · manga larga · a la cadera</p>
-          </div>
-        </div>
-        <div class="mt-5 grid grid-cols-2 gap-2 text-xs">
-          @for (r of FICHA_DEMO; track r[0]) {
-            <div class="rounded-lg bg-hueso px-3 py-2"><span class="block text-tinta-3">{{ r[0] }}</span><span class="font-medium text-tinta">{{ r[1] }}</span></div>
-          }
-        </div>
-        <p class="mt-5 text-xs font-semibold text-tinta">¿Cómo te queda?</p>
-        <div class="segmentos mt-2">
-          <button type="button">Ajustada</button><button type="button" class="activo">Regular</button><button type="button">Holgada</button>
-        </div>
-        <ul class="mt-4 space-y-1 text-[11px] text-tinta-3">
-          <li>· capucha arriba al centro</li>
-          <li>· mangas largas a los lados del cuerpo</li>
-          <li>· abertura al frente (cierre)</li>
-        </ul>
+    </div>
+  </section>
+
+  <!-- Bento de características -->
+  <section id="caracteristicas" class="seccion seccion--hueso">
+    <div class="contenedor">
+      <p class="antetitulo">Características</p>
+      <h2 class="titulo-seccion">Todo lo que necesitas para decidir</h2>
+      <div class="bento mt-12">
+        @for (c of CARACTERISTICAS; track c.titulo) {
+          <article class="bento-celda" [class.bento-celda--grande]="c.grande" [class.bento-celda--oscura]="c.oscura">
+            <span class="icono-caracteristica" [class.!bg-oliva]="c.oscura">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="c.icono" />
+              </svg>
+            </span>
+            <h3 class="mt-5 text-lg font-semibold">{{ c.titulo }}</h3>
+            <p class="mt-2 text-sm leading-relaxed opacity-75">{{ c.texto }}</p>
+          </article>
+        }
       </div>
     </div>
   </section>
 
   <!-- Consejos para la foto -->
-  <section id="consejos" class="seccion seccion--hueso">
+  <section id="consejos" class="seccion">
     <div class="contenedor">
       <p class="antetitulo">Consejos</p>
-      <h2 class="titulo-seccion">Así sale mejor tu foto</h2>
-      <p class="texto-seccion">Con el celular basta. Estos detalles hacen que el recorte y el tipo de prenda salgan a la primera.</p>
-      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        @for (c of CONSEJOS; track c.titulo) {
-          <article class="consejo" [class.consejo--no]="!c.bien">
-            <div class="consejo-foto" [style.background]="c.fondo" aria-hidden="true">
-              <svg viewBox="0 0 100 80" class="h-20 w-24" [style.transform]="'rotate(' + c.giro + 'deg)'">
-                <path d="M36 12q14 8 28 0l22 12-8 14-8-4v38H30V34l-8 4-8-14z" [attr.fill]="c.prenda" />
-                @if (c.persona) {
-                  <circle cx="50" cy="4" r="9" fill="#c99a76" /><rect x="10" y="34" width="9" height="30" rx="4" fill="#c99a76" /><rect x="81" y="34" width="9" height="30" rx="4" fill="#c99a76" />
-                }
-              </svg>
+      <h2 class="titulo-seccion">Así salen mejor tus fotos</h2>
+      <div class="mt-12 grid gap-10 lg:grid-cols-2">
+        @for (grupo of CONSEJOS; track grupo.titulo) {
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-tinta-3">{{ grupo.titulo }}</h3>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              @for (c of grupo.items; track c.titulo) {
+                <article class="consejo">
+                  <p class="flex items-center gap-2 text-sm font-semibold text-tinta">
+                    <span class="consejo-marca" [class.consejo-marca--no]="!c.bien">{{ c.bien ? '✓' : '✕' }}</span>{{ c.titulo }}
+                  </p>
+                  <p class="mt-2 text-xs leading-relaxed text-tinta-2">{{ c.texto }}</p>
+                </article>
+              }
             </div>
-            <p class="mt-4 flex items-center gap-2 text-sm font-semibold text-tinta">
-              <span class="consejo-marca" [class.consejo-marca--no]="!c.bien">{{ c.bien ? '✓' : '✕' }}</span>{{ c.titulo }}
-            </p>
-            <p class="mt-1 text-xs leading-relaxed text-tinta-2">{{ c.texto }}</p>
-          </article>
+          </div>
         }
       </div>
     </div>
   </section>
 
-  <!-- Características -->
-  <section id="caracteristicas" class="seccion">
-    <div class="contenedor">
-      <p class="antetitulo">Características</p>
-      <h2 class="titulo-seccion">Pensado para decidir mejor</h2>
-      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        @for (c of CARACTERISTICAS; track c.titulo) {
-          <article class="caracteristica">
-            <span class="icono-caracteristica">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="c.icono" />
-              </svg>
-            </span>
-            <h3 class="mt-5 text-base font-semibold text-tinta">{{ c.titulo }}</h3>
-            <p class="mt-2 text-sm leading-relaxed text-tinta-2">{{ c.texto }}</p>
-          </article>
-        }
+  <!-- Privacidad -->
+  <section id="privacidad" class="seccion seccion--tinta">
+    <div class="contenedor grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+      <div>
+        <p class="antetitulo !text-oliva-claro">Privacidad</p>
+        <h2 class="titulo-seccion !text-papel">Tus fotos son tuyas</h2>
+        <p class="mt-4 max-w-lg text-base leading-relaxed text-white/70">
+          Tus fotos y tus pruebas se guardan en una carpeta privada del servidor y solo se muestran con tu sesión. Las
+          puedes borrar cuando quieras.
+        </p>
       </div>
-    </div>
-  </section>
-
-  <!-- Usos -->
-  <section id="usos" class="seccion seccion--tinta">
-    <div class="contenedor">
-      <p class="antetitulo !text-oliva-claro">Para qué sirve</p>
-      <h2 class="titulo-seccion !text-papel">Una prueba rápida antes de decidir</h2>
-      <div class="mt-12 grid gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-        @for (u of USOS; track u.titulo) {
+      <div class="grid gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-2">
+        @for (u of PRIVACIDAD; track u.titulo) {
           <article class="bg-tinta p-6">
-            <p class="text-3xl font-semibold text-oliva-claro">{{ u.numero }}</p>
-            <h3 class="mt-4 text-base font-semibold text-papel">{{ u.titulo }}</h3>
+            <p class="text-2xl font-semibold text-oliva-claro">{{ u.numero }}</p>
+            <h3 class="mt-3 text-base font-semibold text-papel">{{ u.titulo }}</h3>
             <p class="mt-2 text-sm leading-relaxed text-white/65">{{ u.texto }}</p>
           </article>
         }
@@ -207,7 +216,7 @@
 
   <!-- Preguntas frecuentes -->
   <section id="preguntas" class="seccion seccion--hueso">
-    <div class="contenedor grid gap-12 md:grid-cols-[0.8fr_1.2fr]">
+    <div class="contenedor grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
       <div>
         <p class="antetitulo">Preguntas frecuentes</p>
         <h2 class="titulo-seccion">Lo que suelen preguntarnos</h2>
@@ -219,20 +228,20 @@
   </section>
 
   <!-- Llamada final -->
-  <section class="contenedor py-20">
+  <section class="contenedor-ancho py-16">
     <div class="banda-oliva">
-      <h2 class="text-3xl font-medium tracking-tight md:text-4xl">Tu armario, en tu avatar, en minutos</h2>
-      <p class="mx-auto mt-4 max-w-xl text-base text-papel/80">Sube la foto de una prenda y mírala puesta. Sin cuenta, sin descargar nada.</p>
-      <a href="#probador" class="mt-8 inline-flex rounded-full bg-papel px-6 py-3 text-sm font-medium text-tinta transition-colors hover:bg-hueso">Empezar ahora</a>
+      <h2 class="text-3xl font-medium tracking-tight md:text-5xl">Tu armario, en tu foto, en minutos</h2>
+      <p class="mx-auto mt-4 max-w-xl text-base text-papel/80">Sube una foto tuya y una prenda. Sin cuenta, sin descargar nada.</p>
+      <a href="#probador" class="mt-8 inline-flex rounded-full bg-papel px-7 py-3 text-sm font-semibold text-tinta transition-colors hover:bg-hueso">Empezar ahora</a>
     </div>
   </section>
 </main>
 
 <footer class="pie">
-  <div class="contenedor grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+  <div class="contenedor-ancho grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
     <div>
       <span class="marca-logo">TRENDER</span>
-      <p class="mt-3 max-w-xs text-sm leading-relaxed text-tinta-3">Probador virtual 3D: sube fotos de tu ropa y mírala puesta en un avatar con tus medidas.</p>
+      <p class="mt-3 max-w-xs text-sm leading-relaxed text-tinta-3">Probador virtual con IA: sube tu foto y tu ropa, y mírate con ella puesta.</p>
     </div>
     @for (col of PIE; track col.titulo) {
       <nav [attr.aria-label]="col.titulo">
@@ -243,9 +252,9 @@
       </nav>
     }
   </div>
-  <div class="contenedor mt-10 flex flex-wrap justify-between gap-4 border-t border-linea pt-6 text-xs">
+  <div class="contenedor-ancho mt-10 flex flex-wrap justify-between gap-4 border-t border-linea pt-6 text-xs">
     <span>© {{ anio }} Trender</span>
-    <span>Hecho con Angular, Three.js y Node.js</span>
+    <span>Hecho con Angular y Node.js</span>
   </div>
 </footer>
 
