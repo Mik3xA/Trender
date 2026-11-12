@@ -27,6 +27,18 @@ npm test                    # pruebas del backend
 
 La base `dev.db` se crea y migra sola al arrancar (o con `npm run db:migrate`).
 
+### Agregar prendas
+
+- **Subir foto** (recomendado): `POST /api/closet/subir?genero=Femenino&nombre=...` con la imagen
+  como cuerpo (`Content-Type: image/jpeg|png|webp|avif|heic`, máx. 12 MB). Responde 202 y la foto
+  se analiza en segundo plano: recorte del fondo (también fondos caseros), tipo de prenda
+  (superior, inferior, vestido o calzado y el tipo concreto), manga, largo, colores, estampado
+  y zonas de la foto para el avatar 3D. Consulta `GET /api/closet/:id` hasta `ready`/`review`.
+- **Link de tienda**: `POST /api/closet/importar`. Muchas tiendas bloquean la lectura automática;
+  en ese caso la prenda se guarda con los datos del link y se le puede añadir una foto con
+  `POST /api/closet/:id/foto` (mismo formato que `subir`). Un link directo a una imagen
+  (`.jpg`, `.png`, `.webp`) se analiza como foto.
+
 Opcional, para tiendas que bloquean la lectura automática (Amazon, captchas):
 `npm install puppeteer` (descarga un Chromium de ~170 MB). Para recortes de mayor calidad,
 `REMOVE_BG_API_KEY` en `.env` (remove.bg).

@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { body, param, query } = require('express-validator');
+const { body, header, param, query } = require('express-validator');
 
 const closetController = require('../controladores/closet.controller');
 const { CATEGORIAS, GENEROS } = require('../servicios/closet.service');
@@ -43,6 +43,27 @@ router.post('/importar', limitadorImportacion, validarImportacion, manejarValida
 // Alias histórico (misma operación).
 router.post('/add-from-link', limitadorImportacion, validarImportacion, manejarValidacion, closetController.importar);
 
+// Subir foto: el cuerpo es la imagen tal cual (sin multipart). Límite 12 MB.
+const MAX_FOTO = '12mb';
+const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/tiff', 'image/heic', 'image/heif'];
+const validarImagenCuerpo = [
+  express.raw({ type: TIPOS_FOTO, limit: MAX_FOTO }),
+  header('content-type')
+    .custom((valor) => TIPOS_FOTO.includes(String(valor).split(';')[0].trim().toLowerCase()))
+    .withMessage(`La foto debe enviarse como ${TIPOS_FOTO.join(', ')}`),
+  body()
+    .custom((cuerpo) => Buffer.isBuffer(cuerpo) && cuerpo.length > 0)
+    .withMessage('Falta la imagen en el cuerpo de la petición'),
+];
+const validarSubida = [
+  ...validarImagenCuerpo,
+  validarGenero(query('genero').optional()),
+  validarCategoria(query('category').optional()),
+  query('nombre').optional().isString().trim().isLength({ max: 120 }).withMessage('nombre: máximo 120 caracteres'),
+];
+router.post('/subir', limitadorImportacion, validarSubida, manejarValidacion, closetController.subir);
+
+router.post('/:id/foto', limitadorImportacion, validarId, validarImagenCuerpo, manejarValidacion, closetController.agregarFoto);
 router.get('/:id', validarId, manejarValidacion, closetController.obtener);
 router.patch(
   '/:id',

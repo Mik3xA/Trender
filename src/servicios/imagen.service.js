@@ -184,6 +184,200 @@ function mascaraPorBorde(mini) {
   return mascara;
 }
 
+// ------------------------------------------------------------------ recorte tolerante (fotos caseras)
+
+/** k-medias sobre los colores del borde: los "colores de fondo" (pared, piso, sábana...). */
+function modelosDeFondo({ data, ancho, alto }, grosor = 3) {
+  const muestras = [];
+  for (let y = 0; y < alto; y += 1) {
+    for (let x = 0; x < ancho; x += 1) {
+      if (x >= grosor && x < ancho - grosor && y >= grosor && y < alto - grosor) continue;
+      const i = (y * ancho + x) * 3;
+      muestras.push([data[i], data[i + 1], data[i + 2]]);
+    }
+  }
+  const k = 4;
+  const ordenadas = [...muestras].sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
+  let centros = Array.from({ length: k }, (_, j) => [...ordenadas[Math.floor(((j + 0.5) / k) * ordenadas.length)]]);
+  let asignacion = new Uint8Array(muestras.length);
+  for (let iter = 0; iter < 10; iter += 1) {
+    muestras.forEach((m, n) => {
+      let mejor = 0;
+      let dMejor = Infinity;
+      centros.forEach((c, j) => {
+        const d = distancia(...m, ...c);
+        if (d < dMejor) {
+          dMejor = d;
+          mejor = j;
+        }
+      });
+      asignacion[n] = mejor;
+    });
+    centros = centros.map((c, j) => {
+      const miembros = muestras.filter((_, n) => asignacion[n] === j);
+      if (!miembros.length) return c;
+      return [0, 1, 2].map((canal) => miembros.reduce((s, m) => s + m[canal], 0) / miembros.length);
+    });
+  }
+  return centros
+    .map((c, j) => {
+      const miembros = muestras.filter((_, n) => asignacion[n] === j);
+      const dispersion = miembros.length ? Math.sqrt(miembros.reduce((s, m) => s + distancia(...m, ...c) ** 2, 0) / miembros.length) : 0;
+      return { color: c, peso: miembros.length / muestras.length, umbral: Math.min(60, Math.max(24, dispersion * 2.6)) };
+    })
+    .filter((m) => m.peso >= 0.04);
+}
+
+/** Erosión (min) o dilatación (max) cuadrada separable sobre una máscara 0/255. */
+function morfologia(mascara, ancho, alto, radio, dilatar) {
+  const op = dilatar ? Math.max : Math.min;
+  const tmp = new Uint8Array(mascara.length);
+  const out = new Uint8Array(mascara.length);
+  for (let y = 0; y < alto; y += 1) {
+    for (let x = 0; x < ancho; x += 1) {
+      let v = mascara[y * ancho + x];
+      for (let d = -radio; d <= radio; d += 1) {
+        const xx = Math.min(ancho - 1, Math.max(0, x + d));
+        v = op(v, mascara[y * ancho + xx]);
+      }
+      tmp[y * ancho + x] = v;
+    }
+  }
+  for (let y = 0; y < alto; y += 1) {
+    for (let x = 0; x < ancho; x += 1) {
+      let v = tmp[y * ancho + x];
+      for (let d = -radio; d <= radio; d += 1) {
+        const yy = Math.min(alto - 1, Math.max(0, y + d));
+        v = op(v, tmp[yy * ancho + x]);
+      }
+      out[y * ancho + x] = v;
+    }
+  }
+  return out;
+}
+
+/** Deja solo las piezas grandes (la prenda, o el par de zapatos) y quita motas. */
+function piezasPrincipales(mascara, ancho, alto) {
+  const etiqueta = new Int32Array(mascara.length).fill(-1);
+  const areas = [];
+  const pila = [];
+  for (let inicio = 0; inicio < mascara.length; inicio += 1) {
+    if (!mascara[inicio] || etiqueta[inicio] >= 0) continue;
+    const id = areas.length;
+    let area = 0;
+    etiqueta[inicio] = id;
+    pila.push(inicio);
+    while (pila.length) {
+      const k = pila.pop();
+      area += 1;
+      const x = k % ancho;
+      const y = (k - x) / ancho;
+      for (const v of [x > 0 ? k - 1 : -1, x < ancho - 1 ? k + 1 : -1, y > 0 ? k - ancho : -1, y < alto - 1 ? k + ancho : -1]) {
+        if (v >= 0 && mascara[v] && etiqueta[v] < 0) {
+          etiqueta[v] = id;
+          pila.push(v);
+        }
+      }
+    }
+    areas.push(area);
+  }
+  const mayor = Math.max(0, ...areas);
+  const salida = new Uint8Array(mascara.length);
+  for (let k = 0; k < mascara.length; k += 1) if (etiqueta[k] >= 0 && areas[etiqueta[k]] >= mayor * 0.25) salida[k] = 255;
+  return salida;
+}
+
+/**
+ * Máscara para fotos caseras: el fondo puede tener varios colores, degradados
+ * y sombras suaves. Se aprende el fondo del borde, se rellena desde el borde
+ * todo lo que se le parece (o que continúa suavemente un fondo ya visto), se
+ * limpian hilos finos (gancho de la percha, pelusas) y se queda la prenda.
+ */
+function mascaraPorModelo(mini) {
+  const { data, ancho, alto } = mini;
+  const modelos = modelosDeFondo(mini);
+  const cercania = (k) => {
+    const i = k * 3;
+    let mejor = Infinity;
+    for (const m of modelos) mejor = Math.min(mejor, distancia(data[i], data[i + 1], data[i + 2], ...m.color) / m.umbral);
+    return mejor; // < 1: parece fondo
+  };
+  const esFondo = new Uint8Array(ancho * alto);
+  const cola = [];
+  const sembrar = (k) => {
+    if (!esFondo[k] && cercania(k) < 1.6) {
+      esFondo[k] = 1;
+      cola.push(k);
+    }
+  };
+  for (let x = 0; x < ancho; x += 1) {
+    sembrar(x);
+    sembrar((alto - 1) * ancho + x);
+  }
+  for (let y = 0; y < alto; y += 1) {
+    sembrar(y * ancho);
+    sembrar(y * ancho + ancho - 1);
+  }
+  while (cola.length) {
+    const k = cola.pop();
+    const x = k % ancho;
+    const y = (k - x) / ancho;
+    for (const v of [x > 0 ? k - 1 : -1, x < ancho - 1 ? k + 1 : -1, y > 0 ? k - ancho : -1, y < alto - 1 ? k + ancho : -1]) {
+      if (v < 0 || esFondo[v]) continue;
+      const c = cercania(v);
+      // Parecido a un color de fondo, o continuación suave (degradado, sombra) no muy lejana.
+      const suave = distancia(data[v * 3], data[v * 3 + 1], data[v * 3 + 2], data[k * 3], data[k * 3 + 1], data[k * 3 + 2]) < 7;
+      if (c < 1 || (suave && c < 2.2)) {
+        esFondo[v] = 1;
+        cola.push(v);
+      }
+    }
+  }
+  // Huecos encerrados (entre las piernas, entre manga y cuerpo, franjas del piso
+  // cortadas por la prenda): zonas grandes parecidas al fondo que no tocan el borde.
+  // Si aparecen MUCHAS es un estampado (rayas claras como la pared): entonces solo
+  // se quitan las de color casi idéntico al fondo.
+  const regiones = [];
+  const visto = new Uint8Array(ancho * alto);
+  const minimo = Math.max(12, ancho * alto * 0.0004);
+  for (let inicio = 0; inicio < esFondo.length; inicio += 1) {
+    if (esFondo[inicio] || visto[inicio] || cercania(inicio) >= 1.2) continue;
+    const region = [inicio];
+    let suma = 0;
+    visto[inicio] = 1;
+    for (let n = 0; n < region.length; n += 1) {
+      const k = region[n];
+      suma += cercania(k);
+      const x = k % ancho;
+      const y = (k - x) / ancho;
+      for (const v of [x > 0 ? k - 1 : -1, x < ancho - 1 ? k + 1 : -1, y > 0 ? k - ancho : -1, y < alto - 1 ? k + ancho : -1]) {
+        if (v >= 0 && !esFondo[v] && !visto[v] && cercania(v) < 1.2) {
+          visto[v] = 1;
+          region.push(v);
+        }
+      }
+    }
+    if (region.length >= minimo) regiones.push({ pixeles: region, media: suma / region.length });
+  }
+  const esEstampado = regiones.filter((r) => r.pixeles.length >= ancho * alto * 0.002).length >= 5;
+  for (const r of regiones) {
+    if (!esEstampado || r.media < 0.4) for (const k of r.pixeles) esFondo[k] = 1;
+  }
+
+  let mascara = new Uint8Array(ancho * alto);
+  for (let k = 0; k < mascara.length; k += 1) mascara[k] = esFondo[k] ? 0 : 255;
+  const radio = Math.max(1, Math.round(Math.min(ancho, alto) * 0.008));
+  mascara = morfologia(morfologia(mascara, ancho, alto, radio, false), ancho, alto, radio, true);
+  mascara = piezasPrincipales(mascara, ancho, alto);
+  let primerPlano = 0;
+  for (const v of mascara) if (v) primerPlano += 1;
+  const fraccion = primerPlano / mascara.length;
+  if (fraccion < 0.03 || fraccion > 0.93) {
+    throw errorOperacional(422, 'No se pudo separar la prenda del fondo: tómale la foto sobre una superficie lisa y con buena luz', 'FONDO_NO_LISO');
+  }
+  return mascara;
+}
+
 /** Quita fondo con remove.bg (si hay REMOVE_BG_API_KEY). Devuelve PNG con alfa o null. */
 async function quitarFondoRemoteBg(buffer) {
   const clave = process.env.REMOVE_BG_API_KEY;
@@ -206,9 +400,10 @@ async function quitarFondoRemoteBg(buffer) {
  * Recorta la prenda: PNG RGBA de hasta 1024 px, ajustado al contorno, con
  * borde suavizado. Usa remove.bg si está configurado; si no, un recorte local
  * pensado para fotos de catálogo (fondo blanco o liso).
+ * Con `tolerante` acepta fotos caseras (fondo con varios colores o degradado).
  * @returns {Promise<{ png: Buffer, metodo: string, ancho: number, alto: number }>}
  */
-async function quitarFondo(buffer) {
+async function quitarFondo(buffer, { tolerante = false } = {}) {
   let recorteRemoto = null;
   try {
     recorteRemoto = await quitarFondoRemoteBg(buffer);
@@ -225,7 +420,16 @@ async function quitarFondo(buffer) {
   const base = sharp(buffer, { failOn: 'none' }).rotate().flatten({ background: '#ffffff' }).resize(LADO_SALIDA, LADO_SALIDA, { fit: 'inside', withoutEnlargement: true });
   const { data: rgb, info } = await base.clone().removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const mini = await miniatura(buffer, LADO_MASCARA);
-  const mascara = mascaraPorBorde(mini);
+  let mascara;
+  let metodo = 'recorte-local';
+  // Una foto casera con dos fondos (pared y piso) puede pasar el umbral de "liso":
+  // en modo tolerante solo se usa el relleno simple si el borde es casi todo de un color.
+  if (tolerante && fondoDelBorde(mini).uniformidad < 0.85) {
+    mascara = mascaraPorModelo(mini);
+    metodo = 'recorte-tolerante';
+  } else {
+    mascara = mascaraPorBorde(mini);
+  }
 
   // Máscara a tamaño completo, suavizada para que el borde no se vea pixelado.
   const alfa = await sharp(Buffer.from(mascara), { raw: { width: mini.ancho, height: mini.alto, channels: 1 } })
@@ -265,7 +469,7 @@ async function quitarFondo(buffer) {
   const png = await sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
   const recortado = await recortarAlContorno(png);
   const meta = await sharp(recortado).metadata();
-  return { png: recortado, metodo: 'recorte-local', ancho: meta.width, alto: meta.height };
+  return { png: recortado, metodo, ancho: meta.width, alto: meta.height };
 }
 
 // ------------------------------------------------------------------ silueta y color

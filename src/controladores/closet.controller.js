@@ -35,6 +35,30 @@ async function importar(req, res, next) {
   }
 }
 
+/**
+ * POST /api/closet/subir — cuerpo: la imagen (image/jpeg, png, webp...).
+ * 202 Accepted: la foto se analiza en segundo plano como una importación.
+ */
+async function subir(req, res, next) {
+  try {
+    const { genero, nombre, category } = req.query;
+    const { prenda } = await closetService.subirFoto(req.auth.userId, { buffer: req.body, genero, nombre: nombre || null, category });
+    res.status(202).location(`/api/closet/${prenda.id}`).json({ status: 'success', data: prenda });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/closet/:id/foto — añade o cambia la foto de una prenda (202). */
+async function agregarFoto(req, res, next) {
+  try {
+    const { prenda } = await closetService.agregarFoto(req.auth.userId, req.params.id, req.body);
+    res.status(202).json({ status: 'success', data: prenda });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function actualizar(req, res, next) {
   try {
     const { category, tipo } = req.body;
@@ -52,4 +76,4 @@ async function eliminar(req, res, next) {
   }
 }
 
-module.exports = { listar, obtener, importar, actualizar, eliminar };
+module.exports = { listar, obtener, importar, subir, agregarFoto, actualizar, eliminar };

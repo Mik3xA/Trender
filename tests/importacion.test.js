@@ -99,7 +99,7 @@ describe('importación de prendas desde links', () => {
     const res = await request(app).post('/api/closet/importar').set(auth).send({ url: 'https://x.example/p/8891', genero: 'Femenino' });
     const prenda = await esperar(auth, res.body.data.id);
     expect(prenda).toMatchObject({ status: 'ready', category: 'bottom', tipo: 'pantalon' });
-    expect(prenda.analisis.evidencias.join(' ')).toContain('dos piernas');
+    expect(prenda.analisis.evidencias.join(' ')).toContain('dos perneras');
   });
 
   it('distingue tenis de zapatos por el texto y los guarda como calzado', async () => {
@@ -157,16 +157,22 @@ describe('importación de prendas desde links', () => {
   });
 });
 
-describe('decidir (texto + silueta)', () => {
-  const silueta = { proporcion: 0.7, huecoInferior: 0.8, anchoArriba: 0.9, anchoAbajo: 0.7 };
-  it('el texto claro manda y la silueta lo confirma', () => {
-    expect(decidir({ categoria: 'Piernas', tipo: 'jeans', confianza: 'media', fuentes: ['titulo'] }, silueta)).toMatchObject({
+describe('decidir (texto + análisis visual)', () => {
+  const visual = { categoria: 'Piernas', tipo: 'pantalon', confianza: 'alta', puntos: { Piernas: 4, Torso: 0, Vestido: -2, Calzado: 0 }, evidencias: ['dos perneras separadas abajo'] };
+  it('el texto claro manda y la foto lo confirma', () => {
+    expect(decidir({ categoria: 'Piernas', tipo: 'jeans', confianza: 'media', fuentes: ['titulo'] }, visual)).toMatchObject({
       categoria: 'Piernas',
       tipo: 'jeans',
       confianza: 'alta',
     });
   });
-  it('sin texto ni silueta concluyente no decide', () => {
+  it('sin texto, decide la foto', () => {
+    expect(decidir({ categoria: null, tipo: null, confianza: 'ninguna', fuentes: [] }, visual)).toMatchObject({ categoria: 'Piernas', tipo: 'pantalon', confianza: 'alta' });
+  });
+  it('si el texto y la foto se contradicen con seguridad, pregunta', () => {
+    expect(decidir({ categoria: 'Torso', tipo: 'camiseta', confianza: 'media', fuentes: ['titulo'] }, visual)).toMatchObject({ categoria: null });
+  });
+  it('sin texto ni foto concluyente no decide', () => {
     expect(decidir({ categoria: null, tipo: null, confianza: 'ninguna', fuentes: [] }, null)).toMatchObject({ categoria: null });
   });
 });
