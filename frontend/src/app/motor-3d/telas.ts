@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { Tela } from '../probador/prendas';
+import { PrendaVirtual, Tela } from '../probador/prendas';
 
 /** Aspecto de cada tela: rugosidad, brillo y patrón procedimental. */
 const PROPIEDADES: Record<Tela, { rugosidad: number; brillo: number; repetir: [number, number] }> = {
@@ -15,6 +15,7 @@ const PROPIEDADES: Record<Tela, { rugosidad: number; brillo: number; repetir: [n
 };
 
 const cache = new Map<Tela, THREE.Texture | null>();
+const cacheRelieve = new Map<Tela, THREE.Texture | null>();
 
 function lienzo(tam = 128): CanvasRenderingContext2D | null {
   if (typeof document === 'undefined') return null;
@@ -108,12 +109,53 @@ export function texturaTela(tela: Tela): THREE.Texture | null {
   return textura;
 }
 
-/** Material de una prenda: color real + textura de su tela. */
+/**
+ * Relieve del tejido (mapa de normales) calculado del mismo patrón: con la luz
+ * rasante se ve la trama, que es lo que distingue la tela de la piel.
+ */
+export function relieveTela(tela: Tela): THREE.Texture | null {
+  if (cacheRelieve.has(tela)) return cacheRelieve.get(tela)!;
+  const ctx = lienzo();
+  let textura: THREE.Texture | null = null;
+  if (ctx) {
+    dibujar(ctx, tela);
+    const t = ctx.canvas.width;
+    const alto = ctx.getImageData(0, 0, t, t).data;
+    const salida = ctx.createImageData(t, t);
+    const h = (x: number, y: number) => alto[(((y + t) % t) * t + ((x + t) % t)) * 4] / 255;
+    for (let y = 0; y < t; y += 1) {
+      for (let x = 0; x < t; x += 1) {
+        const dx = (h(x + 1, y) - h(x - 1, y)) * 2.5;
+        const dy = (h(x, y + 1) - h(x, y - 1)) * 2.5;
+        const n = new THREE.Vector3(-dx, dy, 1).normalize();
+        const i = (y * t + x) * 4;
+        salida.data[i] = (n.x * 0.5 + 0.5) * 255;
+        salida.data[i + 1] = (n.y * 0.5 + 0.5) * 255;
+        salida.data[i + 2] = (n.z * 0.5 + 0.5) * 255;
+        salida.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(salida, 0, 0);
+    textura = new THREE.CanvasTexture(ctx.canvas);
+    textura.wrapS = THREE.RepeatWrapping;
+    textura.wrapT = THREE.RepeatWrapping;
+    textura.anisotropy = 4;
+    const [rx, ry] = PROPIEDADES[tela].repetir;
+    textura.repeat.set(rx * 1.6, ry * 1.6);
+  }
+  cacheRelieve.set(tela, textura);
+  return textura;
+}
+
+/** Material de una prenda: color real + textura y relieve de su tela. */
 export function materialTela(color: string, tela: Tela): THREE.MeshPhysicalMaterial {
   const props = PROPIEDADES[tela];
+  const relieve = relieveTela(tela);
   return new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(color),
     map: texturaTela(tela),
+    normalMap: relieve,
+    normalScale: new THREE.Vector2(0.45, 0.45),
     roughness: props.rugosidad,
     metalness: 0,
     sheen: props.brillo,
@@ -121,14 +163,19 @@ export function materialTela(color: string, tela: Tela): THREE.MeshPhysicalMater
     sheenColor: new THREE.Color('#ffffff'),
     clearcoat: tela === 'piel' ? 0.35 : 0,
     clearcoatRoughness: 0.5,
-    side: THREE.DoubleSide,
+    // Pliegues y oclusión vienen en los colores de vértice (acabado.ts).
+    vertexColors: true,
+    // La cara de dentro la dibuja otra malla, más oscura (materialInterior).
+    side: THREE.FrontSide,
   });
 }
 
 /** Libera las texturas compartidas (al destruir el visor). */
 export function liberarTexturas(): void {
   for (const textura of cache.values()) textura?.dispose();
+  for (const textura of cacheRelieve.values()) textura?.dispose();
   cache.clear();
+  cacheRelieve.clear();
 }
 
 // ------------------------------------------------------------------ foto real de la prenda
@@ -150,22 +197,54 @@ function cargarFoto(url: string): Promise<HTMLImageElement | null> {
 }
 
 /**
- * Material con la foto recortada de la prenda. La foto se dibuja "contain"
- * sobre el color dominante en un lienzo cuadrado: donde la malla 3D se sale
- * de la silueta de la foto se ve el color de la tela, no un hueco.
+ * Material con la foto recortada de la prenda.
+ * - `estirar` (hay zonas del análisis): la foto ocupa todo el lienzo y las UV
+ *   son coordenadas de la foto (0..1), para mapear torso y mangas por separado.
+ * - sin zonas: la foto se dibuja "contain" sobre el color dominante.
+ * En los costados (donde la proyección frontal estiraría la foto) el color se
+ * funde con el color de la tela según el atributo `aLado` de cada vértice.
  * El material se devuelve al instante con el color y la foto se aplica al cargar.
  */
-export function materialConFoto(url: string, colorBase: string, tela: Tela): THREE.MeshPhysicalMaterial {
+export function materialConFoto(url: string, colorBase: string, tela: Tela, estirar = false): THREE.MeshPhysicalMaterial {
   const material = materialTela(colorBase, tela);
   material.map = null;
+  const colorTela = { value: new THREE.Color(colorBase) };
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms['uColorTela'] = colorTela;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aLado;\nvarying float vLado;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLado = aLado;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uColorTela;\nvarying float vLado;')
+      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, uColorTela, clamp(vLado, 0.0, 1.0));');
+  };
+  material.customProgramCacheKey = () => 'tela-con-foto';
   cargarFoto(url).then((foto) => {
     const ctx = lienzo(LADO_TEXTURA);
     if (!foto || !ctx) return;
     ctx.fillStyle = colorBase;
     ctx.fillRect(0, 0, LADO_TEXTURA, LADO_TEXTURA);
-    const escala = Math.min(LADO_TEXTURA / foto.width, LADO_TEXTURA / foto.height);
-    const [w, h] = [foto.width * escala, foto.height * escala];
-    ctx.drawImage(foto, (LADO_TEXTURA - w) / 2, (LADO_TEXTURA - h) / 2, w, h);
+    if (estirar) {
+      ctx.drawImage(foto, 0, 0, LADO_TEXTURA, LADO_TEXTURA);
+    } else {
+      const escala = Math.min(LADO_TEXTURA / foto.width, LADO_TEXTURA / foto.height);
+      const [w, h] = [foto.width * escala, foto.height * escala];
+      ctx.drawImage(foto, (LADO_TEXTURA - w) / 2, (LADO_TEXTURA - h) / 2, w, h);
+    }
+    // Rellena lo transparente (fuera de la prenda) con el color medio de la tela,
+    // para que un pliegue que se sale de la silueta no muestre un hueco blanco.
+    const datos = ctx.getImageData(0, 0, LADO_TEXTURA, LADO_TEXTURA);
+    const base = new THREE.Color(colorBase);
+    for (let i = 0; i < datos.data.length; i += 4) {
+      const a = datos.data[i + 3] / 255;
+      if (a < 1) {
+        datos.data[i] = datos.data[i] * a + base.r * 255 * (1 - a);
+        datos.data[i + 1] = datos.data[i + 1] * a + base.g * 255 * (1 - a);
+        datos.data[i + 2] = datos.data[i + 2] * a + base.b * 255 * (1 - a);
+        datos.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(datos, 0, 0);
     const textura = new THREE.CanvasTexture(ctx.canvas);
     textura.colorSpace = THREE.SRGBColorSpace;
     textura.anisotropy = 8;
@@ -176,42 +255,163 @@ export function materialConFoto(url: string, colorBase: string, tela: Tela): THR
   return material;
 }
 
-/**
- * Proyección planar de la foto sobre la prenda 3D (como un proyector):
- * - 'frente': la foto de catálogo (vista frontal) cubre la prenda en X/Y,
- *   mangas y perneras incluidas, centrada y sin deformar (misma escala en
- *   ambos ejes, igual que el "contain" del lienzo).
- * - 'lado': para calzado, cuya foto de tienda suele ser de perfil (Z/Y).
- * Reescribe el atributo `uv` de cada malla con material de tela.
- */
-export function proyectarFoto(grupo: THREE.Object3D, modo: 'frente' | 'lado', esTela: (m: THREE.Mesh) => boolean): void {
-  grupo.updateMatrixWorld(true);
+type ZonaFoto = { x0: number; y0: number; x1: number; y1: number };
+
+function mallasDe(grupo: THREE.Object3D, filtro: (m: THREE.Mesh) => boolean): THREE.Mesh[] {
   const mallas: THREE.Mesh[] = [];
   grupo.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (m.isMesh && esTela(m)) mallas.push(m);
+    if (m.isMesh && filtro(m)) mallas.push(m);
   });
-  if (!mallas.length) return;
+  return mallas;
+}
 
+const suave = (a: number, b: number, x: number) => {
+  const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Proyección planar de la foto (como un proyector) sobre un conjunto de mallas.
+ * - 'frente': X/Y (foto frontal de catálogo); 'lado': Z/Y (calzado de perfil).
+ * - Con `zona`, la caja de las mallas se estira a esa zona de la foto (UV =
+ *   coordenadas de la foto); sin zona, "contain" centrado (lienzo contain).
+ * - Escribe `aLado` (0 = foto, 1 = color de la tela) según hacia dónde mira cada vértice.
+ */
+function proyectarPlanar(
+  grupo: THREE.Object3D,
+  mallas: THREE.Mesh[],
+  modo: 'frente' | 'lado',
+  zona: ZonaFoto | null,
+  opciones: { espaldaConFoto?: boolean; puntaDerecha?: boolean } = {}
+): void {
+  if (!mallas.length) return;
+  grupo.updateMatrixWorld(true);
+  const aLocal = grupo.matrixWorld.clone().invert();
   const caja = new THREE.Box3();
-  for (const m of mallas) caja.expandByObject(m);
+  const v = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  const matriz = new THREE.Matrix4();
+  for (const m of mallas) {
+    matriz.multiplyMatrices(aLocal, m.matrixWorld);
+    const pos = m.geometry.getAttribute('position');
+    for (let i = 0; i < pos.count; i += 1) caja.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(matriz));
+  }
   const centro = caja.getCenter(new THREE.Vector3());
   const tam = caja.getSize(new THREE.Vector3());
-  const ancho = modo === 'frente' ? tam.x : tam.z;
-  const escala = Math.max(ancho, tam.y) * 1.02;
-  const v = new THREE.Vector3();
+  const ancho = Math.max(1e-6, modo === 'frente' ? tam.x : tam.z);
+  const alto = Math.max(1e-6, tam.y);
+  const escala = Math.max(ancho, alto) * 1.02;
+  const espalda = opciones.espaldaConFoto ?? true;
 
   for (const malla of mallas) {
+    matriz.multiplyMatrices(aLocal, malla.matrixWorld);
+    const normalMatriz = new THREE.Matrix3().getNormalMatrix(matriz);
     const pos = malla.geometry.getAttribute('position');
+    const nor = malla.geometry.getAttribute('normal');
     const uv = new Float32Array(pos.count * 2);
+    const lado = new Float32Array(pos.count);
     for (let i = 0; i < pos.count; i += 1) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(malla.matrixWorld).applyMatrix4(grupo.matrixWorld.clone().invert());
-      const horizontal = modo === 'frente' ? v.x - centro.x : centro.z - v.z;
-      uv[i * 2] = 0.5 + horizontal / escala;
-      uv[i * 2 + 1] = 0.5 + (v.y - centro.y) / escala;
+      v.fromBufferAttribute(pos, i).applyMatrix4(matriz);
+      let horizontal = modo === 'frente' ? v.x - centro.x : centro.z - v.z;
+      if (modo === 'lado' && opciones.puntaDerecha) horizontal = -horizontal;
+      if (zona) {
+        const fx = 0.5 + horizontal / ancho;
+        const fy = 0.5 - (v.y - centro.y) / alto; // 0 arriba, 1 abajo (como en la foto)
+        uv[i * 2] = zona.x0 + THREE.MathUtils.clamp(fx, 0, 1) * (zona.x1 - zona.x0);
+        uv[i * 2 + 1] = 1 - (zona.y0 + THREE.MathUtils.clamp(fy, 0, 1) * (zona.y1 - zona.y0));
+      } else {
+        uv[i * 2] = 0.5 + horizontal / escala;
+        uv[i * 2 + 1] = 0.5 + (v.y - centro.y) / escala;
+      }
+      // Cuánto mira hacia la cámara del "proyector": de lado, la foto se estiraría.
+      if (nor) {
+        n.fromBufferAttribute(nor, i).applyMatrix3(normalMatriz).normalize();
+        const frente = modo === 'frente' ? n.z : Math.abs(n.x);
+        const mira = espalda || frente > 0 ? Math.abs(frente) : 0;
+        lado[i] = 1 - suave(0.18, 0.55, mira);
+      }
     }
     malla.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    malla.geometry.setAttribute('aLado', new THREE.BufferAttribute(lado, 1));
   }
+}
+
+/**
+ * Manga: la foto plana tiene la manga extendida hacia el costado y en el
+ * avatar cuelga a lo largo del brazo. Se usa la parametrización del tubo
+ * (v = del hombro al puño, u = alrededor) para recorrer la zona de la manga
+ * de la foto desde el torso hacia fuera.
+ */
+function proyectarManga(malla: THREE.Mesh, zona: ZonaFoto, haciaIzquierda: boolean): void {
+  const uvTubo = malla.geometry.getAttribute('uv');
+  const pos = malla.geometry.getAttribute('position');
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i += 1) {
+    const largo = uvTubo.getY(i); // 0 hombro, 1 puño
+    const vuelta = uvTubo.getX(i);
+    const fx = haciaIzquierda ? 1 - largo : largo;
+    const fy = 0.5 - 0.5 * Math.cos(Math.PI * 2 * vuelta); // frente y espalda ven la misma franja
+    uv[i * 2] = zona.x0 + fx * (zona.x1 - zona.x0);
+    uv[i * 2 + 1] = 1 - (zona.y0 + (0.15 + 0.7 * fy) * (zona.y1 - zona.y0));
+  }
+  malla.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  malla.geometry.setAttribute('aLado', new THREE.BufferAttribute(new Float32Array(pos.count), 1));
+}
+
+/** Borde de la manga: el color del puño (el extremo de la zona de la manga). */
+function proyectarPuno(malla: THREE.Mesh, zona: ZonaFoto, haciaIzquierda: boolean): void {
+  const pos = malla.geometry.getAttribute('position');
+  const uv = new Float32Array(pos.count * 2);
+  const x = haciaIzquierda ? zona.x0 + (zona.x1 - zona.x0) * 0.08 : zona.x1 - (zona.x1 - zona.x0) * 0.08;
+  const y = 1 - (zona.y0 + zona.y1) / 2;
+  for (let i = 0; i < pos.count; i += 1) uv.set([x, y], i * 2);
+  malla.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  malla.geometry.setAttribute('aLado', new THREE.BufferAttribute(new Float32Array(pos.count), 1));
+}
+
+/**
+ * Coloca la foto de la prenda sobre su malla 3D.
+ * Con zonas del análisis (fotos subidas o recortadas en el servidor):
+ *   superior -> torso a la zona del torso y cada manga a su zona;
+ *   resto -> toda la prenda a la zona de la prenda (estirada, no "contain").
+ * Sin zonas: proyección frontal (o lateral en calzado) "contain".
+ */
+export function proyectarFoto(
+  grupo: THREE.Object3D,
+  prenda: Pick<PrendaVirtual, 'categoria' | 'zonas' | 'estampado' | 'puntaDerecha'>,
+  esTela: (m: THREE.Mesh) => boolean
+): void {
+  const modo = prenda.categoria === 'Calzado' ? 'lado' : 'frente';
+  const zonas = prenda.zonas;
+  // Un estampado grande al frente no se repite en la espalda (se vería al revés).
+  const espaldaConFoto = prenda.estampado !== 'estampado';
+  const tela = mallasDe(grupo, esTela);
+
+  if (modo === 'lado') {
+    for (const zapato of grupo.children) {
+      proyectarPlanar(zapato, mallasDe(zapato, esTela), 'lado', zonas?.prenda ?? null, { puntaDerecha: prenda.puntaDerecha });
+    }
+    return;
+  }
+  if (zonas?.torso && (prenda.categoria === 'Torso' || prenda.categoria === 'Vestido')) {
+    const esManga = (m: THREE.Mesh) => /^manga_(izq|der)/.test(m.name);
+    proyectarPlanar(grupo, tela.filter((m) => !esManga(m)), 'frente', zonas.torso, { espaldaConFoto });
+    for (const m of tela.filter(esManga)) {
+      // La manga izquierda del avatar (+X) se ve a la derecha de la foto frontal.
+      const izquierdaAvatar = m.name.startsWith('manga_izq');
+      const zona = izquierdaAvatar ? zonas.mangaDerecha : zonas.mangaIzquierda;
+      if (!zona) {
+        proyectarPlanar(grupo, [m], 'frente', zonas.torso, { espaldaConFoto });
+      } else if (m.name.endsWith('_borde')) {
+        proyectarPuno(m, zona, !izquierdaAvatar);
+      } else {
+        proyectarManga(m, zona, !izquierdaAvatar);
+      }
+    }
+    return;
+  }
+  proyectarPlanar(grupo, tela, 'frente', zonas?.prenda ?? null, { espaldaConFoto });
 }
 
 /** Libera las fotos cargadas (al destruir el visor). */

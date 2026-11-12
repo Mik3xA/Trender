@@ -33,6 +33,19 @@ export interface PrendaVirtual {
   tienda?: string | null;
   precio?: string | null;
   imagen?: string | null;
+  /** Zonas de la foto (0..1) para proyectar torso y mangas por separado. */
+  zonas?: {
+    prenda: { x0: number; y0: number; x1: number; y1: number };
+    torso?: { x0: number; y0: number; x1: number; y1: number };
+    mangaIzquierda?: { x0: number; y0: number; x1: number; y1: number };
+    mangaDerecha?: { x0: number; y0: number; x1: number; y1: number };
+  };
+  /** Tela detectada en la foto (si se reconoció, p. ej. mezclilla). */
+  tela?: Tela;
+  /** 'liso', 'rayas…' o 'estampado' (un estampado no se repite en la espalda). */
+  estampado?: string | null;
+  /** Calzado: la punta del zapato mira a la derecha en la foto. */
+  puntaDerecha?: boolean;
 }
 
 /** Prenda tal como la devuelve POST /api/ropa/escanear-link. */
@@ -96,8 +109,9 @@ export const NOMBRE_CATEGORIA: Record<CategoriaPrenda, string> = {
   Vestido: 'Vestido',
 };
 
-export function estiloDe(prenda: Pick<PrendaVirtual, 'tipo' | 'categoria'>): Estilo {
-  return ESTILOS[prenda.tipo] ?? ESTILOS[TIPO_POR_CATEGORIA[prenda.categoria]];
+export function estiloDe(prenda: Pick<PrendaVirtual, 'tipo' | 'categoria'> & { tela?: Tela }): Estilo {
+  const estilo = ESTILOS[prenda.tipo] ?? ESTILOS[TIPO_POR_CATEGORIA[prenda.categoria]];
+  return prenda.tela ? { ...estilo, tela: prenda.tela } : estilo;
 }
 
 /** Ranura del avatar que ocupa la prenda. Un vestido ocupa la superior y la inferior. */
