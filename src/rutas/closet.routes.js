@@ -61,8 +61,8 @@ router.patch(
   body('ajustes')
     .optional({ values: 'null' })
     .isObject().withMessage('ajustes debe ser un objeto')
-    .custom((a) => Object.keys(a).every((k) => ['ajuste', 'largo', 'manga', 'capucha', 'cuello', 'usar'].includes(k)))
-    .withMessage('ajustes solo admite ajuste, largo, manga, capucha, cuello y usar'),
+    .custom((a) => Object.keys(a).every((k) => ['ajuste', 'largo', 'manga', 'capucha', 'cuello', 'usar', 'aspecto'].includes(k)))
+    .withMessage('ajustes solo admite ajuste, largo, manga, capucha, cuello, aspecto y usar'),
   ...Object.entries(OPCIONES_AJUSTES).map(([clave, valores]) =>
     body(`ajustes.${clave}`).optional().isIn(valores).withMessage(`ajustes.${clave} debe ser uno de: ${valores.join(', ')}`)
   ),
