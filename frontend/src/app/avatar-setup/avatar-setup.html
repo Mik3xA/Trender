@@ -29,43 +29,29 @@
     <aside class="panel" aria-label="Configuración">
       <section class="bloque" data-tutorial="importar">
         <h2 class="titulo">Agregar prenda</h2>
-        <div class="pestanas mt-3" role="tablist" aria-label="Cómo agregar la prenda">
-          <button type="button" role="tab" class="pestana" [class.pestana--activa]="modoAgregar() === 'foto'"
-                  [attr.aria-selected]="modoAgregar() === 'foto'" (click)="modoAgregar.set('foto')">Subir foto</button>
-          <button type="button" role="tab" class="pestana" [class.pestana--activa]="modoAgregar() === 'link'"
-                  [attr.aria-selected]="modoAgregar() === 'link'" (click)="modoAgregar.set('link')">Link de tienda</button>
+        <p class="etiqueta mt-3">¿Qué vas a subir? <span class="font-normal text-tinta-3">(opcional)</span></p>
+        <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Tipo de prenda que vas a subir">
+          <button type="button" class="chip-pequeno" [class.chip-pequeno--activo]="!tipoSubida()" (click)="tipoSubida.set(null)">Detectar</button>
+          @for (t of TIPOS_RAPIDOS; track t) {
+            <button type="button" class="chip-pequeno" [class.chip-pequeno--activo]="tipoSubida() === t" (click)="tipoSubida.set(t)">{{ NOMBRE_TIPO[t] }}</button>
+          }
         </div>
-
-        @if (modoAgregar() === 'foto') {
-          <label class="zona-subida mt-3" [class.zona-subida--activa]="arrastrando()"
-                 (dragover)="$event.preventDefault(); arrastrando.set(true)" (dragleave)="arrastrando.set(false)"
-                 (drop)="$event.preventDefault(); arrastrando.set(false); subirArchivos($any($event).dataTransfer?.files)">
-            <input type="file" accept="image/*,.heic,.heif" multiple class="sr-only" data-subir-foto
-                   (change)="subirArchivos($any($event.target).files); $any($event.target).value = ''">
-            <svg class="h-6 w-6 text-oliva" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            <span class="text-sm font-medium text-tinta">{{ subiendo() ? 'Analizando ' + subiendo() + '…' : 'Elige o arrastra fotos' }}</span>
-            <span class="text-[11px] text-tinta-3">Detectamos si es superior, inferior, vestido o calzado</span>
-          </label>
-          <input type="text" class="campo mt-2" placeholder="Nombre (opcional)" maxlength="120" [value]="nombreFoto()"
-                 (input)="nombreFoto.set($any($event.target).value)" aria-label="Nombre de la prenda (opcional)">
-          <p class="mt-2 text-[11px] leading-relaxed text-tinta-3">
-            Mejor resultado: la prenda sola, extendida o en gancho, de frente, sobre un fondo liso y con buena luz.
-          </p>
-        } @else {
-          <form class="mt-3 flex flex-col gap-2" (submit)="$event.preventDefault(); importar()">
-            <input id="enlace" name="enlace" type="url" [value]="enlace()" (input)="enlace.set($any($event.target).value)"
-                   placeholder="https://…" autocomplete="off" class="campo" aria-label="Link del producto">
-            <button type="submit" class="boton" [disabled]="!enlace().trim()">
-              {{ importando() ? 'Analizando ' + importando() + '…' : 'Importar prenda' }}
-            </button>
-          </form>
-          <p class="mt-2 text-[11px] leading-relaxed text-tinta-3">
-            Algunas tiendas no dejan leer sus páginas. También puedes pegar la dirección de la foto
-            (clic derecho sobre la imagen → “Copiar dirección de imagen”) o subir una captura.
-          </p>
-        }
+        <label class="zona-subida mt-3" [class.zona-subida--activa]="arrastrando()"
+               (dragover)="$event.preventDefault(); arrastrando.set(true)" (dragleave)="arrastrando.set(false)"
+               (drop)="$event.preventDefault(); arrastrando.set(false); subirArchivos($any($event).dataTransfer?.files)">
+          <input type="file" accept="image/*,.heic,.heif" multiple class="sr-only" data-subir-foto
+                 (change)="subirArchivos($any($event.target).files); $any($event.target).value = ''">
+          <svg class="h-6 w-6 text-oliva" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          <span class="text-sm font-medium text-tinta">{{ subiendo() ? 'Analizando ' + subiendo() + '…' : 'Elige o arrastra fotos' }}</span>
+          <span class="text-[11px] text-tinta-3">JPG, PNG, WEBP o HEIC · hasta 6 a la vez</span>
+        </label>
+        <input type="text" class="campo mt-2" placeholder="Nombre (opcional)" maxlength="120" [value]="nombreFoto()"
+               (input)="nombreFoto.set($any($event.target).value)" aria-label="Nombre de la prenda (opcional)">
+        <p class="mt-2 text-[11px] leading-relaxed text-tinta-3">
+          Mejor resultado: la prenda sola, extendida o en gancho, de frente, sobre un fondo liso y con buena luz.
+        </p>
         @if (errorImportacion()) {
           <p class="mt-2 text-xs text-[#b4532a]" role="alert">{{ errorImportacion() }}</p>
         }
@@ -158,52 +144,101 @@
       </p>
     }
     @if (ficha(); as f) {
-      <section class="ficha" aria-label="Análisis de la prenda" data-ficha>
+      <section class="ficha" aria-label="Cuestionario de la prenda" data-ficha>
         <header class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-oliva">Análisis</p>
-            <h3 class="mt-1 truncate text-sm font-semibold">{{ f.nombre ?? 'Prenda' }}</h3>
-          </div>
-          <button type="button" class="icono !h-7 !w-7 shrink-0" (click)="cerrarFicha()" aria-label="Cerrar análisis">×</button>
-        </header>
-        <dl class="ficha-datos">
-          <dt>Tipo</dt>
-          <dd>
-            @if (f.category) {
-              <select class="campo !py-1 !text-xs" [value]="f.tipo ?? ''" (change)="cambiarTipo(f, $any($event.target).value)" aria-label="Tipo de prenda">
-                @for (t of tiposDe(f.category); track t) { <option [value]="t" [selected]="t === f.tipo">{{ t }}</option> }
-              </select>
-            } @else { Por confirmar }
-          </dd>
-          <dt>Categoría</dt><dd>{{ f.category ? NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[f.category]] : 'Por confirmar' }}</dd>
-          <dt>Seguridad</dt><dd>{{ confianza(f) || '—' }}</dd>
-          @if (f.analisis?.visual?.detalle; as d) {
-            @if (d.manga) { <dt>Manga</dt><dd>{{ d.manga }}</dd> }
-            @if (d.largo) { <dt>Largo</dt><dd>{{ d.largo }}</dd> }
-            @if (d.estampado) { <dt>Estampado</dt><dd>{{ d.estampado }}</dd> }
-            @if (d.tela) { <dt>Tela</dt><dd>{{ d.tela }}</dd> }
-            @if (d.colores.length) {
-              <dt>Colores</dt>
-              <dd class="flex flex-wrap gap-2">
-                @for (c of d.colores; track c.hex) {
-                  <span class="inline-flex items-center gap-1"><span class="h-3 w-3 rounded-full border border-black/10" [style.background]="c.hex"></span>{{ c.nombre }}</span>
-                }
-              </dd>
+          <div class="flex min-w-0 items-center gap-3">
+            @if (f.imagen_url) {
+              <img [src]="apiUrl + f.imagen_url" alt="" class="h-12 w-12 shrink-0 rounded-lg bg-hueso object-contain p-1">
             }
+            <div class="min-w-0">
+              <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-oliva">Tu prenda</p>
+              <h3 class="mt-0.5 truncate text-sm font-semibold">{{ f.nombre ?? 'Prenda' }}</h3>
+              <p class="text-[11px] text-tinta-3">Responde y el avatar se ajusta al instante</p>
+            </div>
+          </div>
+          <button type="button" class="icono !h-7 !w-7 shrink-0" (click)="cerrarFicha()" aria-label="Cerrar cuestionario">×</button>
+        </header>
+
+        <div class="pregunta-ficha">
+          <p>¿Qué prenda es?</p>
+          @for (g of GRUPOS_TIPO; track g.categoria) {
+            <span class="grupo-ficha">{{ g.nombre }}</span>
+            <div class="flex flex-wrap gap-1.5">
+              @for (t of g.tipos; track t) {
+                <button type="button" class="chip-pequeno" [class.chip-pequeno--activo]="f.tipo === t" [attr.aria-pressed]="f.tipo === t"
+                        [class.chip-pequeno--sugerido]="f.tipo !== t && sugerido(f, t)" (click)="responder(f, { tipo: t })">{{ NOMBRE_TIPO[t] }}</button>
+              }
+            </div>
           }
-          @if (f.tienda) { <dt>Tienda</dt><dd>{{ f.tienda }}{{ f.precio ? ' · ' + f.precio : '' }}</dd> }
-        </dl>
-        @if (f.analisis?.evidencias?.length) {
-          <p class="mt-3 text-[11px] font-medium text-tinta-2">Por qué lo creemos</p>
-          <ul class="mt-1 space-y-0.5 text-[11px] text-tinta-3">
-            @for (e of f.analisis!.evidencias; track e) { <li>· {{ e }}</li> }
-          </ul>
+        </div>
+
+        @if (f.category && f.category !== 'shoes') {
+          <div class="pregunta-ficha">
+            <p>¿Cómo te queda?</p>
+            <div class="segmentos">
+              @for (o of OPCIONES.ajuste; track o.id) {
+                <button type="button" [class.activo]="respuesta(f, 'ajuste') === o.id" (click)="responder(f, { ajustes: { ajuste: o.id } })">{{ o.nombre }}</button>
+              }
+            </div>
+          </div>
+          <div class="pregunta-ficha">
+            <p>Largo</p>
+            <div class="segmentos">
+              @for (o of OPCIONES.largo; track o.id) {
+                <button type="button" [class.activo]="respuesta(f, 'largo') === o.id" (click)="responder(f, { ajustes: { largo: o.id } })">{{ o.nombre }}</button>
+              }
+            </div>
+          </div>
         }
+        @if (f.category === 'top' || f.category === 'dress') {
+          <div class="pregunta-ficha">
+            <p>Manga</p>
+            <div class="segmentos">
+              @for (o of OPCIONES.manga; track o.id) {
+                <button type="button" [class.activo]="respuesta(f, 'manga') === o.id" (click)="responder(f, { ajustes: { manga: o.id } })">{{ o.nombre }}</button>
+              }
+            </div>
+          </div>
+        }
+        @if (f.category === 'top') {
+          <div class="grid grid-cols-2 gap-2">
+            <label class="interruptor"><input type="checkbox" [checked]="respuesta(f, 'capucha') === true" (change)="responder(f, { ajustes: { capucha: $any($event.target).checked } })"> Capucha</label>
+            <label class="interruptor"><input type="checkbox" [checked]="respuesta(f, 'cuello') === true" (change)="responder(f, { ajustes: { cuello: $any($event.target).checked } })"> Cuello</label>
+          </div>
+        }
+
+        <details class="detalles mt-4 border-t border-linea pt-3">
+          <summary>Lo que vimos en la foto <span class="text-tinta-3">{{ confianza(f) }}</span></summary>
+          <dl class="ficha-datos">
+            @if (f.analisis?.visual?.detalle; as d) {
+              @if (d.manga) { <dt>Manga</dt><dd>{{ d.manga }}</dd> }
+              @if (d.largo) { <dt>Largo</dt><dd>{{ d.largo }}</dd> }
+              @if (d.estampado) { <dt>Estampado</dt><dd>{{ d.estampado }}</dd> }
+              @if (d.tela) { <dt>Tela</dt><dd>{{ d.tela }}</dd> }
+              @if (d.capucha) { <dt>Capucha</dt><dd>sí</dd> }
+              @if (d.abertura) { <dt>Abertura</dt><dd>cierre o botones</dd> }
+              @if (d.colores.length) {
+                <dt>Colores</dt>
+                <dd class="flex flex-wrap gap-2">
+                  @for (c of d.colores; track c.hex) {
+                    <span class="inline-flex items-center gap-1"><span class="h-3 w-3 rounded-full border border-black/10" [style.background]="c.hex"></span>{{ c.nombre }}</span>
+                  }
+                </dd>
+              }
+            }
+          </dl>
+          @if (f.analisis?.evidencias?.length) {
+            <ul class="mt-2 space-y-0.5 text-[11px] text-tinta-3">
+              @for (e of f.analisis!.evidencias; track e) { <li>· {{ e }}</li> }
+            </ul>
+          }
+        </details>
         @if (f.analisis?.avisos?.length) {
           <ul class="mt-3 space-y-1 rounded-lg bg-oliva-tenue px-3 py-2 text-[11px] text-oliva-oscuro">
             @for (a of f.analisis!.avisos; track a) { <li>{{ a }}</li> }
           </ul>
         }
+        <button type="button" class="boton mt-4 w-full" (click)="cerrarFicha()">Listo</button>
       </section>
     }
     @if (conjunto().length) {
@@ -246,7 +281,7 @@
             <span class="pie-tarjeta">
               <span class="truncate">{{ item.nombre ?? item.source_url }}</span>
               @if (item.status === 'ready' && item.category) {
-                <span class="text-tinta-3">{{ NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[item.category]] }} · {{ item.tipo }}</span>
+                <span class="text-tinta-3">{{ NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[item.category]] }} · {{ NOMBRE_TIPO[item.tipo ?? ''] ?? item.tipo }}</span>
               } @else if (item.status === 'review') {
                 <span class="text-oliva">¿Qué es?</span>
               } @else {
@@ -269,7 +304,7 @@
               </label>
             }
             @if (item.analisis && item.status !== 'processing') {
-              <button type="button" class="info" (click)="verFicha(item, $event)" [attr.aria-label]="'Ver análisis de ' + (item.nombre ?? 'la prenda')">i</button>
+              <button type="button" class="info" (click)="verFicha(item, $event)" [attr.aria-label]="'Ajustar ' + (item.nombre ?? 'la prenda')" title="Ajustar prenda">i</button>
             }
             <button type="button" class="borrar" (click)="eliminar(item, $event)" [attr.aria-label]="'Eliminar ' + (item.nombre ?? 'prenda')">×</button>
           </div>

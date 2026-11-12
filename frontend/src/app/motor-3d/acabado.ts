@@ -56,7 +56,7 @@ export function plegar(geo: THREE.BufferGeometry, p: Pliegue): THREE.BufferGeome
       valle = Math.min(valle, arruga * lado);
     }
     pos.setXYZ(i, pos.getX(i) + nor.getX(i) * d, pos.getY(i) + nor.getY(i) * d, pos.getZ(i) + nor.getZ(i) * d);
-    const sombra = THREE.MathUtils.clamp(1 - 0.22 * Math.max(0, -valle) - 0.05 * libre, 0.66, 1);
+    const sombra = THREE.MathUtils.clamp(1 - 0.3 * Math.max(0, -valle) - 0.05 * libre, 0.6, 1);
     colores.set([sombra, sombra, sombra], i * 3);
   }
   pos.needsUpdate = true;

@@ -48,4 +48,16 @@ describe('prendas', () => {
       expect(estiloDe({ tipo, categoria: 'Torso' })).toBeDefined();
     }
   });
+
+  it('el cuestionario cambia el estilo 3D: holgura, largo, manga, capucha', () => {
+    const base = estiloDe({ tipo: 'sueter', categoria: 'Torso' });
+    const holgado = estiloDe({ tipo: 'sueter', categoria: 'Torso', ajustes: { ajuste: 'holgado', largo: 'largo', manga: 'corta', capucha: true } });
+    expect(holgado.holgura).toBeGreaterThan(base.holgura);
+    expect(holgado.largo).toBeLessThan(base.largo); // bajo más abajo
+    expect(holgado.manga).toBeCloseTo(0.32);
+    expect(holgado.capucha).toBe(true);
+    const ajustado = estiloDe({ tipo: 'jeans', categoria: 'Piernas', ajustes: { ajuste: 'ajustado', largo: 'corto' } });
+    expect(ajustado.holgura).toBeLessThan(estiloDe({ tipo: 'jeans', categoria: 'Piernas' }).holgura);
+    expect(ajustado.largo).toBeGreaterThan(0.1);
+  });
 });

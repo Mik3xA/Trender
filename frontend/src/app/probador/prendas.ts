@@ -21,6 +21,17 @@ export interface Estilo {
   cana?: number;
   /** Holgura mínima de la cintura para abajo: una prenda superior cubre al pantalón que lleva debajo. */
   holguraCadera?: number;
+  /** Bajo y puños con resorte (sudaderas, suéteres, pants): se ciñen al cuerpo. */
+  resorte?: boolean;
+}
+
+/** Respuestas del cuestionario de la prenda: cómo queda puesta. */
+export interface AjustesPrenda {
+  ajuste?: 'ajustado' | 'regular' | 'holgado';
+  largo?: 'corto' | 'normal' | 'largo';
+  manga?: 'sin' | 'corta' | 'tres-cuartos' | 'larga';
+  capucha?: boolean;
+  cuello?: boolean;
 }
 
 export interface PrendaVirtual {
@@ -46,6 +57,8 @@ export interface PrendaVirtual {
   estampado?: string | null;
   /** Calzado: la punta del zapato mira a la derecha en la foto. */
   puntaDerecha?: boolean;
+  /** Cuestionario (o lo detectado en la foto): ajuste, largo, manga, capucha, cuello. */
+  ajustes?: AjustesPrenda;
 }
 
 /** Prenda tal como la devuelve POST /api/ropa/escanear-link. */
@@ -64,19 +77,43 @@ export interface PrendaEscaneada {
   motivo: string | null;
 }
 
+/** Nombre para mostrar de cada tipo ("jogger" se conoce como "pants"). */
+export const NOMBRE_TIPO: Record<string, string> = {
+  camiseta: 'Playera',
+  camisa: 'Camisa',
+  blusa: 'Blusa',
+  top: 'Top',
+  sueter: 'Suéter',
+  sudadera: 'Sudadera',
+  chamarra: 'Chamarra',
+  blazer: 'Saco',
+  abrigo: 'Abrigo',
+  pantalon: 'Pantalón',
+  jeans: 'Jeans',
+  jogger: 'Pants',
+  leggings: 'Leggings',
+  short: 'Short',
+  falda: 'Falda',
+  vestido: 'Vestido',
+  tenis: 'Tenis',
+  zapatos: 'Zapatos',
+  botas: 'Botas',
+  sandalias: 'Sandalias',
+};
+
 export const ESTILOS: Record<string, Estilo> = {
   camiseta: { largo: 0.5, manga: 0.32, holgura: 1.05, vuelo: 0, tela: 'punto' },
   camisa: { largo: 0.49, manga: 1, holgura: 1.06, vuelo: 0.02, tela: 'tejido', cuello: true },
   blusa: { largo: 0.52, manga: 0.75, holgura: 1.07, vuelo: 0.04, tela: 'satin' },
   top: { largo: 0.64, manga: 0, holgura: 1.02, vuelo: 0, tela: 'punto' },
-  sueter: { largo: 0.5, manga: 1, holgura: 1.09, vuelo: 0, tela: 'lana' },
-  sudadera: { largo: 0.5, manga: 1, holgura: 1.11, vuelo: 0, tela: 'felpa', capucha: true },
+  sueter: { largo: 0.5, manga: 1, holgura: 1.09, vuelo: 0, tela: 'lana', resorte: true },
+  sudadera: { largo: 0.5, manga: 1, holgura: 1.11, vuelo: 0, tela: 'felpa', capucha: true, resorte: true },
   chamarra: { largo: 0.5, manga: 1, holgura: 1.13, vuelo: 0.02, tela: 'lona', cuello: true },
   blazer: { largo: 0.46, manga: 1, holgura: 1.08, vuelo: 0.03, tela: 'tejido', cuello: true },
   abrigo: { largo: 0.3, manga: 1, holgura: 1.15, vuelo: 0.08, tela: 'lana', cuello: true },
   pantalon: { largo: 0.04, manga: 0, holgura: 1.08, vuelo: 0.02, tela: 'tejido' },
   jeans: { largo: 0.04, manga: 0, holgura: 1.05, vuelo: 0, tela: 'mezclilla' },
-  jogger: { largo: 0.05, manga: 0, holgura: 1.12, vuelo: 0, tela: 'felpa' },
+  jogger: { largo: 0.05, manga: 0, holgura: 1.12, vuelo: 0, tela: 'felpa', resorte: true },
   leggings: { largo: 0.05, manga: 0, holgura: 1.015, vuelo: 0, tela: 'punto' },
   short: { largo: 0.38, manga: 0, holgura: 1.1, vuelo: 0.02, tela: 'tejido' },
   falda: { largo: 0.3, manga: 0, holgura: 1.04, vuelo: 0.07, tela: 'tejido' },
@@ -109,9 +146,33 @@ export const NOMBRE_CATEGORIA: Record<CategoriaPrenda, string> = {
   Vestido: 'Vestido',
 };
 
-export function estiloDe(prenda: Pick<PrendaVirtual, 'tipo' | 'categoria'> & { tela?: Tela }): Estilo {
-  const estilo = ESTILOS[prenda.tipo] ?? ESTILOS[TIPO_POR_CATEGORIA[prenda.categoria]];
-  return prenda.tela ? { ...estilo, tela: prenda.tela } : estilo;
+const MANGA: Record<NonNullable<AjustesPrenda['manga']>, number> = { sin: 0, corta: 0.32, 'tres-cuartos': 0.7, larga: 1 };
+
+/**
+ * Estilo 3D de una prenda: el de su tipo, ajustado con las respuestas del
+ * cuestionario (holgura, largo del bajo, manga, capucha, cuello) y la tela detectada.
+ */
+export function estiloDe(prenda: Pick<PrendaVirtual, 'tipo' | 'categoria'> & { tela?: Tela; ajustes?: AjustesPrenda }): Estilo {
+  const base = ESTILOS[prenda.tipo] ?? ESTILOS[TIPO_POR_CATEGORIA[prenda.categoria]];
+  const estilo: Estilo = { ...base, ...(prenda.tela ? { tela: prenda.tela } : {}) };
+  const a = prenda.ajustes;
+  if (!a) return estilo;
+
+  if (a.ajuste === 'ajustado') estilo.holgura = Math.max(1.015, base.holgura - 0.04);
+  if (a.ajuste === 'holgado') estilo.holgura = base.holgura + 0.05;
+
+  const esFalda = prenda.tipo === 'falda' || prenda.categoria === 'Vestido';
+  if (a.largo && a.largo !== 'normal' && prenda.categoria !== 'Calzado') {
+    const corto = a.largo === 'corto';
+    if (prenda.categoria === 'Torso') estilo.largo = base.largo + (corto ? 0.055 : -0.07);
+    else if (esFalda) estilo.largo = corto ? 0.4 : 0.1;
+    else if (prenda.tipo === 'short') estilo.largo = corto ? 0.43 : 0.33;
+    else estilo.largo = corto ? 0.13 : 0.025; // pantalón al tobillo o hasta el suelo
+  }
+  if (a.manga && (prenda.categoria === 'Torso' || prenda.categoria === 'Vestido')) estilo.manga = MANGA[a.manga];
+  if (a.capucha !== undefined && prenda.categoria === 'Torso') estilo.capucha = a.capucha;
+  if (a.cuello !== undefined && prenda.categoria === 'Torso') estilo.cuello = a.cuello;
+  return estilo;
 }
 
 /** Ranura del avatar que ocupa la prenda. Un vestido ocupa la superior y la inferior. */

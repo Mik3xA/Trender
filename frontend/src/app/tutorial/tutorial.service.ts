@@ -21,12 +21,12 @@ export const PASOS_TUTORIAL: PasoTutorial[] = [
   {
     objetivo: 'importar',
     titulo: 'Agrega tus prendas',
-    texto: 'Sube fotos de tu ropa (o pega el link de una tienda). Detectamos si es prenda superior, inferior, vestido o calzado, su color y estampado, y la guardamos en tu armario.',
+    texto: 'Sube fotos de tu ropa (si quieres, dinos antes qué es). Detectamos si es prenda superior, inferior, vestido o calzado, su color y estampado, y te hacemos unas preguntas para que se vea igual en el avatar.',
   },
   {
     objetivo: 'armario',
     titulo: 'Tu armario',
-    texto: 'Tus prendas quedan guardadas aquí. Toca una para probártela; con la "i" ves su análisis y si la clasificamos mal puedes corregirla.',
+    texto: 'Tus prendas quedan guardadas aquí. Toca una para probártela; con la "i" abres su cuestionario: tipo, ajuste, largo, manga y capucha.',
   },
   {
     objetivo: 'visor',

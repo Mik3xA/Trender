@@ -303,9 +303,16 @@ function anillosPrenda(
   }
 
   const limiteCadera = p.y.cintura + 0.03 * H;
-  return anillos.map((anillo) =>
-    inflar(anillo, anillo.y < limiteCadera ? Math.max(estilo.holgura, estilo.holguraCadera ?? 0) : estilo.holgura, extra)
-  );
+  const bandaResorte = desde + 0.045 * H;
+  return anillos.map((anillo) => {
+    let holgura = anillo.y < limiteCadera ? Math.max(estilo.holgura, estilo.holguraCadera ?? 0) : estilo.holgura;
+    // Resorte en el bajo (sudadera, suéter): la tela se recoge sobre la cadera.
+    if (estilo.resorte && modo === 'cuelga' && anillo.y < bandaResorte) {
+      const t = 1 - (anillo.y - desde) / (bandaResorte - desde);
+      holgura = mezcla(holgura, Math.max(1.03, (estilo.holguraCadera ?? 1.03) - 0.02), Math.min(1, t * 1.2));
+    }
+    return inflar(anillo, holgura, extra);
+  });
 }
 
 /** Envolvente convexa superior de un perfil (y, valor), evaluada en cada y. */
@@ -400,13 +407,18 @@ export function construirSuperior(esq: Esqueleto, estilo: Estilo, mat: Materiale
   const desde = estilo.largo * H;
   const holgura = Math.max(0, estilo.holgura - 1);
   // Las prendas superiores van por fuera del pantalón: más separación del cuerpo.
-  const cuerpo = loft(anillosPrenda(esq, desde, hasta, estilo, 'cuelga', 0.016), { segmentos: 96 });
+  const cuerpo = loft(anillosPrenda(esq, desde, hasta, estilo, 'cuelga', 0.02), { segmentos: 112 });
   grupo.add(
     ...pieza(
       cuerpo,
       mat,
       'superior_cuerpo',
-      { amplitud: H * (0.0018 + holgura * 0.05 + estilo.vuelo * 0.02), pliegues: 7, libre: 'v0', semilla: 0.7 },
+      {
+        amplitud: H * Math.min(0.0085, 0.0024 + holgura * 0.04 + estilo.vuelo * 0.03) * (estilo.resorte ? 0.7 : 1),
+        pliegues: 7,
+        libre: 'v0',
+        semilla: 0.7,
+      },
       [
         { borde: 'primera', grosor: 0.0022 * H },
         { borde: 'ultima', grosor: 0.0016 * H },
@@ -416,17 +428,17 @@ export function construirSuperior(esq: Esqueleto, estilo: Estilo, mat: Materiale
 
   if (!sinManga) {
     for (const brazo of esq.brazos) {
-      const manga = tramoExtremidad(brazo, 0.02, Math.min(estilo.manga, 0.97), estilo.holgura * 1.06, 0.008, estilo.manga < 0.5 ? 0.14 : 0.06);
+      const manga = tramoExtremidad(brazo, 0.02, Math.min(estilo.manga, 0.97), estilo.holgura * 1.08, 0.011, estilo.manga < 0.5 ? 0.2 : estilo.resorte ? -0.18 : 0.08);
       grupo.add(
         ...pieza(
           tubo(manga, { segmentos: 36, pasos: 32 }),
           mat,
           brazo.lado > 0 ? 'manga_izq' : 'manga_der',
           {
-            amplitud: H * (0.0012 + holgura * 0.03),
+            amplitud: H * Math.min(0.006, 0.0016 + holgura * 0.03),
             pliegues: 3,
             libre: 'v1',
-            arrugas: estilo.manga > 0.6 ? H * 0.0011 : 0,
+            arrugas: estilo.manga > 0.6 ? H * 0.0009 : 0,
             semilla: brazo.lado > 0 ? 1.1 : 2.3,
           },
           [{ borde: 'ultima', grosor: 0.0018 * H }]
@@ -451,10 +463,12 @@ export function construirSuperior(esq: Esqueleto, estilo: Estilo, mat: Materiale
 
   if (estilo.capucha) {
     // Capucha caída sobre la espalda: media elipse aplanada detrás del cuello.
-    const capucha = elipsoide(radioCuello * 2.3, radioCuello * 2.2, radioCuello * 0.9, 0.25, 32);
+    // Capucha caída: una media cáscara ancha que descansa sobre la espalda, detrás del cuello.
+    const capucha = elipsoide(radioCuello * 2.7, radioCuello * 2.1, radioCuello * 1.15, 0.3, 32);
+    capucha.scale(1, 1, 0.75);
     const m = malla(capucha, mat.tela, 'capucha');
-    m.position.set(0, 0.775 * H, -p.pecho.fondo * 1.0);
-    m.rotation.x = -0.35;
+    m.position.set(0, 0.79 * H, -p.pecho.fondo * 0.82);
+    m.rotation.x = 0.25;
     grupo.add(m);
   }
   if (estilo.cuello) {
@@ -494,12 +508,14 @@ export function construirInferior(esq: Esqueleto, estilo: Estilo, tipo: string, 
     grupo.add(malla(loft(pelvis, { tapaInferior: true }), mat.tela, 'pelvis'));
     const hasta = fraccionPierna(esq, Math.max(bajo, p.y.tobillo - 0.004 * H));
     for (const pierna of esq.piernas) {
-      const pernera = tramoExtremidad(pierna, 0, hasta, estilo.holgura, 0.006, estilo.vuelo * 4).map((s, i, todas) => {
+      const pernera = tramoExtremidad(pierna, 0, hasta, estilo.holgura, 0.01, estilo.vuelo * 4).map((s, i, todas) => {
         // Arriba la pernera recoge el glúteo y la entrepierna: más ancha, para que la
         // transición desde la pelvis sea continua (sin "escalón" bajo la cadera).
         const t = i / (todas.length - 1);
         const arriba = Math.max(0, 1 - (t * hasta) / 0.18);
-        return { ...s, radio: s.radio * (1 + 0.2 * arriba ** 1.5) };
+        // Pants: puño con resorte en el tobillo.
+        const puno = estilo.resorte && t > 0.85 ? 1 - 0.22 * ((t - 0.85) / 0.15) : 1;
+        return { ...s, radio: s.radio * (1 + 0.2 * arriba ** 1.5) * puno };
       });
       grupo.add(
         ...pieza(
@@ -507,10 +523,10 @@ export function construirInferior(esq: Esqueleto, estilo: Estilo, tipo: string, 
           mat,
           'pernera',
           {
-            amplitud: H * (0.0008 + holgura * 0.035),
+            amplitud: H * Math.min(0.006, 0.0012 + holgura * 0.04),
             pliegues: 3,
             libre: 'v1',
-            arrugas: H * (holgura > 0.03 ? 0.0014 : 0.0004),
+            arrugas: H * (holgura > 0.03 ? 0.0014 : 0.0005),
             semilla: pierna.lado > 0 ? 0.3 : 1.9,
           },
           [{ borde: 'ultima', grosor: 0.002 * H }]

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 /** Tonos del avatar. "maniqui" es porcelana de estudio; el resto, piel. */
 export const TONOS = [
-  { id: 'maniqui', nombre: 'Maniquí', color: '#e6e2db' },
+  { id: 'maniqui', nombre: 'Maniquí', color: '#bdb8ae' },
   { id: 'claro', nombre: 'Claro', color: '#e9c6aa' },
   { id: 'medio', nombre: 'Medio', color: '#c99a76' },
   { id: 'moreno', nombre: 'Moreno', color: '#9c6b4a' },
@@ -55,7 +55,7 @@ export function aplicarTono(material: THREE.MeshPhysicalMaterial, tono: string):
   const info = TONOS.find((t) => t.id === tono) ?? TONOS[0];
   material.color.set(info.color);
   if (info.id === 'maniqui') {
-    material.roughness = 0.58;
+    material.roughness = 0.78; // mate: la ropa (con brillo de tela) resalta sobre el maniquí
     material.clearcoat = 0.25;
     material.sheen = 0.25;
     material.normalMap = null;

@@ -28,13 +28,17 @@ describe('ArmarioService', () => {
     vi.useRealTimers();
   });
 
-  it('importa (202) y consulta cada segundo hasta que la prenda deja de estar "processing"', () => {
+  it('sube la foto (202) y consulta cada segundo hasta que deja de estar "processing"', () => {
     const estados: string[] = [];
     let completo = false;
-    servicio.importar('https://x.example/jeans', 'Masculino').subscribe({ next: (p) => estados.push(p.status), complete: () => (completo = true) });
+    const foto = new Blob([new Uint8Array([1, 2])], { type: 'image/jpeg' });
+    servicio.subirFoto(foto, 'Masculino', { nombre: 'Jeans', tipo: 'jeans' }).subscribe({ next: (p) => estados.push(p.status), complete: () => (completo = true) });
 
-    const post = http.expectOne(`${URL}/importar`);
-    expect(post.request.body).toEqual({ url: 'https://x.example/jeans', genero: 'Masculino' });
+    const post = http.expectOne((r) => r.url === `${URL}/subir`);
+    expect(post.request.body).toBe(foto);
+    expect(post.request.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(post.request.params.get('genero')).toBe('Masculino');
+    expect(post.request.params.get('tipo')).toBe('jeans');
     post.flush({ data: prenda({}) });
 
     vi.advanceTimersByTime(0);
@@ -60,5 +64,15 @@ describe('ArmarioService', () => {
     expect(lista).toMatchObject({ categoria: 'Calzado', tipo: 'zapatos', color: '#222222', imagen: `${environment.apiUrl}/media/x.png` });
     // Un tipo desconocido cae al tipo por defecto de la categoría.
     expect(aPrendaVirtual(prenda({ status: 'ready', category: 'top', tipo: 'poncho' }))!.tipo).toBe('camiseta');
+  });
+
+  it('envía las respuestas del cuestionario y las usa para vestir', () => {
+    servicio.clasificar('p1', 'top', 'sudadera', { ajuste: 'holgado', capucha: true }).subscribe();
+    const req = http.expectOne(`${URL}/p1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ category: 'top', tipo: 'sudadera', ajustes: { ajuste: 'holgado', capucha: true } });
+    req.flush({ data: prenda({}) });
+    const vestible = aPrendaVirtual(prenda({ status: 'ready', category: 'top', tipo: 'sudadera', ajustes: { ajuste: 'holgado' } }));
+    expect(vestible?.ajustes).toMatchObject({ ajuste: 'holgado' });
   });
 });
