@@ -3,12 +3,12 @@ const rateLimit = require('express-rate-limit');
 const { body, header, param, query } = require('express-validator');
 
 const closetController = require('../controladores/closet.controller');
-const { CATEGORIAS, GENEROS } = require('../servicios/closet.service');
+const { CATEGORIAS, GENEROS, TIPOS, OPCIONES_AJUSTES } = require('../servicios/closet.service');
 const { manejarValidacion } = require('../middlewares/validacion.middleware');
 
 const router = express.Router();
 
-// Importar descarga páginas e imágenes: se limita para no usar el servidor como robot.
+// Analizar fotos consume CPU: se limita por usuario/IP.
 const limitadorImportacion = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: Number(process.env.IMPORT_RATE_LIMIT) || 40,
@@ -21,16 +21,6 @@ const validarCategoria = (cadena) => cadena.isIn(CATEGORIAS).withMessage(`catego
 const validarGenero = (cadena) => cadena.isIn(GENEROS).withMessage(`genero debe ser uno de: ${GENEROS.join(', ')}`);
 const validarId = param('id').isUUID().withMessage('id de prenda inválido');
 
-const validarImportacion = [
-  body('url')
-    .isString().withMessage('url es requerida')
-    .trim()
-    .isLength({ min: 1, max: 2048 }).withMessage('url debe tener entre 1 y 2048 caracteres')
-    .isURL({ protocols: ['http', 'https'], require_protocol: true }).withMessage('url debe ser http(s) válida'),
-  validarGenero(body('genero').optional()),
-  validarCategoria(body('category').optional()),
-];
-
 router.get(
   '/',
   validarCategoria(query('category').optional()),
@@ -38,10 +28,6 @@ router.get(
   manejarValidacion,
   closetController.listar
 );
-
-router.post('/importar', limitadorImportacion, validarImportacion, manejarValidacion, closetController.importar);
-// Alias histórico (misma operación).
-router.post('/add-from-link', limitadorImportacion, validarImportacion, manejarValidacion, closetController.importar);
 
 // Subir foto: el cuerpo es la imagen tal cual (sin multipart). Límite 12 MB.
 const MAX_FOTO = '12mb';
@@ -59,6 +45,7 @@ const validarSubida = [
   ...validarImagenCuerpo,
   validarGenero(query('genero').optional()),
   validarCategoria(query('category').optional()),
+  query('tipo').optional().isIn(TIPOS).withMessage(`tipo debe ser uno de: ${TIPOS.join(', ')}`),
   query('nombre').optional().isString().trim().isLength({ max: 120 }).withMessage('nombre: máximo 120 caracteres'),
 ];
 router.post('/subir', limitadorImportacion, validarSubida, manejarValidacion, closetController.subir);
@@ -69,7 +56,18 @@ router.patch(
   '/:id',
   validarId,
   validarCategoria(body('category')),
-  body('tipo').optional().isString().isLength({ min: 1, max: 30 }).withMessage('tipo inválido'),
+  body('tipo').optional().isIn(TIPOS).withMessage(`tipo debe ser uno de: ${TIPOS.join(', ')}`),
+  // Cuestionario: solo claves conocidas y valores de la lista (o null para borrar).
+  body('ajustes')
+    .optional({ values: 'null' })
+    .isObject().withMessage('ajustes debe ser un objeto')
+    .custom((a) => Object.keys(a).every((k) => ['ajuste', 'largo', 'manga', 'capucha', 'cuello'].includes(k)))
+    .withMessage('ajustes solo admite ajuste, largo, manga, capucha y cuello'),
+  ...Object.entries(OPCIONES_AJUSTES).map(([clave, valores]) =>
+    body(`ajustes.${clave}`).optional().isIn(valores).withMessage(`ajustes.${clave} debe ser uno de: ${valores.join(', ')}`)
+  ),
+  body('ajustes.capucha').optional().isBoolean({ strict: true }).withMessage('ajustes.capucha debe ser true o false'),
+  body('ajustes.cuello').optional().isBoolean({ strict: true }).withMessage('ajustes.cuello debe ser true o false'),
   manejarValidacion,
   closetController.actualizar
 );

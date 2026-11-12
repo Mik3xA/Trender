@@ -21,28 +21,13 @@ async function obtener(req, res, next) {
 }
 
 /**
- * POST /api/closet/importar (y su alias /add-from-link).
- * 202 Accepted: la prenda queda "processing" y se analiza en segundo plano;
- * el cliente consulta GET /api/closet/:id hasta "ready", "review" o "failed".
- */
-async function importar(req, res, next) {
-  try {
-    const { url, genero, category } = req.body;
-    const { prenda } = closetService.importarDesdeLink(req.auth.userId, { url, genero, category });
-    res.status(202).location(`/api/closet/${prenda.id}`).json({ status: 'success', data: prenda });
-  } catch (err) {
-    next(err);
-  }
-}
-
-/**
  * POST /api/closet/subir — cuerpo: la imagen (image/jpeg, png, webp...).
  * 202 Accepted: la foto se analiza en segundo plano como una importación.
  */
 async function subir(req, res, next) {
   try {
-    const { genero, nombre, category } = req.query;
-    const { prenda } = await closetService.subirFoto(req.auth.userId, { buffer: req.body, genero, nombre: nombre || null, category });
+    const { genero, nombre, category, tipo } = req.query;
+    const { prenda } = await closetService.subirFoto(req.auth.userId, { buffer: req.body, genero, nombre: nombre || null, category, tipo: tipo || null });
     res.status(202).location(`/api/closet/${prenda.id}`).json({ status: 'success', data: prenda });
   } catch (err) {
     next(err);
@@ -61,8 +46,8 @@ async function agregarFoto(req, res, next) {
 
 async function actualizar(req, res, next) {
   try {
-    const { category, tipo } = req.body;
-    res.status(200).json({ status: 'success', data: closetService.actualizarPrenda(req.auth.userId, req.params.id, { category, tipo }) });
+    const { category, tipo, ajustes } = req.body;
+    res.status(200).json({ status: 'success', data: closetService.actualizarPrenda(req.auth.userId, req.params.id, { category, tipo, ajustes }) });
   } catch (err) {
     next(err);
   }
@@ -76,4 +61,4 @@ async function eliminar(req, res, next) {
   }
 }
 
-module.exports = { listar, obtener, importar, subir, agregarFoto, actualizar, eliminar };
+module.exports = { listar, obtener, subir, agregarFoto, actualizar, eliminar };

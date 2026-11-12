@@ -158,6 +158,16 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    version: 4,
+    nombre: 'closet_items_ajustes',
+    // Respuestas del cuestionario de la prenda (ajuste, largo, manga, capucha, cuello).
+    up(db) {
+      if (!columnas(db, 'closet_items').includes('ajustes_json')) {
+        db.exec('ALTER TABLE closet_items ADD COLUMN ajustes_json TEXT CHECK (ajustes_json IS NULL OR json_valid(ajustes_json))');
+      }
+    },
+  },
 ];
 
 /**
