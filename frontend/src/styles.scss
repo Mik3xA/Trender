@@ -1,31 +1,40 @@
 @use './styles/estudio';
+@use './styles/pagina';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-
-// Trender: pantalla completa, negro mate, sin sombras ni efectos de cristal.
+// Trender: blanco, negro y verde oliva. Plano, con bordes finos y mucho aire.
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-html,
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+}
+
 body {
-  height: 100%;
   margin: 0;
-  background: #0e0e0d;
-  color: #ece8de;
+  background: #ffffff;
+  color: #141414;
   font-family: Inter, 'Helvetica Neue', Arial, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(236, 232, 222, 0.2) transparent;
+  scrollbar-color: #d6d4cb transparent;
 }
 
 :focus-visible {
-  outline: 1px solid #8a8f58;
+  outline: 2px solid #7a8650;
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

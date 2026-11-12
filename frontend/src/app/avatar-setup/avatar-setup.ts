@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 
 import { TONOS } from '../motor-3d/piel';
@@ -8,6 +8,8 @@ import { MUESTRAS, NOMBRE_CATEGORIA, PrendaVirtual, vestirConjunto } from '../pr
 import { recomendarTalla } from '../probador/tallas';
 import { ArmarioService, CATEGORIA_PROBADOR, CategoriaArmario, PrendaArmario, aPrendaVirtual } from '../servicios/armario.service';
 import { PerfilGenero, PerfilService, Perfiles } from '../servicios/perfil.service';
+import { SesionService } from '../servicios/sesion.service';
+import { TutorialService } from '../tutorial/tutorial.service';
 import { Visor3dComponent } from '../visor-3d/visor-3d';
 import { environment } from '../../environments/environment';
 
@@ -22,7 +24,7 @@ const MAX_PRENDAS = 6;
 const perfilInicial = (genero: Genero): PerfilGenero => ({ medidas: { ...MEDIDAS_INICIALES[genero] }, conjunto: [], tono: 'maniqui' });
 
 /**
- * Probador de pantalla completa. Mujer y Hombre son apartados independientes:
+ * Probador embebido en la página. Mujer y Hombre son apartados independientes:
  * cada uno tiene su cuerpo, su tono, su conjunto y su armario en el servidor.
  * No hay login: SesionService crea una sesión de invitado de forma transparente.
  */
@@ -36,6 +38,9 @@ export class AvatarSetupComponent implements OnInit {
   private readonly armarioApi = inject(ArmarioService);
   private readonly perfilApi = inject(PerfilService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  protected readonly sesion = inject(SesionService);
+  protected readonly tutorial = inject(TutorialService);
 
   protected readonly apiUrl = environment.apiUrl;
   protected readonly LIMITES = LIMITES;
@@ -101,6 +106,25 @@ export class AvatarSetupComponent implements OnInit {
       }
       clearTimeout(this.guardadoTimer);
       this.guardadoTimer = setTimeout(() => this.perfilApi.guardar(genero, perfiles).subscribe({ error: () => undefined }), GUARDADO_MS);
+    });
+    // El tutorial necesita ver el panel lateral.
+    effect(() => {
+      if (this.tutorial.activo()) this.panelAbierto.set(true);
+    });
+    // Primera visita: el tutorial arranca cuando el probador entra en pantalla.
+    afterNextRender(() => {
+      if (this.tutorial.visto() || typeof IntersectionObserver === 'undefined') return;
+      const observador = new IntersectionObserver(
+        (entradas) => {
+          if (entradas.some((e) => e.isIntersecting && e.intersectionRatio >= 0.6)) {
+            observador.disconnect();
+            this.tutorial.iniciarSiEsNuevo();
+          }
+        },
+        { threshold: [0.6] }
+      );
+      observador.observe(this.host.nativeElement);
+      this.destroyRef.onDestroy(() => observador.disconnect());
     });
     this.destroyRef.onDestroy(() => {
       clearTimeout(this.guardadoTimer);

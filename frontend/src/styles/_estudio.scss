@@ -1,17 +1,16 @@
-// Estilos globales del estudio (layout de pantalla completa y componentes del probador).
-// Layout de pantalla completa: barra, panel lateral colapsable, visor y armario.
-// Negro mate, acento oliva, texto y bordes de 1 px en blanco hueso. Sin sombras.
+// Estudio (probador): barra con apartados, panel lateral colapsable, visor 3D y armario inferior.
+// Blanco, negro y verde oliva; bordes finos, sin sombras.
 
 app-avatar-setup {
-  display: block;
-  height: 100vh;
-  height: 100dvh;
+  @apply block overflow-hidden rounded-3xl border border-linea bg-papel;
+  height: min(880px, calc(100vh - 104px));
+  min-height: 640px;
 }
 
 .estudio {
-  @apply grid h-full overflow-hidden bg-negro text-hueso;
-  grid-template-columns: 340px minmax(0, 1fr);
-  grid-template-rows: 52px minmax(0, 1fr) 212px;
+  @apply relative grid h-full text-tinta;
+  grid-template-columns: 330px minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr) 200px;
   grid-template-areas:
     'barra barra'
     'panel visor'
@@ -25,139 +24,140 @@ app-avatar-setup {
 
 .barra {
   grid-area: barra;
-  @apply flex items-center justify-between border-b border-linea px-4;
+  @apply flex items-center justify-between gap-3 border-b border-linea px-4;
 }
 
 .apartados {
-  @apply flex border border-linea;
+  @apply flex rounded-full bg-hueso p-1;
 }
 
 .apartado {
-  @apply px-6 py-1.5 text-xs uppercase tracking-[0.18em] text-hueso-2 transition-colors hover:text-hueso;
-  & + & {
-    @apply border-l border-linea;
-  }
+  @apply rounded-full px-6 py-1.5 text-sm text-tinta-2 transition-colors hover:text-tinta;
 }
 
 .apartado--activo {
-  @apply bg-oliva text-hueso;
+  @apply bg-tinta text-papel hover:text-papel;
 }
 
 .icono {
-  @apply flex h-8 w-8 items-center justify-center border border-linea text-hueso-2 hover:text-hueso;
+  @apply flex h-9 w-9 items-center justify-center rounded-full border border-linea text-tinta-2 transition-colors hover:border-tinta hover:text-tinta;
 }
 
 .panel {
   grid-area: panel;
-  @apply overflow-y-auto border-r border-linea bg-negro-2;
+  @apply overflow-y-auto border-r border-linea bg-papel;
 }
 
 .bloque {
-  @apply border-b border-linea p-5;
+  @apply border-b border-linea px-5 py-5;
 }
 
 .titulo {
-  @apply text-[11px] font-medium uppercase tracking-[0.2em] text-hueso;
+  @apply text-sm font-semibold text-tinta;
 }
 
 .etiqueta {
-  @apply text-[11px] uppercase tracking-[0.16em] text-hueso-3;
+  @apply text-xs font-medium text-tinta-2;
 }
 
 .fila {
-  @apply mb-2 flex items-baseline justify-between text-[11px] uppercase tracking-[0.16em] text-hueso-3;
+  @apply mb-2 flex items-baseline justify-between text-xs font-medium text-tinta-2;
   span {
-    @apply normal-case tracking-normal text-hueso-2;
+    @apply font-normal text-tinta-3;
   }
 }
 
 .campo {
-  @apply w-full border border-linea bg-negro px-3 py-2.5 text-sm text-hueso outline-none placeholder:text-hueso-3 focus:border-oliva-claro;
+  @apply w-full rounded-xl border border-linea bg-papel px-3 py-2.5 text-sm text-tinta outline-none transition-colors placeholder:text-tinta-3 focus:border-oliva;
 }
 
 .numero {
-  @apply w-14 border border-transparent bg-transparent text-right text-sm text-hueso outline-none hover:border-linea focus:border-oliva-claro;
+  @apply w-14 rounded-md border border-transparent bg-transparent text-right text-sm font-medium text-tinta outline-none hover:border-linea focus:border-oliva;
 }
 
 .deslizador {
-  @apply h-px w-full cursor-pointer appearance-none bg-linea accent-oliva;
+  @apply h-1 w-full cursor-pointer appearance-none rounded-full bg-hueso-2 accent-oliva;
 }
 
 .boton {
-  @apply border border-oliva bg-oliva px-4 py-2.5 text-xs font-medium uppercase tracking-[0.16em] text-hueso transition-colors hover:bg-oliva-claro disabled:cursor-not-allowed disabled:border-linea disabled:bg-transparent disabled:text-hueso-3;
+  @apply rounded-full bg-tinta px-4 py-2.5 text-sm font-medium text-papel transition-colors hover:bg-oliva-oscuro disabled:cursor-not-allowed disabled:bg-hueso-2 disabled:text-tinta-3;
 }
 
 .chip {
-  @apply border border-linea py-2 text-[11px] text-hueso-2 transition-colors hover:text-hueso;
+  @apply rounded-lg border border-linea py-2 text-xs text-tinta-2 transition-colors hover:border-tinta/30 hover:text-tinta;
 }
 
 .chip--activo {
-  @apply border-oliva bg-oliva-tenue text-hueso;
+  @apply border-oliva bg-oliva-tenue font-medium text-oliva-oscuro;
 }
 
 .tono {
-  @apply h-7 w-7 border border-linea;
+  @apply h-7 w-7 rounded-full border border-black/10;
 }
 
 .tono--activo {
-  @apply outline outline-1 outline-offset-2 outline-hueso;
+  @apply outline outline-2 outline-offset-2 outline-oliva;
 }
 
 .detalles summary {
-  @apply flex cursor-pointer list-none justify-between text-xs text-hueso-2;
+  @apply flex cursor-pointer list-none justify-between text-xs font-medium text-tinta-2;
 }
 
 .talla {
-  @apply flex h-7 min-w-[2.25rem] items-center justify-center border border-oliva px-1 text-xs font-medium text-hueso;
+  @apply flex h-8 min-w-[2.5rem] items-center justify-center rounded-lg bg-tinta px-1.5 text-xs font-semibold text-papel;
 }
 
 .visor {
   grid-area: visor;
-  @apply relative bg-[#121211];
+  @apply relative bg-hueso;
 }
 
 .marca {
-  @apply border border-linea bg-negro px-2.5 py-1 text-[11px] text-hueso-2;
+  @apply rounded-full border border-linea bg-papel px-3 py-1 text-xs text-tinta-2;
+}
+
+.sin-conexion {
+  @apply absolute inset-x-4 top-14 z-10 rounded-xl border border-[#e7c9a9] bg-[#fdf6ee] px-4 py-3 text-xs leading-relaxed text-[#7a4b1e];
 }
 
 .armario {
   grid-area: armario;
-  @apply flex flex-col border-t border-linea bg-negro-2 px-4 pt-3;
+  @apply flex flex-col border-t border-linea bg-papel px-4 pt-3;
 }
 
 .filtro {
-  @apply shrink-0 border border-transparent px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-hueso-3 hover:text-hueso;
+  @apply shrink-0 rounded-full px-3 py-1 text-xs text-tinta-2 transition-colors hover:text-tinta;
 }
 
 .filtro--activo {
-  @apply border-linea text-hueso;
+  @apply bg-tinta text-papel hover:text-papel;
 }
 
 .rejilla {
-  @apply flex min-h-0 flex-1 gap-2 overflow-x-auto pb-3;
+  @apply flex min-h-0 flex-1 gap-2.5 overflow-x-auto pb-3;
 }
 
 .tarjeta {
-  @apply relative flex w-36 shrink-0 flex-col border border-linea bg-negro text-left transition-colors hover:border-hueso-3;
+  @apply relative flex w-36 shrink-0 flex-col overflow-hidden rounded-xl border border-linea bg-papel text-left transition-colors hover:border-tinta/30;
 
   .foto {
-    @apply flex h-[104px] w-full items-center justify-center bg-negro-3;
+    @apply flex h-[100px] w-full items-center justify-center bg-hueso;
   }
 
-  .pie {
-    @apply flex flex-col gap-0.5 border-t border-linea px-2 py-1.5 text-[11px] leading-tight;
+  .pie-tarjeta {
+    @apply flex flex-col gap-0.5 px-2.5 py-2 text-[11px] leading-tight;
   }
 
   .borrar {
-    @apply absolute right-1 top-1 hidden h-5 w-5 items-center justify-center border border-linea bg-negro text-xs text-hueso-2 hover:text-hueso;
+    @apply absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded-full border border-linea bg-papel text-xs text-tinta-2 hover:text-tinta;
   }
 
   .categorias {
     @apply absolute inset-x-0 top-0 hidden grid-cols-2 gap-px bg-linea;
     button {
-      @apply bg-negro py-1 text-[10px] text-hueso-2 hover:text-hueso;
+      @apply bg-papel py-1 text-[10px] text-tinta-2 hover:text-tinta;
       &.activa {
-        @apply bg-oliva-tenue text-hueso;
+        @apply bg-oliva-tenue font-medium text-oliva-oscuro;
       }
     }
   }
@@ -173,27 +173,36 @@ app-avatar-setup {
 }
 
 .tarjeta--puesta {
-  @apply border-oliva;
+  @apply border-oliva ring-1 ring-oliva;
 }
 
 .vacio {
-  @apply flex items-center text-xs text-hueso-3;
+  @apply flex items-center text-xs text-tinta-3;
 }
 
 .aviso {
-  @apply fixed bottom-6 left-1/2 z-50 -translate-x-1/2 border border-linea bg-negro px-4 py-2.5 text-xs text-hueso;
+  @apply fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-tinta px-5 py-2.5 text-sm text-papel;
 }
 
-// Móvil: columna única con scroll.
-@media (max-width: 860px) {
+// Tutorial guiado.
+.tutorial-resalte {
+  @apply pointer-events-none fixed z-[60] rounded-2xl border-2 border-oliva transition-all duration-300;
+  box-shadow: 0 0 0 9999px rgba(20, 20, 20, 0.45);
+}
+
+.tutorial-tarjeta {
+  @apply fixed z-[61] w-[320px] rounded-2xl border border-linea bg-papel p-5 text-tinta;
+}
+
+@media (max-width: 900px) {
   app-avatar-setup {
     height: auto;
+    min-height: 0;
   }
   .estudio,
   .estudio--sin-panel {
-    @apply h-auto overflow-visible;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 52px 62vh auto 212px;
+    grid-template-rows: 56px 60vh auto 200px;
     grid-template-areas: 'barra' 'visor' 'panel' 'armario';
   }
   .panel {

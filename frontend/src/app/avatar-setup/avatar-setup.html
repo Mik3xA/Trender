@@ -10,21 +10,26 @@
       </button>
       <span class="text-sm font-semibold tracking-[0.32em]">TRENDER</span>
     </div>
-    <nav class="apartados" aria-label="Apartado">
+    <nav class="apartados" aria-label="Apartado" data-tutorial="apartados">
       @for (g of [['Femenino', 'Mujer'], ['Masculino', 'Hombre']]; track g[0]) {
         <button type="button" (click)="cambiarGenero($any(g[0]))" [attr.aria-pressed]="genero() === g[0]"
                 [class.apartado--activo]="genero() === g[0]" class="apartado">{{ g[1] }}</button>
       }
     </nav>
-    <span class="hidden text-xs text-hueso-3 md:block">{{ armario().length }} {{ armario().length === 1 ? 'prenda' : 'prendas' }} en tu armario</span>
+    <div class="flex items-center gap-3">
+      <span class="hidden text-xs text-tinta-3 md:block">{{ armario().length }} {{ armario().length === 1 ? 'prenda' : 'prendas' }} en tu armario</span>
+      <button type="button" class="icono" (click)="tutorial.iniciar()" aria-label="Ver tutorial" title="Ver tutorial">
+        <span class="text-sm font-semibold" aria-hidden="true">?</span>
+      </button>
+    </div>
   </header>
 
   <!-- Panel lateral -->
   @if (panelAbierto()) {
     <aside class="panel" aria-label="Configuración">
-      <section class="bloque">
+      <section class="bloque" data-tutorial="importar">
         <h2 class="titulo">Importar desde tienda</h2>
-        <p class="mt-1 text-xs leading-relaxed text-hueso-3">Amazon, Mercado Libre, Nike, Zara, H&amp;M o cualquier tienda.</p>
+        <p class="mt-1 text-xs leading-relaxed text-tinta-3">Amazon, Mercado Libre, Nike, Zara, H&amp;M o cualquier tienda.</p>
         <form class="mt-3 flex flex-col gap-2" (submit)="$event.preventDefault(); importar()">
           <input id="enlace" name="enlace" type="url" [value]="enlace()" (input)="enlace.set($any($event.target).value)"
                  placeholder="https://…" autocomplete="off" class="campo" aria-label="Link del producto">
@@ -33,11 +38,11 @@
           </button>
         </form>
         @if (errorImportacion()) {
-          <p class="mt-2 text-xs text-[#d08770]" role="alert">{{ errorImportacion() }}</p>
+          <p class="mt-2 text-xs text-[#b4532a]" role="alert">{{ errorImportacion() }}</p>
         }
       </section>
 
-      <section class="bloque">
+      <section class="bloque" data-tutorial="cuerpo">
         <h2 class="titulo">Cuerpo</h2>
         <div class="mt-4 space-y-5">
           <div>
@@ -73,10 +78,10 @@
             </div>
           </div>
           <details class="detalles">
-            <summary>Medidas exactas <span class="text-hueso-3">opcional</span></summary>
+            <summary>Medidas exactas <span class="text-tinta-3">opcional</span></summary>
             <div class="mt-3 grid grid-cols-3 gap-2">
               @for (c of [['pecho', genero() === 'Femenino' ? 'Busto' : 'Pecho'], ['cintura', 'Cintura'], ['cadera', 'Cadera']]; track c[0]) {
-                <label class="text-[11px] text-hueso-3">{{ c[1] }}
+                <label class="text-[11px] text-tinta-3">{{ c[1] }}
                   <input type="number" class="campo mt-1 !px-2 !py-1.5" [min]="LIMITES.contorno.min" [max]="LIMITES.contorno.max" step="0.5"
                          [value]="$any(medidas())[c[0]] ?? ''" [placeholder]="$any(contornos())[c[0]]"
                          (change)="cambiarContorno($any(c[0]), $any($event.target).value)">
@@ -87,7 +92,7 @@
         </div>
       </section>
 
-      <section class="bloque">
+      <section class="bloque" data-tutorial="talla">
         <h2 class="titulo">Talla recomendada</h2>
         @if (recomendaciones().length) {
           <ul class="mt-3 space-y-2" aria-label="Prendas puestas">
@@ -95,34 +100,41 @@
               <li class="flex items-center gap-3 text-xs">
                 <span class="talla" data-talla>{{ r.talla.talla }}</span>
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-hueso">{{ r.prenda.nombre }}</span>
-                  <span class="block truncate text-hueso-3">{{ r.talla.nota ?? r.talla.base }}</span>
+                  <span class="block truncate text-tinta">{{ r.prenda.nombre }}</span>
+                  <span class="block truncate text-tinta-3">{{ r.talla.nota ?? r.talla.base }}</span>
                 </span>
-                <button type="button" class="text-hueso-3 hover:text-hueso" (click)="quitar(r.prenda.id)" [attr.aria-label]="'Quitar ' + r.prenda.nombre">×</button>
+                <button type="button" class="text-tinta-3 hover:text-tinta" (click)="quitar(r.prenda.id)" [attr.aria-label]="'Quitar ' + r.prenda.nombre">×</button>
               </li>
             }
           </ul>
         } @else {
-          <p class="mt-2 text-xs text-hueso-3">Elige una prenda del armario para ver tu talla.</p>
+          <p class="mt-2 text-xs text-tinta-3">Elige una prenda del armario para ver tu talla.</p>
         }
       </section>
     </aside>
   }
 
   <!-- Visor -->
-  <main class="visor" aria-label="Avatar 3D">
+  <main class="visor" aria-label="Avatar 3D" data-tutorial="visor">
     <tr-visor-3d [medidas]="medidas()" [conjunto]="conjunto()" [tono]="tono()" class="block h-full w-full" />
-    <div class="pointer-events-none absolute left-4 top-4 flex gap-2 text-[11px] text-hueso-2">
+    <div class="pointer-events-none absolute left-4 top-4 flex gap-2 text-[11px] text-tinta-2">
       <span class="marca">{{ genero() === 'Femenino' ? 'Mujer' : 'Hombre' }}</span>
       <span class="marca">{{ medidas().altura }} cm · {{ medidas().peso }} kg</span>
     </div>
+    @if (!sesion.conectado()) {
+      <p class="sin-conexion" role="alert" data-sin-conexion>
+        <strong class="font-semibold">Sin conexión con el servidor.</strong>
+        El armario y la importación necesitan el backend: en la carpeta raíz ejecuta <code>npm install</code> y luego <code>npm run dev</code>.
+        Mientras tanto puedes probar los básicos.
+      </p>
+    }
     @if (conjunto().length) {
-      <button type="button" class="marca absolute right-4 top-4 hover:text-hueso" (click)="quitarTodo()">Quitar todo</button>
+      <button type="button" class="marca absolute right-4 top-4 pointer-events-auto hover:text-tinta" (click)="quitarTodo()">Quitar todo</button>
     }
   </main>
 
   <!-- Armario -->
-  <section class="armario" aria-label="Armario">
+  <section class="armario" aria-label="Armario" data-tutorial="armario">
     <div class="flex items-center gap-1 overflow-x-auto pb-3">
       @for (f of FILTROS; track f.id) {
         <button type="button" class="filtro" [class.filtro--activo]="filtro() === f.id" (click)="filtro.set(f.id)">{{ f.nombre }}</button>
@@ -133,7 +145,7 @@
         @for (b of basicos(); track b.id) {
           <button type="button" class="tarjeta" [class.tarjeta--puesta]="estaPuesta(b.id)" (click)="alternarBasico(b)">
             <span class="foto"><span class="h-10 w-10 border border-linea" [style.background]="b.color"></span></span>
-            <span class="pie"><span class="truncate">{{ b.nombre }}</span><span class="text-hueso-3">{{ NOMBRE_CATEGORIA[b.categoria] }}</span></span>
+            <span class="pie-tarjeta"><span class="truncate">{{ b.nombre }}</span><span class="text-tinta-3">{{ NOMBRE_CATEGORIA[b.categoria] }}</span></span>
           </button>
         }
       } @else {
@@ -142,25 +154,25 @@
             <button type="button" class="foto" (click)="alternar(item)" [disabled]="item.status !== 'ready'"
                     [attr.aria-label]="(estaPuesta(item.id) ? 'Quitar ' : 'Probar ') + (item.nombre ?? 'prenda')">
               @switch (item.status) {
-                @case ('processing') { <span class="text-[11px] text-hueso-3">Analizando…</span> }
-                @case ('failed') { <span class="px-2 text-center text-[11px] text-[#d08770]">{{ item.error }}</span> }
+                @case ('processing') { <span class="text-[11px] text-tinta-3">Analizando…</span> }
+                @case ('failed') { <span class="px-2 text-center text-[11px] text-[#b4532a]">{{ item.error }}</span> }
                 @default {
                   @if (item.imagen_url) {
                     <img [src]="item.imagen_url ? apiUrl + item.imagen_url : ''" alt="" class="h-full w-full object-contain p-2" loading="lazy">
                   } @else {
-                    <span class="h-10 w-10 border border-linea" [style.background]="item.color ?? '#2a2a28'"></span>
+                    <span class="h-10 w-10 border border-linea" [style.background]="item.color ?? '#d9d7cf'"></span>
                   }
                 }
               }
             </button>
-            <span class="pie">
+            <span class="pie-tarjeta">
               <span class="truncate">{{ item.nombre ?? item.source_url }}</span>
               @if (item.status === 'ready' && item.category) {
-                <span class="text-hueso-3">{{ NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[item.category]] }} · {{ item.tipo }}</span>
+                <span class="text-tinta-3">{{ NOMBRE_CATEGORIA[CATEGORIA_PROBADOR[item.category]] }} · {{ item.tipo }}</span>
               } @else if (item.status === 'review') {
-                <span class="text-oliva-claro">¿Qué es?</span>
+                <span class="text-oliva">¿Qué es?</span>
               } @else {
-                <span class="text-hueso-3">{{ item.tienda ?? '' }}</span>
+                <span class="text-tinta-3">{{ item.tienda ?? '' }}</span>
               }
             </span>
             @if (item.status === 'review' || item.status === 'ready') {

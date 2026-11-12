@@ -178,7 +178,7 @@ export class MotorAvatar {
   }
 
   private prepararSuelo(): void {
-    const suelo = new THREE.Mesh(new THREE.CircleGeometry(1.6, 64), new THREE.ShadowMaterial({ opacity: 0.4 }));
+    const suelo = new THREE.Mesh(new THREE.CircleGeometry(1.6, 64), new THREE.ShadowMaterial({ opacity: 0.16 }));
     suelo.rotation.x = -Math.PI / 2;
     suelo.receiveShadow = true;
     this.escena.add(suelo);
