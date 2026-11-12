@@ -7,3 +7,4 @@ dev.db-*
 *.db-wal
 *.db-shm
 privado/
+.jwt-secret.local

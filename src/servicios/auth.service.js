@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { promisify } = require('util');
@@ -12,16 +14,31 @@ const SEGUNDOS_POR_DEFECTO = 7 * 24 * 60 * 60; // 7 días
 const RONDAS_BCRYPT = Number(process.env.BCRYPT_ROUNDS) || 12;
 
 /**
- * Secreto de firma. En producción es obligatorio definir JWT_SECRET; en
- * desarrollo se genera uno aleatorio por proceso (los tokens caducan al reiniciar).
+ * Secreto de firma. En producción es obligatorio definir JWT_SECRET. En
+ * desarrollo, si falta, se genera uno y se GUARDA en .jwt-secret.local (no se
+ * sube a git): así las sesiones y el armario de invitado sobreviven a los
+ * reinicios del servidor (antes cada reinicio invalidaba los tokens -> 401).
  */
 const SECRETO = (() => {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   if (process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET es obligatorio en producción');
   }
-  console.warn('[Auth] JWT_SECRET no definido: usando un secreto temporal de desarrollo.');
-  return crypto.randomBytes(48).toString('hex');
+  const archivo = path.join(__dirname, '../../.jwt-secret.local');
+  try {
+    const guardado = fs.readFileSync(archivo, 'utf8').trim();
+    if (guardado.length >= 32) return guardado;
+  } catch {
+    /* primera vez: se crea abajo */
+  }
+  const nuevo = crypto.randomBytes(48).toString('hex');
+  try {
+    fs.writeFileSync(archivo, nuevo, { mode: 0o600 });
+    console.warn('[Auth] JWT_SECRET no definido: se creó un secreto de desarrollo en .jwt-secret.local');
+  } catch {
+    console.warn('[Auth] JWT_SECRET no definido: usando un secreto temporal (las sesiones caducan al reiniciar).');
+  }
+  return nuevo;
 })();
 
 const DURACION_SEGUNDOS = Number(process.env.JWT_EXPIRES_IN_SECONDS) || SEGUNDOS_POR_DEFECTO;
