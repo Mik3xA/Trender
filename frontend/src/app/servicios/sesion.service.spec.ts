@@ -73,3 +73,32 @@ describe('SesionService + sesionInterceptor', () => {
     expect(localStorage.getItem('trender.sesion')).toBeNull();
   });
 });
+
+describe('SesionService sin backend', () => {
+  it('no reintenta en cada acción: espera creciente y avisa que no hay conexión', () => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(withInterceptors([sesionInterceptor])), provideHttpClientTesting()],
+    });
+    const http = TestBed.inject(HttpClient);
+    const mock = TestBed.inject(HttpTestingController);
+    const sesion = TestBed.inject(SesionService);
+
+    http.get(`${API}/api/closet`).subscribe({ error: () => undefined });
+    mock.expectOne(`${API}/api/auth/invitado`).error(new ProgressEvent('error'), { status: 0 });
+    expect(sesion.conectado()).toBe(false);
+
+    // Varias acciones seguidas: ninguna sale a la red durante la espera.
+    for (let i = 0; i < 5; i += 1) http.get(`${API}/api/profile`).subscribe({ error: () => undefined });
+    mock.expectNone(`${API}/api/auth/invitado`);
+
+    vi.advanceTimersByTime(1100);
+    http.get(`${API}/api/closet`).subscribe({ error: () => undefined });
+    mock.expectOne(`${API}/api/auth/invitado`).flush(invitado('t'));
+    mock.expectOne(`${API}/api/closet`).flush({});
+    expect(sesion.conectado()).toBe(true);
+    mock.verify();
+    vi.useRealTimers();
+  });
+});

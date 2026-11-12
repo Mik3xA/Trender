@@ -1,1 +1,135 @@
-<app-avatar-setup></app-avatar-setup>
+<header class="cabecera">
+  <div class="contenedor flex h-16 items-center justify-between gap-6">
+    <a href="#inicio" class="marca-logo">TRENDER</a>
+    <nav class="hidden items-center gap-8 md:flex" aria-label="Secciones">
+      <a href="#probador" class="enlace-nav">Probador</a>
+      <a href="#como-funciona" class="enlace-nav">Cómo funciona</a>
+      <a href="#caracteristicas" class="enlace-nav">Características</a>
+      <a href="#preguntas" class="enlace-nav">Preguntas</a>
+    </nav>
+    <a href="#probador" class="boton-negro !py-2">Probar ahora</a>
+  </div>
+</header>
+
+<main>
+  <!-- Portada -->
+  <section id="inicio" class="contenedor grid items-center gap-12 pb-16 pt-16 md:grid-cols-[1.1fr_0.9fr] md:pt-24">
+    <div>
+      <p class="antetitulo">Probador virtual 3D</p>
+      <h1 class="mt-4 text-4xl font-medium leading-[1.08] tracking-tight text-tinta md:text-6xl">
+        Pruébate la ropa <span class="text-oliva">antes de comprarla.</span>
+      </h1>
+      <p class="mt-6 max-w-xl text-lg leading-relaxed text-tinta-2">
+        Pega el link de una prenda de tu tienda favorita y mírala sobre un avatar con tu altura, tu peso y tu tipo de cuerpo.
+        Sin registro y con talla recomendada.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="#probador" class="boton-negro">Abrir el probador</a>
+        <button type="button" class="boton-borde" (click)="verTutorial()">Ver tutorial</button>
+      </div>
+      <div class="mt-10">
+        <p class="text-xs text-tinta-3">Importa desde</p>
+        <ul class="mt-3 flex flex-wrap gap-x-7 gap-y-2 text-sm font-medium text-tinta-2">
+          @for (t of TIENDAS; track t) { <li>{{ t }}</li> }
+          <li class="text-tinta-3">y más</li>
+        </ul>
+      </div>
+    </div>
+    <div class="relative hidden aspect-[4/5] overflow-hidden rounded-3xl bg-hueso md:block" aria-hidden="true">
+      <div class="absolute inset-x-10 bottom-0 top-10 rounded-t-[160px] bg-oliva-tenue"></div>
+      <svg class="absolute inset-0 m-auto h-[78%] text-tinta" viewBox="0 0 200 400" fill="none">
+        <circle cx="100" cy="44" r="24" fill="currentColor" opacity=".9" />
+        <path d="M58 92c8-12 26-18 42-18s34 6 42 18l14 92-18 4-8-60v74H70v-74l-8 60-18-4z" fill="#5f6b38" />
+        <path d="M70 202h60l6 160h-26l-10-120-10 120H64z" fill="currentColor" opacity=".9" />
+        <path d="M60 362h38v14H54zM102 362h38l6 14h-44z" fill="currentColor" />
+      </svg>
+      <div class="absolute bottom-6 left-6 right-6 flex items-center justify-between rounded-2xl border border-linea bg-papel px-4 py-3 text-xs">
+        <span><span class="block font-medium text-tinta">Chamarra de mezclilla</span><span class="text-tinta-3">Superior · 168 cm · Normal</span></span>
+        <span class="talla">M</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Probador -->
+  <section id="probador" class="contenedor scroll-mt-20 pb-20" aria-label="Probador">
+    <app-avatar-setup />
+  </section>
+
+  <!-- Cómo funciona -->
+  <section id="como-funciona" class="seccion seccion--hueso">
+    <div class="contenedor">
+      <p class="antetitulo">Cómo funciona</p>
+      <h2 class="titulo-seccion">Cuatro pasos, menos de un minuto</h2>
+      <p class="texto-seccion">No necesitas fotos tuyas ni una cuenta: solo tus medidas aproximadas y el link de la prenda.</p>
+      <ol class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @for (p of PASOS; track p.titulo; let i = $index) {
+          <li class="paso">
+            <span class="paso-numero">{{ i + 1 }}</span>
+            <h3 class="mt-5 text-base font-semibold text-tinta">{{ p.titulo }}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-tinta-2">{{ p.texto }}</p>
+          </li>
+        }
+      </ol>
+      <div class="mt-10 flex flex-wrap items-center gap-4">
+        <button type="button" class="boton-negro" (click)="verTutorial()">Hacer el tutorial guiado</button>
+        <span class="text-sm text-tinta-3">Puedes repetirlo cuando quieras con el botón “?” del probador.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Características -->
+  <section id="caracteristicas" class="seccion">
+    <div class="contenedor">
+      <p class="antetitulo">Características</p>
+      <h2 class="titulo-seccion">Pensado para decidir mejor</h2>
+      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        @for (c of CARACTERISTICAS; track c.titulo) {
+          <article class="caracteristica">
+            <span class="icono-caracteristica">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="c.icono" />
+              </svg>
+            </span>
+            <h3 class="mt-5 text-base font-semibold text-tinta">{{ c.titulo }}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-tinta-2">{{ c.texto }}</p>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Preguntas frecuentes -->
+  <section id="preguntas" class="seccion seccion--hueso">
+    <div class="contenedor grid gap-12 md:grid-cols-[0.8fr_1.2fr]">
+      <div>
+        <p class="antetitulo">Preguntas frecuentes</p>
+        <h2 class="titulo-seccion">Lo que suelen preguntarnos</h2>
+        <p class="texto-seccion">¿No encuentras tu respuesta? Repite el tutorial desde el probador o revisa el README del proyecto.</p>
+      </div>
+      <tr-preguntas />
+    </div>
+  </section>
+
+  <!-- Llamada final -->
+  <section class="contenedor py-20">
+    <div class="banda-oliva">
+      <h2 class="text-3xl font-medium tracking-tight md:text-4xl">Tu próxima compra, sin dudas de talla</h2>
+      <p class="mx-auto mt-4 max-w-xl text-base text-papel/80">Importa una prenda y mírala puesta en segundos.</p>
+      <a href="#probador" class="mt-8 inline-flex rounded-full bg-papel px-6 py-3 text-sm font-medium text-tinta transition-colors hover:bg-hueso">Empezar ahora</a>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="contenedor flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+    <span class="marca-logo !text-tinta">TRENDER</span>
+    <nav class="flex flex-wrap gap-6" aria-label="Pie">
+      <a href="#probador" class="enlace-nav">Probador</a>
+      <a href="#como-funciona" class="enlace-nav">Cómo funciona</a>
+      <a href="#preguntas" class="enlace-nav">Preguntas</a>
+    </nav>
+    <span>© {{ anio }} Trender</span>
+  </div>
+</footer>
+
+<tr-tutorial />

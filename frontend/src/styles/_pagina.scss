@@ -1,0 +1,81 @@
+// Secciones de la página: cabecera, portada, cómo funciona, características, preguntas y pie.
+
+.contenedor {
+  @apply mx-auto w-full max-w-pagina px-5 lg:px-8;
+}
+
+.cabecera {
+  @apply sticky top-0 z-40 border-b border-linea bg-papel/95 backdrop-blur-sm;
+}
+
+.marca-logo {
+  @apply text-[15px] font-semibold tracking-[0.3em] text-tinta;
+}
+
+.enlace-nav {
+  @apply text-sm text-tinta-2 transition-colors hover:text-tinta;
+}
+
+.boton-negro {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-tinta px-5 py-2.5 text-sm font-medium text-papel transition-colors hover:bg-oliva-oscuro disabled:cursor-not-allowed disabled:bg-linea disabled:text-tinta-3;
+}
+
+.boton-borde {
+  @apply inline-flex items-center justify-center gap-2 rounded-full border border-tinta/20 px-5 py-2.5 text-sm font-medium text-tinta transition-colors hover:border-tinta;
+}
+
+.antetitulo {
+  @apply text-xs font-medium uppercase tracking-[0.22em] text-oliva;
+}
+
+.titulo-seccion {
+  @apply mt-3 text-3xl font-medium tracking-tight text-tinta md:text-4xl;
+}
+
+.texto-seccion {
+  @apply mt-3 max-w-2xl text-base leading-relaxed text-tinta-2;
+}
+
+.seccion {
+  @apply py-20 md:py-24;
+}
+
+.seccion--hueso {
+  @apply bg-hueso;
+}
+
+.paso {
+  @apply relative rounded-2xl border border-linea bg-papel p-6;
+}
+
+.paso-numero {
+  @apply flex h-9 w-9 items-center justify-center rounded-full bg-oliva-tenue text-sm font-semibold text-oliva;
+}
+
+.caracteristica {
+  @apply rounded-2xl border border-linea p-6 transition-colors hover:border-oliva/40;
+}
+
+.icono-caracteristica {
+  @apply flex h-10 w-10 items-center justify-center rounded-xl bg-tinta text-papel;
+}
+
+.pregunta {
+  @apply border-b border-linea;
+
+  button {
+    @apply flex w-full items-center justify-between gap-6 py-5 text-left text-base font-medium text-tinta;
+  }
+
+  .respuesta {
+    @apply pb-5 pr-10 text-sm leading-relaxed text-tinta-2;
+  }
+}
+
+.banda-oliva {
+  @apply rounded-3xl bg-oliva px-8 py-14 text-center text-papel md:px-16;
+}
+
+.pie {
+  @apply border-t border-linea py-10 text-sm text-tinta-3;
+}

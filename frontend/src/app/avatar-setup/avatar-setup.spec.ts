@@ -6,6 +6,8 @@ import { MEDIDAS_INICIALES } from '../probador/cuerpo';
 import { MUESTRAS } from '../probador/prendas';
 import { ArmarioService, PrendaArmario } from '../servicios/armario.service';
 import { PerfilService } from '../servicios/perfil.service';
+import { SesionService } from '../servicios/sesion.service';
+import { TutorialService } from '../tutorial/tutorial.service';
 import { AvatarSetupComponent } from './avatar-setup';
 
 const prenda = (extra: Partial<PrendaArmario> = {}): PrendaArmario => ({
@@ -174,5 +176,24 @@ describe('AvatarSetupComponent', () => {
 
   it('no usa "IA" en la interfaz', () => {
     expect(texto()).not.toMatch(/\bIA\b|Inteligencia Artificial/);
+  });
+
+  it('avisa cuando no hay conexión con el backend', () => {
+    expect(fixture.nativeElement.querySelector('[data-sin-conexion]')).toBeNull();
+    TestBed.inject(SesionService).conectado.set(false);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-sin-conexion]')?.textContent).toContain('npm run dev');
+  });
+
+  it('marca los pasos del tutorial y abre el panel al iniciarlo', () => {
+    for (const objetivo of ['apartados', 'cuerpo', 'importar', 'armario', 'visor', 'talla']) {
+      expect(fixture.nativeElement.querySelector(`[data-tutorial="${objetivo}"]`)).not.toBeNull();
+    }
+    c.alternarPanel();
+    fixture.detectChanges();
+    TestBed.inject(TutorialService).iniciar();
+    fixture.detectChanges();
+    expect(c.panelAbierto()).toBe(true);
+    expect(fixture.nativeElement.querySelector('aside')).not.toBeNull();
   });
 });
