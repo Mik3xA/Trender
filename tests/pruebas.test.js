@@ -186,6 +186,8 @@ describe('tryon.service: proveedores de IA (respuestas simuladas)', () => {
     await expect(tryon.generar(persona, prendas)).rejects.toMatchObject({ code: 'IA_ERROR', message: expect.stringContaining('API key not valid') });
     jest.spyOn(global, 'fetch').mockResolvedValueOnce(respuesta({ promptFeedback: { blockReason: 'SAFETY' } }));
     await expect(tryon.generar(persona, prendas)).rejects.toMatchObject({ code: 'IA_SIN_IMAGEN', message: expect.stringContaining('SAFETY') });
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(respuesta({ error: { message: 'The Gemini API free tier is not available for this project. Please set up billing' } }, 403));
+    await expect(tryon.generar(persona, prendas)).rejects.toMatchObject({ code: 'IA_FACTURACION', message: expect.stringContaining('facturación') });
     jest.spyOn(global, 'fetch').mockResolvedValueOnce(respuesta({}, 401));
     await expect(tryon.generar(persona, prendas)).rejects.toMatchObject({ code: 'IA_CLAVE_INVALIDA' });
   });
